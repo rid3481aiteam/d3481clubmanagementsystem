@@ -1,0 +1,45 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { supabase } from '@/lib/supabase'
+import type { FeatureKey, FeatureMap } from '@/types'
+
+const DEFAULT_FLAGS: FeatureMap = {
+  A1_login: true, A2_roles: true, A3_isolation: true,
+  B1_meeting_info: true, B2_attendance_summary: true,
+  B3_attendance_personal: true, B4_attendance_detail: true, B5_edm: false,
+  D1_roster: true, D2_roster_excel: true, D3_prospective: true, D4_care: false,
+  H1_directory: true, H2_directory_search: true, H3_directory_admin: true,
+}
+
+export const useFeaturesStore = defineStore('features', () => {
+  const flags = ref<FeatureMap>({ ...DEFAULT_FLAGS })
+  const loading = ref(false)
+
+  // 載入某社的功能開關（先取地區預設，再用社層覆蓋）
+  async function load(clubId: string | null) {
+    loading.value = true
+    const { data } = await supabase
+      .from('feature_flags')
+      .select('club_id, feature_key, enabled')
+      .or(`club_id.is.null,club_id.eq.${clubId ?? 'null'}`)
+
+    if (data) {
+      // 先套地區預設，再套社層覆蓋
+      const reset = { ...DEFAULT_FLAGS }
+      const district = data.filter(r => r.club_id === null)
+      const clubLevel = data.filter(r => r.club_id === clubId)
+
+      for (const r of district) reset[r.feature_key as FeatureKey] = r.enabled
+      for (const r of clubLevel) reset[r.feature_key as FeatureKey] = r.enabled
+
+      flags.value = reset
+    }
+    loading.value = false
+  }
+
+  function isEnabled(key: FeatureKey): boolean {
+    return flags.value[key] ?? true
+  }
+
+  return { flags, loading, load, isEnabled }
+})

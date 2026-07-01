@@ -1,0 +1,60 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { supabase } from '@/lib/supabase'
+import { useFeaturesStore } from '@/stores/features'
+import type { UserProfile, UserRole } from '@/types'
+
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref<import('@supabase/supabase-js').User | null>(null)
+  const profile = ref<UserProfile | null>(null)
+  const loading = ref(true)
+
+  const isLoggedIn = computed(() => !!user.value)
+  const isDistrictAdmin = computed(() => profile.value?.role === 'district_admin')
+  const canWrite = computed(() =>
+    ['district_admin', 'club_admin', 'club_secretary'].includes(profile.value?.role ?? '')
+  )
+  const clubId = computed(() => profile.value?.club_id ?? null)
+  const role = computed<UserRole | null>(() => profile.value?.role ?? null)
+
+  async function init() {
+    loading.value = true
+    const { data: { session } } = await supabase.auth.getSession()
+    user.value = session?.user ?? null
+    if (user.value) await fetchProfile()
+    loading.value = false
+
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      user.value = session?.user ?? null
+      if (user.value) await fetchProfile()
+      else profile.value = null
+    })
+  }
+
+  async function fetchProfile() {
+    if (!user.value) return
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', user.value.id)
+      .single()
+    profile.value = data
+
+    // 取得 profile 後立即載入功能開關
+    const features = useFeaturesStore()
+    await features.load(data?.club_id ?? null)
+  }
+
+  async function signIn(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return { error }
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    user.value = null
+    profile.value = null
+  }
+
+  return { user, profile, loading, isLoggedIn, isDistrictAdmin, canWrite, clubId, role, init, signIn, signOut }
+})
