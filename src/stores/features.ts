@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
-import type { FeatureKey, FeatureMap } from '@/types'
+import type { FeatureFlag, FeatureKey, FeatureMap } from '@/types'
 
 const DEFAULT_FLAGS: FeatureMap = {
   A1_login: true, A2_roles: true, A3_isolation: true,
@@ -41,5 +41,30 @@ export const useFeaturesStore = defineStore('features', () => {
     return flags.value[key] ?? true
   }
 
-  return { flags, loading, load, isEnabled }
+  const districtFlags = ref<FeatureFlag[]>([])
+
+  async function fetchDistrictFlags() {
+    const { data } = await supabase
+      .from('feature_flags')
+      .select('*')
+      .is('club_id', null)
+      .order('feature_key')
+    districtFlags.value = data ?? []
+  }
+
+  async function setDistrictFlag(key: FeatureKey, enabled: boolean, userId: string | null) {
+    const existing = districtFlags.value.find(f => f.feature_key === key)
+    const { error } = existing
+      ? await supabase
+          .from('feature_flags')
+          .update({ enabled, updated_by: userId })
+          .eq('id', existing.id)
+      : await supabase
+          .from('feature_flags')
+          .insert({ club_id: null, feature_key: key, enabled, updated_by: userId })
+    if (!error) await fetchDistrictFlags()
+    return { error }
+  }
+
+  return { flags, loading, districtFlags, load, isEnabled, fetchDistrictFlags, setDistrictFlag }
 })
