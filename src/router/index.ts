@@ -50,6 +50,19 @@ const router = createRouter({
       component: () => import('@/views/directory/DirectoryView.vue'),
       meta: { feature: 'H1_directory' as FeatureKey },
     },
+    // Admin（地區管理員）
+    {
+      path: '/admin/clubs',
+      name: 'admin-clubs',
+      component: () => import('@/views/admin/ClubListView.vue'),
+      meta: { role: 'district_admin' },
+    },
+    {
+      path: '/admin/features',
+      name: 'admin-features',
+      component: () => import('@/views/admin/FeatureFlagsView.vue'),
+      meta: { role: 'district_admin' },
+    },
     // 404
     {
       path: '/:pathMatch(.*)*',
@@ -66,6 +79,9 @@ router.beforeEach(async (to) => {
   if (auth.loading) await auth.init()
 
   if (!to.meta.public && !auth.isLoggedIn) return { name: 'login' }
+
+  // 角色限定路由：非該角色導回首頁
+  if (to.meta.role && auth.role !== to.meta.role) return { name: 'dashboard' }
 
   if (to.meta.feature) {
     const key = to.meta.feature as FeatureKey
