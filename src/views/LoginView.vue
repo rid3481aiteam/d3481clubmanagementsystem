@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
-        <div class="brand-wheel">⚙️</div>
+        <RotaryWheelIcon class="brand-wheel" />
         <div class="brand-text">
           <div class="brand-title">國際扶輪 3481 地區</div>
           <div class="brand-sub">社務管理平台</div>
@@ -51,6 +51,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import RotaryWheelIcon from '@/components/RotaryWheelIcon.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -123,8 +124,10 @@ async function handleLogin() {
 }
 
 .brand-wheel {
-  font-size: 36px;
-  line-height: 1;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  color: var(--gold);
 }
 
 .brand-title {

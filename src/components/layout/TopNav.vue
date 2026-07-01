@@ -1,7 +1,7 @@
 <template>
   <header class="topnav">
     <div class="topnav-left">
-      <span class="topnav-wheel">⚙</span>
+      <RotaryWheelIcon class="topnav-wheel" />
       <span class="topnav-title">國際扶輪 3481 地區</span>
     </div>
     <div class="topnav-right">
@@ -16,6 +16,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import RotaryWheelIcon from '@/components/RotaryWheelIcon.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -66,9 +67,10 @@ async function handleSignOut() {
 }
 
 .topnav-wheel {
-  font-size: 22px;
+  width: 22px;
+  height: 22px;
   color: var(--gold);
-  line-height: 1;
+  flex-shrink: 0;
 }
 
 .topnav-title {
