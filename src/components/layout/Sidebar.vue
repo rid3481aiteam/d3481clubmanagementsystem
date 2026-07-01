@@ -1,6 +1,11 @@
 <template>
   <aside class="sidebar">
     <nav class="sidebar-nav">
+      <div class="nav-section">總覽</div>
+      <RouterLink to="/" class="nav-item">
+        <span class="nav-icon">📊</span>儀表板
+      </RouterLink>
+
       <!-- 地區管理員 -->
       <template v-if="auth.role === 'district_admin'">
         <div class="nav-section">地區管理</div>
@@ -9,6 +14,17 @@
         </RouterLink>
         <RouterLink to="/admin/features" class="nav-item">
           <span class="nav-icon">⚙️</span>功能開關
+        </RouterLink>
+
+        <div class="nav-section">全區檢視（唯讀）</div>
+        <RouterLink v-if="features.isEnabled('D1_roster')" to="/roster" class="nav-item">
+          <span class="nav-icon">📋</span>社友名冊
+        </RouterLink>
+        <RouterLink v-if="features.isEnabled('D3_prospective')" to="/roster/prospective" class="nav-item">
+          <span class="nav-icon">🔍</span>潛在社友
+        </RouterLink>
+        <RouterLink v-if="features.isEnabled('B1_meeting_info')" to="/meetings" class="nav-item">
+          <span class="nav-icon">📅</span>例會管理
         </RouterLink>
       </template>
 
