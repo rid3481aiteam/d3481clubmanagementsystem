@@ -1,43 +1,49 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-01
+> 最後更新：2026-07-02
 
 ---
 
 ## 本次完成
 
-### Bug 修復：建立/邀請使用者失敗
-
-Supabase 後台「Create user」「Invite user」皆回傳 `Database error creating/saving new user`。
-
-**根因**：`handle_new_user()` trigger 是 `SECURITY DEFINER`，但未設定 `search_path`。Auth 服務觸發 trigger 時的 session search_path 不含 `public`，導致未加 schema 前綴的 `user_role` enum 找不到（`type "user_role" does not exist`）。
-
-**修復**：`008_fix_handle_new_user_search_path.sql` — function 加上 `SET search_path = public`，並將 `user_role` 明確加上 `public.` 前綴。已在 production 套用並用測試帳號驗證通過。
-
-### P1 前端骨架（全部完成）
+### P2 社友名冊、P3 例會與出席、P4 通訊錄與管理後台（全部完成）
 
 | 檔案 | 說明 |
 |------|------|
-| `package.json` / `vite.config.ts` / `tsconfig.json` | Vite + Vue 3 + TS 專案設定 |
-| `index.html` | HTML 入口 |
-| `src/main.ts` | App 初始化（Pinia + Router） |
-| `src/App.vue` | 全域 CSS variables（扶輪藍 #17458F + 金 #F7A81B）、Layout（TopNav + Sidebar + RouterView）、Splash loading |
-| `src/components/layout/TopNav.vue` | 頂部導覽列：logo、標題、使用者名稱、角色 badge、登出 |
-| `src/components/layout/Sidebar.vue` | 左側選單，依 role 動態顯示（district_admin / club_secretary / club_admin） |
-| `src/views/LoginView.vue` | 登入頁：Email/密碼、錯誤提示、依 role 導向 |
-| `src/views/DashboardView.vue` | 儀表板佔位 |
-| `src/views/admin/*.vue` | 地區管理員頁面佔位（P4） |
-| `src/views/roster/*.vue` | 名冊頁面佔位（P2/P3） |
-| `src/views/meetings/*.vue` | 例會頁面佔位（P3） |
-| `src/views/directory/*.vue` | 通訊錄佔位（P4） |
-| `src/stores/club.ts` | 社別 store（fetchCurrent / fetchAll / upsertClub） |
-| `src/router/index.ts` | 新增 admin 路由、role guard、feature flag guard |
+| `src/stores/roster.ts` + `src/views/roster/RosterView.vue` | 社友列表、搜尋/篩選、新增編輯 Modal、停用/恢復、Excel 匯入匯出（xlsx） |
+| `src/stores/meetings.ts` + `src/views/meetings/MeetingListView.vue` | 例會 CRUD（日期/講者/地點），連結到出席記錄頁 |
+| `src/stores/attendance.ts` + `src/views/meetings/AttendanceView.vue` | 逐人出席登記、彙總統計（出席率等）、個人出席率總表 |
+| `src/views/directory/DirectoryView.vue` | 地區通訊錄，讀取全部社別資料，H2 搜尋、H3 導向社團管理 |
+| `src/views/admin/ClubListView.vue` | 社團總覽 CRUD（district_admin 專用） |
+| `src/views/admin/FeatureFlagsView.vue` + `src/stores/features.ts` 擴充 | 地區層級功能開關管理（A 類鎖定不可關） |
+
+角色寫入權限：`club_admin` / `club_secretary` 可寫，`district_admin` 對名冊/例會/出席只能讀（依 RLS）。
+
+### Cloudflare Pages 部署除錯（重要，花了不少來回）
+
+上線網址：`https://d3481clubmanagementsystem.pages.dev`
+
+踩過的坑，依序記錄：
+
+1. **`npm run build` 本身就會失敗**：`tsconfig.node.json` 缺 `"composite": true` 且設了 `noEmit: true`（與 project reference 衝突）→ 已修正為 `composite: true`、移除 `noEmit`。
+2. **缺 `src/vite-env.d.ts`**：導致 `import.meta.env.VITE_*` 型別錯誤，`vue-tsc` 直接擋下 build。已新增標準的 `/// <reference types="vite/client" />`。
+   → 以上兩個問題代表**先前所有 push 到 Cloudflare Pages 的 build 應該都是失敗的**（如果 build command 有設定 `npm run build` 的話）。
+3. **Cloudflare Pages Build configuration 一開始完全空白**（Build command / Output directory 都沒填）：代表 Cloudflare 沒有真的執行 build，只是把 repo 原始檔案當靜態站丟上去 → 手動設定 Build command `npm run build`、Output directory `dist`。
+4. **環境變數 `VITE_SUPABASE_ANON_KEY` 設定後仍讀不到**：第一次存的值不知為何沒生效（`process.env` 讀不到），刪除重新增加一次後才正常。曾經用暫時加在 `vite.config.ts` 的 `console.log('ENV CHECK', ...)` 印到 build log 來確認（**已移除**，不要再加類似 debug log 進 repo）。
+5. **`public/_redirects` 的 SPA fallback 規則被判定為 infinite loop 而整個被忽略**：這個專案用的是 Cloudflare 新版 Workers Assets Pages（build log 會出現 `Checking for configuration in a Wrangler configuration file`），舊版 `_redirects` 語法在這個產品上行不通。已改用 `wrangler.jsonc`：
+   ```json
+   { "assets": { "directory": "./dist", "not_found_handling": "single-page-application" } }
+   ```
+   `public/_redirects` 已刪除。
+6. **登入頁 / TopNav 的齒輪 icon**：一開始用 emoji `⚙️`，後來手畫 SVG 都不是使用者要的圖。最終改用使用者提供的實體圖檔 `public/rotary-logo.png`，透過共用元件 `src/components/RotaryWheelIcon.vue`（單純 `<img src="/rotary-logo.png">`）在 LoginView 和 TopNav 共用。
+
+**目前狀態**：`.env.local`（本機開發用，未進 git）與 Cloudflare Pages 的 Production 環境變數都已設定好真實的 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`。最新一次 deploy 已確認 build 成功、登入頁能正常顯示。
 
 ### 啟動方式
 ```bash
 cd /tmp/d3481clubmanagementsystem   # 每次對話需重新 clone
 npm install
-# 填入 .env.local 的 VITE_SUPABASE_ANON_KEY
+# .env.local 需要填入真實的 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
 npm run dev   # port 5174
 ```
 
@@ -69,22 +75,23 @@ npm run dev   # port 5174
 
 ---
 
-## 下一步：P2 社友名冊（RosterView.vue）
+## 下一步：Phase 2（暫緩，尚未排入開發）
 
-### 功能清單
-- [ ] 社友列表（表格：姓名、暱稱、職稱、公司、電話、Email、入社日期、狀態）
-- [ ] 搜尋（關鍵字）+ 篩選（在職 / 離職）
-- [ ] 新增 / 編輯社友 Modal
-- [ ] 停用社友（is_active = false）
-- [ ] Excel 匯入（SheetJS，feature flag `D2_roster_excel`）
-- [ ] Excel 匯出
+- B5 EDM 通知（AI 整合）
+- D4 社友關懷
+- 社費 / 財務模組
 
-### 技術注意
-- `club_secretary` 可 CRUD；`club_admin` 唯讀（`auth.canWrite` 判斷）
-- `district_admin` 查詢不帶 club_id filter
-- Excel 匯入格式見 `types/index.ts` 的 `RosterExcelRow`
+其餘 P1~P4 功能已全部完成並上線。
 
 ---
+
+## Cloudflare Pages 專案資訊
+
+- **網址**：`https://d3481clubmanagementsystem.pages.dev`
+- **Build command**：`npm run build`
+- **Build output directory**：`dist`
+- **環境變數**（Production）：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`（已設定）
+- **SPA fallback**：`wrangler.jsonc` 的 `not_found_handling: single-page-application`（不要再用 `public/_redirects`）
 
 ## Supabase 專案資訊
 
@@ -96,10 +103,4 @@ npm run dev   # port 5174
 
 ## 未解決問題
 
-- `.env.local` 的 `VITE_SUPABASE_ANON_KEY` 目前是 placeholder，需填入真實值才能連接 Supabase（去 Supabase dashboard → Settings → API 複製 anon public key）
-
-## Phase 2（暫緩）
-
-- B5 EDM 通知（AI 整合）
-- D4 社友關懷
-- 社費 / 財務模組
+目前無已知未解決問題。
