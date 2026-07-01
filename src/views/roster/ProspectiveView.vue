@@ -2,14 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProspectiveStore } from '@/stores/prospective'
+import { usePermissionsStore } from '@/stores/permissions'
 import type { ProspectiveMember, ProspectiveMemberInsert, ProspectStatus } from '@/types'
 
 const auth = useAuthStore()
 const prospective = useProspectiveStore()
+const permissions = usePermissionsStore()
 
-const canManage = computed(() =>
-  auth.role === 'club_admin' || auth.role === 'club_secretary'
-)
+const canManage = computed(() => permissions.can('prospective_members', 'edit'))
 
 const STATUS_LABEL: Record<ProspectStatus, string> = {
   not_invited: '尚未邀請',

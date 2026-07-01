@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMeetingsStore } from '@/stores/meetings'
 import { useAttendanceStore } from '@/stores/attendance'
 import { useRosterStore } from '@/stores/roster'
+import { usePermissionsStore } from '@/stores/permissions'
 import type { AttendanceStatus } from '@/types'
 
 const route = useRoute()
@@ -12,10 +13,9 @@ const auth = useAuthStore()
 const meetings = useMeetingsStore()
 const attendance = useAttendanceStore()
 const roster = useRosterStore()
+const permissions = usePermissionsStore()
 
-const canManage = computed(() =>
-  auth.role === 'club_admin' || auth.role === 'club_secretary'
-)
+const canManage = computed(() => permissions.can('attendance', 'edit'))
 
 const statuses = ref<Record<string, AttendanceStatus>>({})
 

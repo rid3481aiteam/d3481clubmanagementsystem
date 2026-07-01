@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useFeaturesStore } from '@/stores/features'
+import { usePermissionsStore } from '@/stores/permissions'
 import type { UserProfile, UserRole } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -11,9 +12,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => !!user.value)
   const isDistrictAdmin = computed(() => profile.value?.role === 'district_admin')
-  const canWrite = computed(() =>
-    ['district_admin', 'club_admin', 'club_secretary'].includes(profile.value?.role ?? '')
-  )
   const clubId = computed(() => profile.value?.club_id ?? null)
   const role = computed<UserRole | null>(() => profile.value?.role ?? null)
 
@@ -40,9 +38,12 @@ export const useAuthStore = defineStore('auth', () => {
       .single()
     profile.value = data
 
-    // 取得 profile 後立即載入功能開關
+    // 取得 profile 後立即載入功能開關與權限矩陣
     const features = useFeaturesStore()
     await features.load(data?.club_id ?? null)
+
+    const permissions = usePermissionsStore()
+    await permissions.load(data?.role ?? null)
   }
 
   async function signIn(email: string, password: string) {
@@ -56,5 +57,5 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
   }
 
-  return { user, profile, loading, isLoggedIn, isDistrictAdmin, canWrite, clubId, role, init, signIn, signOut }
+  return { user, profile, loading, isLoggedIn, isDistrictAdmin, clubId, role, init, signIn, signOut }
 })

@@ -4,7 +4,41 @@
 
 ---
 
-## 本次完成
+## ⚠️ 待辦：本次有 2 支 SQL migration + 1 個 Edge Function 尚未在 Supabase 執行/部署
+
+**這是目前最優先的待辦事項**，前端程式碼已經全部寫完、`npm run build` 通過、也已 commit + push，但功能還無法運作，因為：
+
+1. 到 Supabase dashboard → **SQL Editor**，依序執行：
+   - `supabase/migrations/010_role_permissions.sql`（新增 `role_permissions` 表 + `has_permission()` + 種子資料 + 重寫 roster/prospective_members/meetings/attendance_sessions/attendance_details 的 write policy）
+   - `supabase/migrations/011_invite_deactivate_gaps.sql`（新增 district_admin 可管理 user_profiles 的 UPDATE policy）
+2. 重新部署 `invite-user` Edge Function（改了 club_member 邀請驗證邏輯）：
+   ```bash
+   supabase functions deploy invite-user
+   ```
+   （或用 Supabase dashboard 的 Edge Functions 頁面重新部署這支 function 的最新程式碼）
+
+沒做這兩步之前：權限矩陣頁面會抓不到資料（`role_permissions` 表不存在）、帳號邀請頁會失敗（Edge Function 邏輯是舊的）。
+
+## 本次完成：細粒度權限系統 + 帳號邀請/管理 UI + club_member 角色定義
+
+之前所有角色權限都寫死在程式碼裡（RLS 用 `role IN (...)`，前端用 `auth.role === '...'` 散落 4 處）。這次做成地區管理員可在 UI 上調整、且真的驅動後端 RLS 的權限矩陣，並補上完全沒做過的帳號邀請/停用前端頁面（之前 Sidebar 有一個死連結 `/club/invite`），以及定義 `club_member`（一般社友）的唯讀存取範圍。
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/010_role_permissions.sql` | 新表 `role_permissions`（role/resource/action/allowed）+ `has_permission()` function（`SECURITY DEFINER`，比照 009 已驗證安全的模式）+ 種子資料（忠實反映現況：district_admin 對 5 個資源皆無 edit 權限，之前 `auth.canWrite` 誤把它算進去）+ 重寫 roster/prospective_members/meetings/attendance_sessions/attendance_details 的 write policy，改用 `has_permission()` 而非寫死的角色列表 |
+| `supabase/migrations/011_invite_deactivate_gaps.sql` | 新增 `profiles_district_admin_manage` policy，讓 district_admin 能停用/啟用執秘帳號（原本完全沒有這個能力） |
+| `supabase/functions/invite-user/index.ts` | 補上 `club_member` 邀請驗證分支 + 拒絕未知角色字串（原本這兩種情況會直接放行，是個授權漏洞）|
+| `src/stores/permissions.ts` | 權限矩陣 store，登入後載入目前角色的權限 map（`can(resource, action)`），另外提供 `fetchAll()`/`setPermission()` 給矩陣管理頁用 |
+| `src/stores/invites.ts` | 呼叫 `invite-user` Edge Function（`supabase.functions.invoke`）+ 讀 `invite_log` |
+| `src/stores/accounts.ts` | 管理執秘/社長帳號的啟用/停用 |
+| `src/views/admin/PermissionMatrixView.vue`（路由 `/admin/permissions`） | 地區管理員可視覺化調整各角色對 4 個資源（名冊/潛在社友/例會/出席）的檢視/編輯權限 |
+| `src/views/admin/AccountManagementView.vue`（路由 `/club/invite`） | district_admin 邀執秘、club_secretary 邀本社社長；邀請紀錄列表；帳號停用/啟用 |
+| `src/stores/auth.ts` | 移除誤導性的 `canWrite`（原本錯把 district_admin 算進可寫入），改成登入後同時載入 permissions store |
+| `src/views/roster/RosterView.vue`、`src/views/roster/ProspectiveView.vue`、`src/views/meetings/MeetingListView.vue`、`src/views/meetings/AttendanceView.vue` | 權限判斷全部改用 `permissions.can(resource, 'edit')` |
+| `src/components/layout/Sidebar.vue` | 修好死連結、新增「權限矩陣」「帳號邀請/管理」連結；`club_member` 現在能看到本社名冊（唯讀）+ 例會資訊（唯讀）|
+| `src/router/index.ts` | 新增 `meta.roles` 陣列 guard（一個路由允許多種角色，用於帳號管理頁）|
+
+**注意行為變化**：`ProspectiveView.vue` 改用 `permissions.can()` 後，`club_member` 會開始看到新增/編輯按鈕——因為 DB 的 RLS 本來就允許 club_member 寫入 `prospective_members`（跟其他表不同），只是之前前端沒開放，這是修正既有不一致，不是新開的漏洞。
 
 ### P2 社友名冊、P3 例會與出席、P4 通訊錄與管理後台（全部完成）
 

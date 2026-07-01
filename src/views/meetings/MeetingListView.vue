@@ -2,14 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMeetingsStore } from '@/stores/meetings'
+import { usePermissionsStore } from '@/stores/permissions'
 import type { Meeting, MeetingInsert } from '@/types'
 
 const auth = useAuthStore()
 const meetings = useMeetingsStore()
+const permissions = usePermissionsStore()
 
-const canManage = computed(() =>
-  auth.role === 'club_admin' || auth.role === 'club_secretary'
-)
+const canManage = computed(() => permissions.can('meetings', 'edit'))
 
 const showModal = ref(false)
 const editing = ref<Meeting | null>(null)

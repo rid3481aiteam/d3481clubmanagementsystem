@@ -69,6 +69,18 @@ const router = createRouter({
       component: () => import('@/views/admin/ClubDetailView.vue'),
       meta: { role: 'district_admin' },
     },
+    {
+      path: '/admin/permissions',
+      name: 'admin-permissions',
+      component: () => import('@/views/admin/PermissionMatrixView.vue'),
+      meta: { role: 'district_admin' },
+    },
+    {
+      path: '/club/invite',
+      name: 'account-management',
+      component: () => import('@/views/admin/AccountManagementView.vue'),
+      meta: { roles: ['district_admin', 'club_secretary'] },
+    },
     // 404
     {
       path: '/:pathMatch(.*)*',
@@ -88,6 +100,7 @@ router.beforeEach(async (to) => {
 
   // 角色限定路由：非該角色導回首頁
   if (to.meta.role && auth.role !== to.meta.role) return { name: 'dashboard' }
+  if (to.meta.roles && !(to.meta.roles as string[]).includes(auth.role ?? '')) return { name: 'dashboard' }
 
   if (to.meta.feature) {
     const key = to.meta.feature as FeatureKey

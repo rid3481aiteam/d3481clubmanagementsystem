@@ -15,15 +15,21 @@
         <RouterLink to="/admin/features" class="nav-item">
           <span class="nav-icon">⚙️</span>功能開關
         </RouterLink>
+        <RouterLink to="/admin/permissions" class="nav-item">
+          <span class="nav-icon">🔐</span>權限矩陣
+        </RouterLink>
+        <RouterLink to="/club/invite" class="nav-item">
+          <span class="nav-icon">👤</span>帳號邀請 / 管理
+        </RouterLink>
       </template>
 
-      <!-- 執秘 + 社長共用 -->
-      <template v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'">
+      <!-- 執秘 + 社長 + 一般社員共用（社員唯讀） -->
+      <template v-if="auth.role === 'club_secretary' || auth.role === 'club_admin' || auth.role === 'club_member'">
         <div class="nav-section">社務管理</div>
         <RouterLink v-if="features.isEnabled('D1_roster')" to="/roster" class="nav-item">
           <span class="nav-icon">📋</span>社友名冊
         </RouterLink>
-        <RouterLink v-if="features.isEnabled('D3_prospective')" to="/roster/prospective" class="nav-item">
+        <RouterLink v-if="features.isEnabled('D3_prospective') && auth.role !== 'club_member'" to="/roster/prospective" class="nav-item">
           <span class="nav-icon">🔍</span>潛在社友
         </RouterLink>
         <RouterLink v-if="features.isEnabled('B1_meeting_info')" to="/meetings" class="nav-item">

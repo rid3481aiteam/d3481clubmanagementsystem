@@ -4,11 +4,14 @@ import * as XLSX from 'xlsx'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useFeaturesStore } from '@/stores/features'
+import { usePermissionsStore } from '@/stores/permissions'
 import type { RosterMember, RosterMemberInsert, RosterExcelRow } from '@/types'
 
 const auth = useAuthStore()
 const roster = useRosterStore()
 const features = useFeaturesStore()
+const permissions = usePermissionsStore()
+const canManage = computed(() => permissions.can('roster', 'edit'))
 
 const keyword = ref('')
 const statusFilter = ref<'active' | 'inactive' | 'all'>('active')
@@ -129,7 +132,7 @@ onMounted(() => {
   <div class="page">
     <div class="ph">
       <h1>社友名冊</h1>
-      <div v-if="auth.canWrite" style="display:flex; gap:8px;">
+      <div v-if="canManage" style="display:flex; gap:8px;">
         <template v-if="features.isEnabled('D2_roster_excel')">
           <input ref="fileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImport" />
           <button class="btn btn-g btn-sm" @click="triggerImport">匯入 Excel</button>
@@ -159,7 +162,7 @@ onMounted(() => {
             <th>Email</th>
             <th>入社日期</th>
             <th>狀態</th>
-            <th v-if="auth.canWrite"></th>
+            <th v-if="canManage"></th>
           </tr>
         </thead>
         <tbody>
@@ -171,13 +174,13 @@ onMounted(() => {
             <td>{{ m.email || '-' }}</td>
             <td>{{ m.join_date || '-' }}</td>
             <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '在職' : '離職' }}</span></td>
-            <td v-if="auth.canWrite" style="display:flex; gap:6px;">
+            <td v-if="canManage" style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="openEdit(m)">編輯</button>
               <button class="btn btn-g btn-sm" @click="toggleActive(m)">{{ m.is_active ? '停用' : '恢復' }}</button>
             </td>
           </tr>
           <tr v-if="!filtered.length">
-            <td :colspan="auth.canWrite ? 8 : 7" style="text-align:center; color:var(--muted);">查無資料</td>
+            <td :colspan="canManage ? 8 : 7" style="text-align:center; color:var(--muted);">查無資料</td>
           </tr>
         </tbody>
       </table>

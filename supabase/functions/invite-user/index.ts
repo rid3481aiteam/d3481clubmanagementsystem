@@ -28,6 +28,9 @@ Deno.serve(async (req) => {
   const isDistrictAdmin = callerProfile.role === 'district_admin'
   const isSecretary = callerProfile.role === 'club_secretary'
 
+  if (!['club_secretary', 'club_admin', 'club_member'].includes(role))
+    return new Response('Invalid role', { status: 400 })
+
   if (role === 'club_secretary' && !isDistrictAdmin)
     return new Response('Only district_admin can invite secretary', { status: 403 })
 
@@ -36,6 +39,13 @@ Deno.serve(async (req) => {
       return new Response('Only club_secretary or district_admin can invite president', { status: 403 })
     if (isSecretary && callerProfile.club_id !== club_id)
       return new Response('Secretary can only invite president for own club', { status: 403 })
+  }
+
+  if (role === 'club_member') {
+    if (!isDistrictAdmin && !isSecretary)
+      return new Response('Only district_admin or club_secretary can invite member', { status: 403 })
+    if (isSecretary && callerProfile.club_id !== club_id)
+      return new Response('Secretary can only invite member for own club', { status: 403 })
   }
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
