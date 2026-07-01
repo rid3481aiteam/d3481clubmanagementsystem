@@ -6,10 +6,37 @@
 
 ## 本次完成
 
-### 架構規劃（全部定案）
-- 角色體系、帳號邀請流程、權限矩陣詳見 `ARCHITECTURE.md`
+### P1 前端骨架（全部完成）
 
-### Supabase 資料庫（全部完成）
+| 檔案 | 說明 |
+|------|------|
+| `package.json` / `vite.config.ts` / `tsconfig.json` | Vite + Vue 3 + TS 專案設定 |
+| `index.html` | HTML 入口 |
+| `src/main.ts` | App 初始化（Pinia + Router） |
+| `src/App.vue` | 全域 CSS variables（扶輪藍 #17458F + 金 #F7A81B）、Layout（TopNav + Sidebar + RouterView）、Splash loading |
+| `src/components/layout/TopNav.vue` | 頂部導覽列：logo、標題、使用者名稱、角色 badge、登出 |
+| `src/components/layout/Sidebar.vue` | 左側選單，依 role 動態顯示（district_admin / club_secretary / club_admin） |
+| `src/views/LoginView.vue` | 登入頁：Email/密碼、錯誤提示、依 role 導向 |
+| `src/views/DashboardView.vue` | 儀表板佔位 |
+| `src/views/admin/*.vue` | 地區管理員頁面佔位（P4） |
+| `src/views/roster/*.vue` | 名冊頁面佔位（P2/P3） |
+| `src/views/meetings/*.vue` | 例會頁面佔位（P3） |
+| `src/views/directory/*.vue` | 通訊錄佔位（P4） |
+| `src/stores/club.ts` | 社別 store（fetchCurrent / fetchAll / upsertClub） |
+| `src/router/index.ts` | 新增 admin 路由、role guard、feature flag guard |
+
+### 啟動方式
+```bash
+cd /tmp/d3481clubmanagementsystem   # 每次對話需重新 clone
+npm install
+# 填入 .env.local 的 VITE_SUPABASE_ANON_KEY
+npm run dev   # port 5174
+```
+
+---
+
+## Supabase 資料庫（全部完成）
+
 | Migration | 內容 |
 |-----------|------|
 | 001_clubs_auth | clubs、user_profiles、RLS、helper functions |
@@ -19,14 +46,6 @@
 | 005_add_year_term | meetings.year_term 自動計算欄位（扶輪年度 7/1~6/30） |
 | 006_fix_rls_policies | is_club_secretary()、執秘可管理社長帳號的 RLS |
 | 007_invite_log | invite_log 稽核表 |
-
-### Edge Function
-- `invite-user`：驗證角色後邀請帳號，寫入 invite_log
-  - district_admin → 邀請 club_secretary
-  - club_secretary → 邀請本社 club_admin（社長）
-
-### Auth Hook
-- `handle_new_user`：受邀者確認後自動建立 user_profiles（從 raw_app_meta_data 取 club_id / role）
 
 ---
 
@@ -39,7 +58,22 @@
 | club_admin | 社長，每社 1 個，每年新帳號 | 一年一屆 |
 | club_member | 保留 enum，暫不開放 | — |
 
-**邀請鏈**：district_admin → 執秘 → 社長（社長卸任由執秘停用舊帳號）
+---
+
+## 下一步：P2 社友名冊（RosterView.vue）
+
+### 功能清單
+- [ ] 社友列表（表格：姓名、暱稱、職稱、公司、電話、Email、入社日期、狀態）
+- [ ] 搜尋（關鍵字）+ 篩選（在職 / 離職）
+- [ ] 新增 / 編輯社友 Modal
+- [ ] 停用社友（is_active = false）
+- [ ] Excel 匯入（SheetJS，feature flag `D2_roster_excel`）
+- [ ] Excel 匯出
+
+### 技術注意
+- `club_secretary` 可 CRUD；`club_admin` 唯讀（`auth.canWrite` 判斷）
+- `district_admin` 查詢不帶 club_id filter
+- Excel 匯入格式見 `types/index.ts` 的 `RosterExcelRow`
 
 ---
 
@@ -51,34 +85,9 @@
 
 ---
 
-## 下一步：前端開發（尚未開始）
-
-### 優先順序
-1. **登入頁面** + Vue Router 路由守衛（依 role 導向不同首頁）
-2. **地區管理員介面**
-   - 社團列表 + 新增社團
-   - 邀請執秘（呼叫 invite-user Edge Function）
-   - Feature Flag 管理
-3. **執秘介面**
-   - 名冊管理（列表、CRUD、Excel 匯入匯出）
-   - 例會管理（含 year_term 顯示）
-   - 出席記錄輸入
-   - 邀請社長
-4. **社長介面**
-   - 社務報表（出席統計、名冊查閱）
-5. **地區通訊錄**（全角色可用）
-
-### 技術注意事項
-- 前端呼叫 `invite-user` 需帶 `Authorization: Bearer <access_token>`
-- `year_term` 是 DB 自動計算欄位，前端不需傳入
-- Feature flag 用 `features.ts` store 的 `isEnabled(key)` 判斷是否渲染功能
-- 所有 DB 查詢直接用 Supabase client，不走 ORM
-
----
-
 ## 未解決問題
 
-- 無
+- `.env.local` 的 `VITE_SUPABASE_ANON_KEY` 目前是 placeholder，需填入真實值才能連接 Supabase（去 Supabase dashboard → Settings → API 複製 anon public key）
 
 ## Phase 2（暫緩）
 
