@@ -6,6 +6,14 @@
 
 ## 本次完成
 
+### Bug 修復：建立/邀請使用者失敗
+
+Supabase 後台「Create user」「Invite user」皆回傳 `Database error creating/saving new user`。
+
+**根因**：`handle_new_user()` trigger 是 `SECURITY DEFINER`，但未設定 `search_path`。Auth 服務觸發 trigger 時的 session search_path 不含 `public`，導致未加 schema 前綴的 `user_role` enum 找不到（`type "user_role" does not exist`）。
+
+**修復**：`008_fix_handle_new_user_search_path.sql` — function 加上 `SET search_path = public`，並將 `user_role` 明確加上 `public.` 前綴。已在 production 套用並用測試帳號驗證通過。
+
 ### P1 前端骨架（全部完成）
 
 | 檔案 | 說明 |
@@ -46,6 +54,7 @@ npm run dev   # port 5174
 | 005_add_year_term | meetings.year_term 自動計算欄位（扶輪年度 7/1~6/30） |
 | 006_fix_rls_policies | is_club_secretary()、執秘可管理社長帳號的 RLS |
 | 007_invite_log | invite_log 稽核表 |
+| 008_fix_handle_new_user_search_path | 修復 handle_new_user() 缺少 search_path 導致建立/邀請使用者失敗 |
 
 ---
 
