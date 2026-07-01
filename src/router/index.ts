@@ -63,6 +63,12 @@ const router = createRouter({
       component: () => import('@/views/admin/FeatureFlagsView.vue'),
       meta: { role: 'district_admin' },
     },
+    {
+      path: '/admin/clubs/:id',
+      name: 'admin-club-detail',
+      component: () => import('@/views/admin/ClubDetailView.vue'),
+      meta: { role: 'district_admin' },
+    },
     // 404
     {
       path: '/:pathMatch(.*)*',

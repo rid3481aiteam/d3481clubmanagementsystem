@@ -68,7 +68,10 @@ onMounted(() => {
             <td>{{ c.sec_name || '-' }}</td>
             <td>{{ c.email || '-' }}</td>
             <td>{{ c.phone || '-' }}</td>
-            <td><button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button></td>
+            <td style="display:flex; gap:6px;">
+              <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社員</RouterLink>
+              <button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button>
+            </td>
           </tr>
           <tr v-if="!club.allClubs.length">
             <td colspan="7" style="text-align:center; color:var(--muted);">尚無社團資料</td>
