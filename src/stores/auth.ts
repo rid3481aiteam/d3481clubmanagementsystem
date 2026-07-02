@@ -57,5 +57,12 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
   }
 
-  return { user, profile, loading, isLoggedIn, isDistrictAdmin, clubId, role, init, signIn, signOut }
+  async function updateName(name: string) {
+    if (!user.value) return { error: new Error('尚未登入') }
+    const { error } = await supabase.from('user_profiles').update({ name }).eq('id', user.value.id)
+    if (!error && profile.value) profile.value = { ...profile.value, name }
+    return { error }
+  }
+
+  return { user, profile, loading, isLoggedIn, isDistrictAdmin, clubId, role, init, signIn, signOut, updateName }
 })

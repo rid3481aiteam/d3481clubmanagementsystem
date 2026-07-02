@@ -14,6 +14,7 @@ const club = useClubStore()
 const isDistrictAdmin = computed(() => auth.role === 'district_admin')
 
 const email = ref('')
+const inviteName = ref('')
 const role = ref<'club_secretary' | 'club_admin'>('club_secretary')
 const clubId = ref<string | null>(isDistrictAdmin.value ? null : auth.clubId)
 const inviting = ref(false)
@@ -26,11 +27,12 @@ async function submitInvite() {
   inviting.value = true
   inviteError.value = null
   inviteSuccess.value = false
-  const { error } = await invites.inviteUser(email.value.trim(), role.value, clubId.value)
+  const { error } = await invites.inviteUser(email.value.trim(), role.value, clubId.value, inviteName.value.trim() || undefined)
   if (error) {
     inviteError.value = error.message
   } else {
     email.value = ''
+    inviteName.value = ''
     inviteSuccess.value = true
   }
   inviting.value = false
@@ -73,6 +75,10 @@ onMounted(async () => {
         <div>
           <label class="fl">Email</label>
           <input v-model="email" type="email" class="fi" placeholder="邀請對象的 Email" style="min-width:240px;" />
+        </div>
+        <div>
+          <label class="fl">姓名（選填）</label>
+          <input v-model="inviteName" type="text" class="fi" placeholder="不填則預設用 Email 前段" style="min-width:160px;" />
         </div>
         <div>
           <label class="fl">角色</label>

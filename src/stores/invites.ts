@@ -28,9 +28,9 @@ export const useInvitesStore = defineStore('invites', () => {
     loading.value = false
   }
 
-  async function inviteUser(email: string, role: UserRole, clubId: string | null) {
+  async function inviteUser(email: string, role: UserRole, clubId: string | null, name?: string) {
     const { data, error } = await supabase.functions.invoke('invite-user', {
-      body: { email, role, club_id: clubId },
+      body: { email, role, club_id: clubId, name },
     })
 
     if (error) {

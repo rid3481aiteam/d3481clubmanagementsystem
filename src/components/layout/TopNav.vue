@@ -5,7 +5,9 @@
       <span class="topnav-title">國際扶輪 3481 地區</span>
     </div>
     <div class="topnav-right">
-      <span class="topnav-user">{{ auth.profile?.name ?? auth.user?.email }}</span>
+      <span class="topnav-user" style="cursor:pointer;" title="點擊修改顯示名稱" @click="editName">
+        {{ auth.profile?.name ?? auth.user?.email }}
+      </span>
       <span class="bdg" :class="roleBadgeClass">{{ roleLabel }}</span>
       <button class="btn btn-g btn-sm" @click="handleSignOut">登出</button>
     </div>
@@ -43,6 +45,16 @@ const roleBadgeClass = computed(() => {
 async function handleSignOut() {
   await auth.signOut()
   router.push('/login')
+}
+
+async function editName() {
+  const current = auth.profile?.name ?? ''
+  const next = prompt('輸入顯示名稱', current)
+  if (next === null) return
+  const trimmed = next.trim()
+  if (!trimmed) return
+  const { error } = await auth.updateName(trimmed)
+  if (error) alert(error.message)
 }
 </script>
 

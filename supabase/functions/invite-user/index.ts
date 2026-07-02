@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
   if (!callerProfile) return errorResponse('找不到使用者資料', 403)
 
-  const { email, role, club_id } = await req.json()
+  const { email, role, club_id, name } = await req.json()
 
   if (!['club_secretary', 'club_admin', 'club_member'].includes(role))
     return errorResponse('角色不正確', 400)
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
   const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: { club_id, role },
+    data: { club_id, role, name },
     redirectTo: `${SITE_URL}/accept-invite`,
   })
 
