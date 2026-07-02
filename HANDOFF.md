@@ -13,7 +13,7 @@
    - `019_seed_club_leaders.sql`：從外部資料來源補上 100 社的 `pres_name`/`sec_name`，只在欄位為 NULL 時才寫入，不會覆蓋各社自行填的資料
    - `020_seed_club_directory_from_excel.sql`：從 Excel 匯入 105 社 `sec_name`/`email`/`phone`/`addr`/`freq`/`meeting_time`/`venue`/`venue_tel`/`note`，採覆蓋式更新；內建 105 筆 row-count guard，未完整對上會 rollback
    - `021_roster_member_profile_fields.sql`（本輪新增）：`roster` 新增 `club_position`、`member_status`、`personal_phone`、`company_phone`，並用既有 `phone` 初始化 `personal_phone`
-2. **檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名**（見下方踩坑紀錄）
+2. ~~檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名~~ **已修正**：`015`/`019` 尚未執行過正式環境，直接把 seed 社名改成正確的正式社名「台北市和平扶輪社」，`020` 既有的 alias 比對邏輯會自動接上這筆既有資料，不會再產生重複的 `clubs` 列（見下方踩坑紀錄）
 3. **Edge Functions → invite-user**：確認部署的是最新版本（含 `name` 欄位，commit `61ae44c`），內容見 `supabase/functions/invite-user/index.ts`
 4. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
 5. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
