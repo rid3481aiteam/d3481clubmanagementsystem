@@ -22,7 +22,7 @@ const filtered = computed(() => {
     if (statusFilter.value === 'active' && !m.is_active) return false
     if (statusFilter.value === 'inactive' && m.is_active) return false
     if (!kw) return true
-    return [m.name, m.nick_name, m.job_title, m.company, m.email, m.phone]
+    return [m.name, m.nick_name, m.job_title, m.company, m.classification, m.email, m.phone]
       .some(v => v?.toLowerCase().includes(kw))
   })
 })
@@ -38,6 +38,7 @@ function emptyForm(): RosterMemberInsert {
     nick_name: null,
     job_title: null,
     company: null,
+    classification: null,
     email: null,
     phone: null,
     join_date: null,
@@ -96,6 +97,7 @@ async function handleImport(e: Event) {
       nick_name: row.英文名 ?? null,
       job_title: row.職稱 ?? null,
       company: row.公司 ?? null,
+      classification: row.職業分類 ?? null,
       email: row.Email ?? null,
       phone: row.電話 ?? null,
       join_date: row.入社日期 ?? null,
@@ -112,6 +114,7 @@ function handleExport() {
     姓名: m.name,
     英文名: m.nick_name ?? '',
     職稱: m.job_title ?? '',
+    職業分類: m.classification ?? '',
     公司: m.company ?? '',
     Email: m.email ?? '',
     電話: m.phone ?? '',
@@ -157,6 +160,7 @@ onMounted(() => {
           <tr>
             <th>姓名</th>
             <th>職稱</th>
+            <th>職業分類</th>
             <th>公司</th>
             <th>電話</th>
             <th>Email</th>
@@ -169,6 +173,7 @@ onMounted(() => {
           <tr v-for="m in filtered" :key="m.id">
             <td>{{ m.name }}<span v-if="m.nick_name" style="color:var(--muted)"> ({{ m.nick_name }})</span></td>
             <td>{{ m.job_title || '-' }}</td>
+            <td>{{ m.classification || '-' }}</td>
             <td>{{ m.company || '-' }}</td>
             <td>{{ m.phone || '-' }}</td>
             <td>{{ m.email || '-' }}</td>
@@ -180,7 +185,7 @@ onMounted(() => {
             </td>
           </tr>
           <tr v-if="!filtered.length">
-            <td :colspan="canManage ? 8 : 7" style="text-align:center; color:var(--muted);">查無資料</td>
+            <td :colspan="canManage ? 9 : 8" style="text-align:center; color:var(--muted);">查無資料</td>
           </tr>
         </tbody>
       </table>
@@ -204,6 +209,10 @@ onMounted(() => {
           <div>
             <label class="fl">職稱</label>
             <input v-model="form.job_title" class="fi" />
+          </div>
+          <div>
+            <label class="fl">職業分類</label>
+            <input v-model="form.classification" class="fi" />
           </div>
           <div>
             <label class="fl">公司</label>

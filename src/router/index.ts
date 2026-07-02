@@ -49,6 +49,12 @@ const router = createRouter({
       component: () => import('@/views/roster/ProspectiveView.vue'),
       meta: { feature: 'D3_prospective' as FeatureKey },
     },
+    {
+      path: '/club/officers',
+      name: 'club-officers',
+      component: () => import('@/views/club/OfficersView.vue'),
+      meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
+    },
     // H 通訊錄
     {
       path: '/directory',

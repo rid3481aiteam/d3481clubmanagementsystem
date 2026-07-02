@@ -40,6 +40,25 @@ export interface Club {
   updated_at: string
 }
 
+// ── 社的年度幹部 ──────────────────────────────────────
+export type ClubOfficerRole =
+  | 'president' | 'president_elect' | 'vice_president' | 'secretary' | 'committee_member'
+
+export interface ClubOfficer {
+  id: string
+  club_id: string
+  year_term: string
+  role: ClubOfficerRole
+  name: string
+  committee_name: string | null
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ClubOfficerInsert = Omit<ClubOfficer, 'id' | 'created_at' | 'updated_at'>
+export type ClubOfficerUpdate = Partial<ClubOfficerInsert>
+
 // ── 功能開關 ─────────────────────────────────────────
 export type FeatureKey =
   | 'A1_login' | 'A2_roles' | 'A3_isolation'
@@ -133,6 +152,7 @@ export interface RosterMember {
   nick_name: string | null
   job_title: string | null
   company: string | null
+  classification: string | null
   email: string | null
   phone: string | null
   join_date: string | null
@@ -150,6 +170,7 @@ export interface RosterExcelRow {
   姓名: string
   英文名?: string
   職稱?: string
+  職業分類?: string
   公司?: string
   Email?: string
   電話?: string

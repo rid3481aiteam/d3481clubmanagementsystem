@@ -1,17 +1,20 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第三輪，Claude 建立全地區社團名冊 + 社團總覽改分區顯示 + 自訂排序 + 刪除社團 + 編輯改頁面 + 通訊錄改分區顯示）
+> 最後更新：2026-07-02（第三輪，Claude 建立全地區社團名冊 + 社團總覽改分區顯示 + 自訂排序 + 刪除社團 + 編輯改頁面 + 通訊錄改分區顯示 + 社團資訊儀表板 + 年度幹部）
 
 ---
 
 ## ⚠️ 待辦
-1. **執行 `015_seed_district_clubs.sql`**（如果還沒跑過）：SQL Editor 貼上執行，建立全地區 105 筆社團基本資料（依分區，僅 name + zone）
-2. **執行 `016_club_sort_order.sql`**：新增 `clubs.sort_order` 欄位並依現有名稱順序初始化，社團總覽的上/下移按鈕需要這個欄位才能運作
-3. **檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名**（見下方踩坑紀錄）
-4. **Edge Functions → invite-user**：確認部署的是最新版本（含 `name` 欄位，commit `61ae44c`），內容見 `supabase/functions/invite-user/index.ts`
-5. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
-6. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
-7. 確認 Authentication → URL Configuration 的 Site URL / Redirect URLs 已改成正式網址（不是 localhost），且自訂 SMTP 已設定並測試成功寄信
+1. **依序執行 `015`～`018` 四支尚未跑過的 migration**（SQL Editor 貼上執行）：
+   - `015_seed_district_clubs.sql`：建立全地區 105 筆社團基本資料（依分區，僅 name + zone）
+   - `016_club_sort_order.sql`：新增 `clubs.sort_order`，社團總覽的上/下移按鈕需要這個欄位
+   - `017_roster_classification.sql`：`roster` 新增 `classification`（職業分類），社團資訊頁的「領域分布」需要這個欄位，且要各社自行在社友名冊補填才有統計意義
+   - `018_club_officers.sql`：新增 `club_officers` 表（社的年度幹部），社團資訊頁的「社的年度成員」跟 `/club/officers` 頁都需要這張表
+2. **檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名**（見下方踩坑紀錄）
+3. **Edge Functions → invite-user**：確認部署的是最新版本（含 `name` 欄位，commit `61ae44c`），內容見 `supabase/functions/invite-user/index.ts`
+4. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
+5. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
+6. 確認 Authentication → URL Configuration 的 Site URL / Redirect URLs 已改成正式網址（不是 localhost），且自訂 SMTP 已設定並測試成功寄信
 
 ## 本次完成（第三輪）：全地區社團名冊 seed + 社團總覽依分區收折 + 自訂排序
 
@@ -36,6 +39,26 @@
 | `src/views/admin/ClubListView.vue` | 移除編輯 modal 與列表上的刪除按鈕，「編輯」改成連到 `/admin/clubs/:id/edit`；「查看社員」按鈕改名「查看社團資訊」（對應下一步待辦：`ClubDetailView.vue` 要重新設計成社團資訊儀表板）；modal 只保留「新增社團」 |
 | `src/router/index.ts` | 新增路由 `/admin/clubs/:id/edit` |
 | `src/views/directory/DirectoryView.vue` | 比照 `ClubListView.vue` 加上依分區分組 + 收折（同一套 `ZONE_ORDER`／`groupedClubs`／`toggleZone` 邏輯）；欄位拿掉社長/執秘，改成例會時間、例會地點、社辦公室地址、電話；搜尋欄位同步調整 |
+
+### 新增：社團資訊儀表板（社員人數/領域分布/例會資訊/出席率/年度幹部）+ 職業分類欄位
+
+使用者要求「查看社員」改成「查看社團資訊」，進去要看到 6 項摘要：社員人數、領域分布、例會時間地點、出席率、最後一次例會資訊、社的年度成員（社長/社長當選人/副社長/秘書/委員會成員）。其中「領域分布」需要新欄位、「年度成員」需要新資料表，這兩個是新的資料模型，已跟使用者確認方向：
+- 領域分布：`roster` 新增 `classification`（職業分類，自由輸入文字），各社自行在社友名冊填寫
+- 年度成員：新增獨立資料表 `club_officers`，依 `year_term`（扶輪年度）記錄，委員會成員可多筆；比照 `roster` 的權限模式，由各社自己的 `club_admin`/`club_secretary` 維護，地區管理員唯讀全區
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/017_roster_classification.sql` | `roster` 新增 `classification text` |
+| `supabase/migrations/018_club_officers.sql` | 新增 `club_officers` 表（`club_id`/`year_term`/`role` enum/`name`/`committee_name`/`note`），RLS 比照 roster（本社寫、district_admin 讀全區） |
+| `src/types/index.ts` | `RosterMember`/`RosterExcelRow` 新增 `classification`；新增 `ClubOfficer`/`ClubOfficerRole`/`ClubOfficerInsert`/`ClubOfficerUpdate` |
+| `src/stores/officers.ts`（新檔案） | `club_officers` CRUD；`currentYearTerm()`（跟 `dashboard.ts` 邏輯一致，7/1~6/30 為一屆，各自獨立一份沒有共用） |
+| `src/views/club/OfficersView.vue`（新檔案，路由 `/club/officers`） | 各社自行維護本社年度幹部：社長/社長當選人/副社長/秘書（單一姓名輸入）+ 委員會成員（可新增多筆，含委員會名稱），依年度切換；`club_member` 唯讀 |
+| `src/components/layout/Sidebar.vue` | 「社務管理」區塊新增「社的年度成員」連結（`club_secretary`/`club_admin`/`club_member` 可見） |
+| `src/router/index.ts` | 新增路由 `/club/officers` |
+| `src/views/roster/RosterView.vue` | 新增/編輯表單、表格欄位、Excel 匯入匯出（`職業分類` 欄）都加上 `classification` |
+| `src/views/admin/ClubDetailView.vue` | 從單純的社員名單頁，改成社團資訊儀表板：卡片區顯示社員人數（在職）、本屆出席率（`attendance_sessions.rate` 平均）、例會時間地點、最後一次例會；下方分別是領域分布（依 `classification` 分組計數）、社的年度成員（唯讀顯示 `club_officers`）、社員名單（原本的表格） |
+
+**注意**：`club_officers` 是全新的表，一開始全部社團都是空的，需要各社自己的 `club_admin`/`club_secretary` 登入 `/club/officers` 填寫，社團資訊頁才會顯示資料；`classification` 同理需要各社自己在社友名冊補填舊資料才有統計意義。
 
 ### 新增：刪除社團的防呆設計
 
@@ -223,6 +246,10 @@ npm run dev   # port 5174
 | 012_club_self_manage_accounts | is_club_tier() helper；社長／執秘互相對等管理本社帳號（見上方踩坑紀錄 #9） |
 | 013_invite_log_club_tier_select | club_admin 也能看本社邀請紀錄，原本只有 club_secretary 能看 |
 | 014_fix_handle_new_user_metadata_source | **關鍵修復**：handle_new_user() 改讀 raw_user_meta_data（見上方踩坑紀錄 #4） |
+| 015_seed_district_clubs | 建立全地區 105 筆社團基本資料（依分區，僅 name + zone） |
+| 016_club_sort_order | clubs 新增 sort_order，社團總覽/地區通訊錄的分區內自訂排序用 |
+| 017_roster_classification | roster 新增 classification（職業分類），社團資訊頁「領域分布」統計用 |
+| 018_club_officers | 新增 club_officers 表（社的年度幹部：社長/社長當選人/副社長/秘書/委員會成員） |
 
 ---
 

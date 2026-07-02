@@ -35,6 +35,9 @@
         <RouterLink v-if="features.isEnabled('B1_meeting_info')" to="/meetings" class="nav-item">
           <span class="nav-icon">📅</span>例會管理
         </RouterLink>
+        <RouterLink to="/club/officers" class="nav-item">
+          <span class="nav-icon">🎖️</span>社的年度成員
+        </RouterLink>
       </template>
 
       <!-- 執秘 + 社長：本社帳號自行管理 -->
