@@ -1,16 +1,16 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十四輪，Claude 清查全站「儲存不檢查 error」寫法並修正 4 個頁面；地區/各社切換按鈕未顯示問題待使用者提供更多資訊排查）
+> 最後更新：2026-07-02（第十五輪，Claude 定位地區/各社切換按鈕未顯示的高度可疑根因——疑似該測試帳號是 014 修復前建立的舊帳號，`club_id` 從一開始就是 NULL，待使用者確認並用 SQL 補值）
 
 ---
 
 ## ⚠️ 待辦
 
-1. **地區/各社切換按鈕沒有顯示（待排查，非本輪修正）**：使用者回報已在「帳號管理」把測試帳號設定 `district_access=true` 且該帳號有綁定 `club_id`，理論上 `TopNav.vue` 的 `auth.canSwitchView` 應為 true 並顯示切換按鈕，但畫面上仍看不到。已完整檢查 `src/stores/auth.ts`（`canSwitchView`/`isDistrictView`/`setViewScope`）、`TopNav.vue`、`024_user_profile_district_access.sql`、`011_invite_deactivate_gaps.sql`（`profiles_district_admin_manage` UPDATE policy）——前端邏輯與 RLS 權限鏈路本身沒有發現程式錯誤，程式碼也已確認整支都推上 GitHub（`git status` 乾淨、與 `origin/main` 同步）。懷疑是環境面問題而非程式碼問題，需要使用者協助確認以下幾點才能繼續排查：
-   - Supabase SQL Editor 執行 `NOTIFY pgrst, 'reload schema';`（或 Dashboard → Settings → API → Reload schema），避免 `024` 新增的 `district_access` 欄位還沒被 PostgREST schema cache 抓到（`select('*')` 在這種情況下會直接漏掉該欄位，不會報錯）
-   - 該測試帳號登出後重新登入（不只是重新整理），確保前端重新抓一次最新的 `user_profiles`
-   - 確認 Cloudflare Pages 最新一次部署對應的 commit 是否已經包含 `6fd267a`（視角切換功能）之後的版本
-   - 順便確認：畫面右上角角色徽章是否有顯示「＋地區」字樣（`TopNav.vue` 的 `roleLabel`）——如果沒有，代表 `district_access` 根本沒有正確載入到前端，問題在資料/環境面；如果有顯示但切換按鈕仍不見，才需要回頭懷疑是程式 bug
+1. **地區/各社切換按鈕沒有顯示——已定位高度可疑根因，待使用者確認並修資料**：使用者確認測試帳號右上角角色徽章有顯示「＋地區」字樣，代表 `district_access` 已正確載入前端（`isDistrictAdmin` 為 true）。`canSwitchView = isDistrictAdmin && !!clubId`，徽章邏輯只吃 `role`/`isDistrictAdmin`、不吃 `clubId`，所以徽章正常但按鈕不出現，唯一合理解釋是該帳號的 `user_profiles.club_id` 其實是 `NULL`。
+   - 回頭查 `supabase/migrations/014_fix_handle_new_user_metadata_source.sql` 的說明文字，發現這正是有前科的 bug：`handle_new_user()` 原本讀錯 metadata 欄位（讀 `raw_app_meta_data`，但 `inviteUserByEmail` 寫入的其實是 `raw_user_meta_data`），導致**在 014 套用之前，每一個被邀請建立的帳號，`club_id` 一律被寫成 NULL**。014 只修好了「以後」新邀請帳號會正確寫入 `club_id`，**不會回頭修正 014 套用之前就已經存在、`club_id` 已經是 NULL 的舊帳號**
+   - 也就是說：如果這次拿來測試切換功能的帳號，是在 014 套用之前就已經邀請建立的舊帳號（例如很早期的測試帳號），它的 `club_id` 很可能從建立那一刻起就一直是 NULL，之後不管怎麼切換 `district_access` 都不會自動補上
+   - **請先確認**：到「帳號管理」頁面看該測試帳號的「社團」欄位，如果顯示空白/`-`，就確定是這個問題
+   - **修法**：SQL Editor 執行 `UPDATE user_profiles SET club_id = '<正確的 club id>' WHERE id = '<該帳號的 user id>';` 補上正確的 `club_id`；或者乾脆刪除該測試帳號重新邀請一次（014 已修好，新邀請的帳號 `club_id` 會正確寫入），應該就能看到切換按鈕
    - 這次確認：**不需要支援「單一帳號歸屬多個扶輪社」**，維持現有「地區權限 + 綁定單一 club_id」的雙重視角模式即可
 2. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：見下方「第十二輪」，`supabase/functions/generate-edm/index.ts` 會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）
 3. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
