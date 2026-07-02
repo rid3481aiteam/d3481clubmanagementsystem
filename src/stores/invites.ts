@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { UserRole } from '@/types'
 
@@ -31,8 +32,22 @@ export const useInvitesStore = defineStore('invites', () => {
     const { data, error } = await supabase.functions.invoke('invite-user', {
       body: { email, role, club_id: clubId },
     })
-    if (!error) await fetchLog()
-    return { data, error }
+
+    if (error) {
+      let message = error.message
+      if (error instanceof FunctionsHttpError) {
+        try {
+          const body = await error.context.json()
+          if (body?.error) message = body.error
+        } catch {
+          // 回應不是 JSON，維持預設訊息
+        }
+      }
+      return { data, error: { message } }
+    }
+
+    await fetchLog()
+    return { data, error: null }
   }
 
   return { log, loading, fetchLog, inviteUser }
