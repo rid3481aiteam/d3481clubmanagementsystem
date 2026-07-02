@@ -50,6 +50,15 @@ const MEMBER_STATUS_LABEL: Record<RosterMemberStatus, string> = {
 const keyword = ref('')
 const statusFilter = ref<RosterMemberStatus | 'all'>('normal')
 
+type ImportAction = 'insert' | 'update'
+interface ImportPreviewItem {
+  key: string
+  rowNo: number
+  action: ImportAction
+  existingId: string | null
+  payload: RosterMemberInsert
+}
+
 function memberStatus(m: RosterMember): RosterMemberStatus {
   return m.member_status ?? (m.is_active ? 'normal' : 'resigned')
 }
@@ -92,8 +101,18 @@ const filtered = computed(() => {
       m.phone,
     ]
       .some(v => v?.toLowerCase().includes(kw))
-  })
+  }).slice().sort(compareRosterMembers)
 })
+
+function compareRosterMembers(a: RosterMember, b: RosterMember) {
+  const aEnglish = (a.nick_name || '').trim()
+  const bEnglish = (b.nick_name || '').trim()
+  if (aEnglish || bEnglish) {
+    const byEnglish = aEnglish.localeCompare(bEnglish, 'en', { sensitivity: 'base' })
+    if (byEnglish !== 0) return byEnglish
+  }
+  return a.name.localeCompare(b.name, 'zh-Hant')
+}
 
 const showModal = ref(false)
 const editing = ref<RosterMember | null>(null)
@@ -144,6 +163,9 @@ async function save() {
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const importPreview = ref<ImportPreviewItem[]>([])
+const showImportPreview = ref(false)
+const importing = ref(false)
 
 function triggerImport() {
   fileInput.value?.click()
@@ -156,14 +178,19 @@ async function handleImport(e: Event) {
   const wb = XLSX.read(buf, { type: 'array' })
   const sheet = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<RosterExcelRow>(sheet)
+  const existingByName = new Map(roster.members.map(m => [m.name.trim(), m]))
+  const seen = new Set<string>()
 
-  for (const row of rows) {
-    if (!row.姓名) continue
+  importPreview.value = rows.flatMap((row, index) => {
+    const name = String(row.姓名 ?? '').trim()
+    if (!name || seen.has(name)) return []
+    seen.add(name)
     const status = normalizeStatus(row.狀態)
     const personalPhone = row.個人電話 ?? row.電話 ?? null
-    await roster.insert({
+    const existing = existingByName.get(name)
+    const payload: RosterMemberInsert = {
       club_id: auth.clubId ?? '',
-      name: row.姓名,
+      name,
       nick_name: row.英文名 ?? null,
       club_position: CLUB_POSITIONS.includes(row.社內職稱 as RosterClubPosition)
         ? (row.社內職稱 as RosterClubPosition)
@@ -179,10 +206,54 @@ async function handleImport(e: Event) {
       join_date: row.入社日期 ?? null,
       is_active: activeFromStatus(status),
       note: null,
-    })
+    }
+    return [{
+      key: `${index}-${name}`,
+      rowNo: index + 2,
+      action: existing ? 'update' : 'insert',
+      existingId: existing?.id ?? null,
+      payload,
+    }]
+  })
+
+  showImportPreview.value = true
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+async function confirmImport() {
+  if (!importPreview.value.length || importing.value) return
+  importing.value = true
+  for (const item of importPreview.value) {
+    if (item.action === 'update' && item.existingId) {
+      await roster.update(item.existingId, item.payload)
+    } else {
+      await roster.insert(item.payload)
+    }
   }
   await roster.fetchAll(auth.clubId)
-  if (fileInput.value) fileInput.value.value = ''
+  importing.value = false
+  showImportPreview.value = false
+  importPreview.value = []
+}
+
+function downloadTemplate() {
+  const rows: RosterExcelRow[] = [{
+    姓名: '王小明',
+    英文名: 'Alex',
+    社內職稱: '社友',
+    狀態: '正常',
+    職稱: '總經理',
+    職業分類: '其他服務業',
+    公司: '範例有限公司',
+    Email: 'alex@example.com',
+    個人電話: '0912345678',
+    公司電話: '02-1234-5678',
+    入社日期: '2026-07-01',
+  }]
+  const sheet = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, sheet, '匯入範本')
+  XLSX.writeFile(wb, '社友名冊匯入範本.xlsx')
 }
 
 function handleExport() {
@@ -216,7 +287,8 @@ onMounted(() => {
       <h1>社友名冊</h1>
       <div v-if="canManage" style="display:flex; gap:8px;">
         <template v-if="features.isEnabled('D2_roster_excel')">
-          <input ref="fileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImport" />
+          <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImport" />
+          <button class="btn btn-g btn-sm" @click="downloadTemplate">下載範本</button>
           <button class="btn btn-g btn-sm" @click="triggerImport">匯入 Excel</button>
           <button class="btn btn-g btn-sm" @click="handleExport">匯出 Excel</button>
         </template>
@@ -235,11 +307,12 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table>
+      <table class="roster-table">
         <thead class="th">
           <tr>
-            <th>英文名稱</th>
-            <th>中文姓名</th>
+            <th class="col-index">項次</th>
+            <th class="col-english">英文名稱</th>
+            <th class="col-name">中文姓名</th>
             <th>社內職稱</th>
             <th>職業分類</th>
             <th>公司</th>
@@ -253,7 +326,8 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in filtered" :key="m.id">
+          <tr v-for="(m, index) in filtered" :key="m.id">
+            <td>{{ index + 1 }}</td>
             <td>{{ m.nick_name || '-' }}</td>
             <td>{{ m.name }}</td>
             <td>{{ m.club_position || '社友' }}</td>
@@ -274,7 +348,7 @@ onMounted(() => {
             </td>
           </tr>
           <tr v-if="!filtered.length">
-            <td :colspan="canManage ? 12 : 11" style="text-align:center; color:var(--muted);">查無資料</td>
+            <td :colspan="canManage ? 13 : 12" style="text-align:center; color:var(--muted);">查無資料</td>
           </tr>
         </tbody>
       </table>
@@ -351,5 +425,83 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <div v-if="showImportPreview" class="mo" @click.self="showImportPreview = false">
+      <div class="mb import-modal">
+        <div class="mb-h">
+          <h3>匯入預覽</h3>
+          <button class="mb-close" @click="showImportPreview = false">×</button>
+        </div>
+        <div class="mb-body">
+          <div class="import-summary">
+            <span class="bdg b-gr">新增 {{ importPreview.filter(i => i.action === 'insert').length }}</span>
+            <span class="bdg b-y">更新 {{ importPreview.filter(i => i.action === 'update').length }}</span>
+          </div>
+          <div class="tw">
+            <table class="import-table">
+              <thead class="th">
+                <tr>
+                  <th>動作</th>
+                  <th>姓名</th>
+                  <th>英文名</th>
+                  <th>個人電話</th>
+                  <th>Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in importPreview" :key="item.key">
+                  <td><span class="bdg" :class="item.action === 'insert' ? 'b-gr' : 'b-y'">{{ item.action === 'insert' ? '新增' : '更新' }}</span></td>
+                  <td>{{ item.payload.name }}</td>
+                  <td>{{ item.payload.nick_name || '-' }}</td>
+                  <td>{{ item.payload.personal_phone || '-' }}</td>
+                  <td>{{ item.payload.email || '-' }}</td>
+                </tr>
+                <tr v-if="!importPreview.length">
+                  <td colspan="5" style="text-align:center; color:var(--muted);">沒有可匯入資料</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="mb-foot">
+          <button class="btn btn-g" @click="showImportPreview = false">取消</button>
+          <button class="btn btn-gold" :disabled="!importPreview.length || importing" @click="confirmImport">確認匯入</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.roster-table {
+  min-width: 1180px;
+}
+
+.col-index {
+  width: 56px;
+}
+
+.col-english {
+  width: 110px;
+}
+
+.col-name {
+  width: 120px;
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.import-modal {
+  max-width: 860px;
+}
+
+.import-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.import-table {
+  min-width: 720px;
+}
+</style>
