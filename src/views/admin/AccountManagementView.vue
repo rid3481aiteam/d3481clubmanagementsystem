@@ -19,6 +19,7 @@ const clubId = ref<string | null>(isDistrictAdmin.value ? null : auth.clubId)
 const inviting = ref(false)
 const inviteError = ref<string | null>(null)
 const inviteSuccess = ref(false)
+const showInviteLog = ref(false)
 
 async function submitInvite() {
   if (!email.value.trim() || !clubId.value) return
@@ -95,8 +96,13 @@ onMounted(async () => {
       <p v-if="inviteSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">邀請已寄出。</p>
     </div>
 
-    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">邀請紀錄</h2>
-    <div class="tw" style="margin-bottom:24px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy);">邀請紀錄</h2>
+      <button class="btn btn-g btn-sm" @click="showInviteLog = !showInviteLog">
+        {{ showInviteLog ? '收起邀請紀錄' : '查看邀請紀錄' }}
+      </button>
+    </div>
+    <div v-if="showInviteLog" class="tw" style="margin-bottom:24px;">
       <table>
         <thead class="th">
           <tr>
