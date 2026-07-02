@@ -1,22 +1,24 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第九輪，Claude 重新設計設定密碼頁版面）
+> 最後更新：2026-07-02（第十輪，Claude 確認 015~021、012~014 migration 全數套用完成）
 
 ---
 
 ## ⚠️ 待辦
-1. **依序執行 `015`～`021` 七支尚未跑過的 migration**（SQL Editor 貼上執行）：
-   - `015_seed_district_clubs.sql`：建立全地區 105 筆社團基本資料（依分區，僅 name + zone）
-   - `016_club_sort_order.sql`：新增 `clubs.sort_order`，社團總覽的上/下移按鈕需要這個欄位
-   - `017_roster_classification.sql`：`roster` 新增 `classification`（職業分類），社團資訊頁的「領域分布」需要這個欄位，且要各社自行在社友名冊補填才有統計意義
-   - `018_club_officers.sql`：新增 `club_officers` 表（社的年度幹部），社團資訊頁的「社的年度成員」跟 `/club/officers` 頁都需要這張表
-   - `019_seed_club_leaders.sql`：從外部資料來源補上 100 社的 `pres_name`/`sec_name`，只在欄位為 NULL 時才寫入，不會覆蓋各社自行填的資料
-   - `020_seed_club_directory_from_excel.sql`：從 Excel 匯入 105 社 `sec_name`/`email`/`phone`/`addr`/`freq`/`meeting_time`/`venue`/`venue_tel`/`note`，採覆蓋式更新；內建 105 筆 row-count guard，未完整對上會 rollback
-   - `021_roster_member_profile_fields.sql`：`roster` 新增 `club_position`、`member_status`、`personal_phone`、`company_phone`，並用既有 `phone` 初始化 `personal_phone`
-2. ~~檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名~~ **已修正**：`015`/`019` 尚未執行過正式環境，直接把 seed 社名改成正確的正式社名「台北市和平扶輪社」，`020` 既有的 alias 比對邏輯會自動接上這筆既有資料，不會再產生重複的 `clubs` 列（見下方踩坑紀錄）
-3. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
-4. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
+
+**目前沒有已知待辦事項。** 以下項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成：
+
+1. ~~依序執行 `015`～`021` 七支 migration~~ **已完成**：105 筆全地區社團 seed、`sort_order`、`roster.classification`、`club_officers` 表、社長/執秘姓名匯入、Excel 通訊錄匯入、`roster` 社內職稱/狀態/電話欄位全部跑完並確認成功。執行過程中發現 `018_club_officers.sql` 原本不可重複執行（`CREATE TYPE` 沒有保護），已修正成可重複執行版本（見下方「018 修正」）
+2. ~~檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名~~ **已修正**：`015`/`019` 尚未執行過正式環境時就直接把 seed 社名改成正確的正式社名「台北市和平扶輪社」，`020` 既有的 alias 比對邏輯會自動接上這筆既有資料，不會再產生重複的 `clubs` 列（見下方踩坑紀錄）
+3. ~~Edge Functions → delete-account / invite-user 部署版本、Site URL / Redirect URLs、自訂 SMTP~~ **已確認**：使用者在 Supabase Dashboard 逐項確認皆正常
+4. ~~確認 `012`、`013`、`014` 三支 migration 已執行~~ **已確認**：用診斷 SQL 查詢 `is_club_tier()`、`profiles_club_tier_manage` policy、`invite_log_select` policy、`handle_new_user()` 函式定義，確認三支皆已正確套用
 5. ~~邀請信連結被導回登入畫面~~ **已解決**：Site URL / Redirect URLs / 已部署的 `invite-user` 都確認正常，根因是 `src/router/index.ts` 的 `/accept-invite` 路由缺少 `public: true`（見「第八輪」），已修正並由使用者實測確認新邀請信可以正常進入設定密碼頁
+
+## 本次完成（第十輪）：018 migration 修正為可重複執行 + 確認 015~021、012~014 全數套用
+
+使用者在正式環境依序執行 015~021 時，`018_club_officers.sql` 回報 `type "club_officer_role" already exists`（代表先前已部分執行過但沒跑完）。原始 018 沒有做重複執行保護（不像 015/019 用 `WHERE NOT EXISTS` / `IS NULL` 防呆），已改寫成每個物件（type/table/index/policy/trigger）建立前都先檢查是否存在，比照 015/019 的可重複執行設計。修正後使用者重新執行成功。
+
+之後用診斷 SQL 依序確認 015~021、012~014 共 10 支 migration 在正式環境皆已正確套用，且「台北市和平扶輪社」/「台北和平扶輪社」重複資料問題已透過修正 seed 社名（見上方待辦 #2）從源頭解決，不需要事後合併。Edge Functions 部署版本、Site URL/Redirect URLs、自訂 SMTP 也逐一在 Dashboard 確認正常。至此 HANDOFF 待辦清單全數清空。
 
 ## 本次完成（第九輪）：設定密碼頁改版面
 
