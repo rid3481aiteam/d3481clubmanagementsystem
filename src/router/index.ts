@@ -61,6 +61,12 @@ const router = createRouter({
       component: () => import('@/views/club/ClubAnnouncementsView.vue'),
       meta: { roles: ['club_admin', 'club_secretary'] },
     },
+    {
+      path: '/club/governor-award',
+      name: 'club-governor-award',
+      component: () => import('@/views/club/GovernorAwardFormView.vue'),
+      meta: { roles: ['club_admin', 'club_secretary'] },
+    },
     // H 通訊錄
     {
       path: '/directory',
@@ -85,6 +91,12 @@ const router = createRouter({
       path: '/admin/announcements',
       name: 'admin-announcements',
       component: () => import('@/views/admin/DistrictAnnouncementsView.vue'),
+      meta: { role: 'district_admin' },
+    },
+    {
+      path: '/admin/governor-awards',
+      name: 'admin-governor-awards',
+      component: () => import('@/views/admin/GovernorAwardSummaryView.vue'),
       meta: { role: 'district_admin' },
     },
     {

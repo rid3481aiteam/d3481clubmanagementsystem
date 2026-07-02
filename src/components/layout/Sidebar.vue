@@ -19,6 +19,9 @@
         <RouterLink to="/admin/announcements" class="nav-item">
           <span class="nav-icon">📣</span>地區公告
         </RouterLink>
+        <RouterLink to="/admin/governor-awards" class="nav-item">
+          <span class="nav-icon">🏅</span>總監獎項統整
+        </RouterLink>
         <RouterLink to="/admin/permissions" class="nav-item">
           <span class="nav-icon">🔐</span>權限矩陣
         </RouterLink>
@@ -44,6 +47,9 @@
         </RouterLink>
         <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/announcements" class="nav-item">
           <span class="nav-icon">📣</span>社內公告
+        </RouterLink>
+        <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/governor-award" class="nav-item">
+          <span class="nav-icon">🏅</span>總監獎項申請
         </RouterLink>
       </template>
 

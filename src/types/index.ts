@@ -81,6 +81,48 @@ export type ClubAnnouncementUpdate = Partial<
   Omit<ClubAnnouncement, 'id' | 'club_id' | 'created_at' | 'updated_at' | 'created_by'>
 >
 
+// ── 總監獎項申請 ─────────────────────────────────────
+export type GovernorAwardStatus = 'draft' | 'submitted'
+export type GovernorAwardGroup = 'A' | 'B'
+
+export interface GovernorAwardCriterion {
+  key: string
+  itemNo: string
+  category: string
+  description: string
+  referenceScore: number | null
+}
+
+export interface GovernorAwardSection {
+  key: string
+  title: string
+  criteria: GovernorAwardCriterion[]
+}
+
+export interface GovernorAwardResponse {
+  score: number | null
+  note: string
+}
+
+export type GovernorAwardResponses = Record<string, GovernorAwardResponse>
+
+export interface GovernorAwardApplication {
+  id: string
+  club_id: string
+  year_term: string
+  group_type: GovernorAwardGroup | null
+  member_count: number | null
+  status: GovernorAwardStatus
+  responses: GovernorAwardResponses
+  other_text: string | null
+  total_score: number
+  submitted_at: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ── 社的年度幹部 ──────────────────────────────────────
 export type ClubOfficerRole =
   | 'president' | 'president_elect' | 'vice_president' | 'secretary' | 'committee_member'
