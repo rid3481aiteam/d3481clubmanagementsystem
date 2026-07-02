@@ -1,20 +1,20 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十九輪，Claude 修正註冊頁——先選分區再選社，避免長清單；第十八輪開發社員手機號碼帳號機制——社員免 Email 註冊，執秘/社長後台建帳號、一鍵重設密碼，與第十七輪的 Email 自助註冊機制並存、分別對應不同社員的使用情境；三輪的 migration 都還**未套用**、edge functions/路由都還**未部署**，待使用者處理）
+> 最後更新：2026-07-02（使用者已在 Supabase SQL Editor 執行完 `025_self_registration.sql`、`026_member_phone_accounts.sql`、`027_registration_zone.sql` 三支 migration；`027` 原始版本因為 Postgres 不准 `CREATE OR REPLACE` 改變 function 回傳型別噴錯，已修成先 `DROP FUNCTION` 再重建，使用者用修好的版本重跑成功。第十九輪修正註冊頁先選分區再選社；第十八輪開發社員手機號碼帳號機制，與第十七輪的 Email 自助註冊機制並存。**接下來還要部署 Edge Functions 跟 Cloudflare Pages 才能真正上線**，見下方待辦）
 
 ---
 
 ## ⚠️ 待辦
 
-0. **【第十七輪，優先處理】自助註冊功能要上線前，需要使用者手動完成以下步驟**（程式碼已寫完並推上 GitHub，但這幾步無法由 Claude 代勞）：
-   - 在 Supabase SQL Editor 依序執行 `supabase/migrations/025_self_registration.sql`（新增 `user_profiles.requested_role` 欄位、更新 `handle_new_user()` trigger、新增 `public_clubs_for_registration()` function 並開放給 `anon` 角色）與 `supabase/migrations/027_registration_zone.sql`（第十九輪新增，`public_clubs_for_registration()` 補回傳 `zone` 欄位，讓註冊頁能先選分區再選社）
+0. **【第十七輪，自助註冊功能上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅，程式碼已寫完並推上 GitHub，剩下這幾步無法由 Claude 代勞）：
+   - ~~在 Supabase SQL Editor 執行 `025_self_registration.sql`、`027_registration_zone.sql`~~ **已完成**
    - Authentication → URL Configuration → Redirect URLs 新增兩個網址：`https://d3481clubmanagementsystem.pages.dev/verify-email` 與 `https://d3481clubmanagementsystem.pages.dev/reset-password`（比照既有 `/accept-invite` 的做法）
    - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）
    - 確認 Authentication → Email Templates 的「Confirm signup」「Reset Password」樣板都有正常寄送（該地區之前已設定自訂 SMTP，理論上沿用即可，但這兩個樣板可能沒單獨測過）
    - 部署到 Cloudflare Pages（新增了 4 個路由：`/register`、`/verify-email`、`/forgot-password`、`/reset-password`）
    - 全部設定完成後，建議實際跑一次完整流程：註冊 → 收驗證信 → 點擊驗證 → 登入 → 地區管理員在「帳號管理」頁看到「自助註冊待審核」名單 → 核准或維持社員
-1. **【第十八輪新功能，待部署與實測】社員手機號碼帳號機制**：
-   - 使用者到 Supabase SQL Editor 執行 `supabase/migrations/026_member_phone_accounts.sql`（`user_profiles` 加 `phone` 欄位 + 放寬 RLS 讓社長/執秘可管理社員帳號）——**檔名是 026 不是 025**，因為第十七輪已經用掉 `025_self_registration.sql` 這個編號，兩支互不依賴、順序不影響
+1. **【第十八輪，社員手機號碼帳號機制上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅）：
+   - ~~在 Supabase SQL Editor 執行 `026_member_phone_accounts.sql`~~ **已完成**
    - 部署兩個新 Edge Function：`supabase functions deploy create-member-account`、`supabase functions deploy reset-member-password`
    - 部署完成後到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝手機末四碼）、用手機號碼登入、忘記密碼一鍵重設回手機末四碼、停用/刪除社員帳號
    - 本機沒有 `.env`（只有 `.env.example`），無法在這個環境跑真實 Supabase 連線驗證登入，只做了 `vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過
