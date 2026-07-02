@@ -6,7 +6,7 @@ import { useMeetingsStore } from '@/stores/meetings'
 import { useAttendanceStore } from '@/stores/attendance'
 import { useRosterStore } from '@/stores/roster'
 import { usePermissionsStore } from '@/stores/permissions'
-import type { AttendanceStatus } from '@/types'
+import type { AttendanceStatus, RosterMember } from '@/types'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -26,6 +26,14 @@ const STATUS_LABEL: Record<AttendanceStatus, string> = {
   exempt: '免計',
 }
 
+function isAttendanceMember(m: RosterMember) {
+  return (m.member_status ?? (m.is_active ? 'normal' : 'resigned')) !== 'resigned'
+}
+
+function displayName(m: RosterMember) {
+  return m.nick_name ? `${m.nick_name}（${m.name}）` : m.name
+}
+
 async function load() {
   const meetingId = route.params.id as string
   await meetings.fetchOne(meetingId)
@@ -33,7 +41,7 @@ async function load() {
   await attendance.fetchSession(meetingId)
 
   const map: Record<string, AttendanceStatus> = {}
-  for (const m of roster.members.filter(m => m.is_active)) {
+  for (const m of roster.members.filter(isAttendanceMember)) {
     const existing = attendance.details.find(d => d.member_id === m.id)
     map[m.id] = existing?.status ?? 'present'
   }
@@ -75,14 +83,14 @@ watch(() => route.params.id, load)
         <thead class="th">
           <tr>
             <th>姓名</th>
-            <th>職稱</th>
+            <th>社內職稱</th>
             <th>狀態</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in roster.members.filter(m => m.is_active)" :key="m.id">
-            <td>{{ m.name }}</td>
-            <td>{{ m.job_title || '-' }}</td>
+          <tr v-for="m in roster.members.filter(isAttendanceMember)" :key="m.id">
+            <td>{{ displayName(m) }}</td>
+            <td>{{ m.club_position || '社友' }}</td>
             <td>
               <select v-if="canManage" v-model="statuses[m.id]" class="fi" style="max-width:120px;">
                 <option v-for="(label, key) in STATUS_LABEL" :key="key" :value="key">{{ label }}</option>
@@ -90,8 +98,8 @@ watch(() => route.params.id, load)
               <span v-else class="bdg b-n">{{ STATUS_LABEL[statuses[m.id]] }}</span>
             </td>
           </tr>
-          <tr v-if="!roster.members.filter(m => m.is_active).length">
-            <td colspan="3" style="text-align:center; color:var(--muted);">尚無在職社友</td>
+          <tr v-if="!roster.members.filter(isAttendanceMember).length">
+            <td colspan="3" style="text-align:center; color:var(--muted);">尚無可登記社友</td>
           </tr>
         </tbody>
       </table>

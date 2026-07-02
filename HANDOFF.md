@@ -1,22 +1,37 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第六輪，Codex 從 Excel 匯入各社執秘與例會通訊錄資料）
+> 最後更新：2026-07-02（第七輪，Codex 調整儀表板與社友名冊欄位）
 
 ---
 
 ## ⚠️ 待辦
-1. **依序執行 `015`～`020` 六支尚未跑過的 migration**（SQL Editor 貼上執行）：
+1. **依序執行 `015`～`021` 七支尚未跑過的 migration**（SQL Editor 貼上執行）：
    - `015_seed_district_clubs.sql`：建立全地區 105 筆社團基本資料（依分區，僅 name + zone）
    - `016_club_sort_order.sql`：新增 `clubs.sort_order`，社團總覽的上/下移按鈕需要這個欄位
    - `017_roster_classification.sql`：`roster` 新增 `classification`（職業分類），社團資訊頁的「領域分布」需要這個欄位，且要各社自行在社友名冊補填才有統計意義
    - `018_club_officers.sql`：新增 `club_officers` 表（社的年度幹部），社團資訊頁的「社的年度成員」跟 `/club/officers` 頁都需要這張表
    - `019_seed_club_leaders.sql`：從外部資料來源補上 100 社的 `pres_name`/`sec_name`，只在欄位為 NULL 時才寫入，不會覆蓋各社自行填的資料
-   - `020_seed_club_directory_from_excel.sql`（本輪新增）：從 Excel 匯入 105 社 `sec_name`/`email`/`phone`/`addr`/`freq`/`meeting_time`/`venue`/`venue_tel`/`note`，採覆蓋式更新；內建 105 筆 row-count guard，未完整對上會 rollback
+   - `020_seed_club_directory_from_excel.sql`：從 Excel 匯入 105 社 `sec_name`/`email`/`phone`/`addr`/`freq`/`meeting_time`/`venue`/`venue_tel`/`note`，採覆蓋式更新；內建 105 筆 row-count guard，未完整對上會 rollback
+   - `021_roster_member_profile_fields.sql`（本輪新增）：`roster` 新增 `club_position`、`member_status`、`personal_phone`、`company_phone`，並用既有 `phone` 初始化 `personal_phone`
 2. **檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名**（見下方踩坑紀錄）
 3. **Edge Functions → invite-user**：確認部署的是最新版本（含 `name` 欄位，commit `61ae44c`），內容見 `supabase/functions/invite-user/index.ts`
 4. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
 5. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
 6. 確認 Authentication → URL Configuration 的 Site URL / Redirect URLs 已改成正式網址（不是 localhost），且自訂 SMTP 已設定並測試成功寄信
+
+## 本次完成（第七輪）：儀表板文案/統計 + 社友名冊欄位調整
+
+使用者回饋儀表板與社友名冊顯示欄位需要更貼近社內使用方式。
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/021_roster_member_profile_fields.sql` | `roster` 新增 `club_position`（`PP`/`IPP`/`P`/`VP`/`PE`/`S`/`社友`）、`member_status`（`normal`/`leave`/`resigned`，畫面顯示正常/請假/退社）、`personal_phone`、`company_phone`；既有 `phone` 會回填到 `personal_phone`，退社資料同步 `member_status='resigned'` |
+| `src/views/DashboardView.vue`、`src/stores/dashboard.ts` | 儀表板「本屆例會數」改為「本月例會數」，統計改查當月 `meetings.date`；「在職社友人數」改顯示「社友人數」 |
+| `src/views/roster/RosterView.vue` | 社友名冊列表改為英文名稱優先、再中文姓名；新增社內職稱、狀態、個人電話、公司電話；社內職稱/狀態在新增與編輯表單中以下拉選單編輯；匯入/匯出 Excel 同步新增欄位；狀態選 `退社` 時仍同步舊欄位 `is_active=false`，讓既有統計/出席邏輯相容 |
+| `src/stores/roster.ts`、`src/types/index.ts` | 型別與排序同步新欄位；名冊載入改依 `nick_name`（英文名稱）優先排序，再依中文姓名 |
+| `src/views/admin/ClubDetailView.vue`、`src/views/meetings/AttendanceView.vue` | 社團資訊頁與出席登記頁同步顯示英文名稱優先、社內職稱、正常/請假/退社狀態，以及個人/公司電話欄位 |
+
+**注意**：`member_status='leave'` 仍視為可出席登記的社友；只有 `resigned` 會同步 `is_active=false` 並從出席登記名單排除。`phone` 欄位仍保留作相容欄位，前端儲存時會用個人電話同步更新。
 
 ## 本次完成（第六輪）：從 Excel 匯入全地區各社執秘與例會通訊錄資料
 
@@ -306,6 +321,7 @@ npm run dev   # port 5174
 | 018_club_officers | 新增 club_officers 表（社的年度幹部：社長/社長當選人/副社長/秘書/委員會成員） |
 | 019_seed_club_leaders | 從外部資料來源補上 100 社 `pres_name`/`sec_name`，只在欄位為 NULL 時寫入 |
 | 020_seed_club_directory_from_excel | 從 2025-26 Excel 通訊錄覆蓋匯入 105 社執秘、社辦、例會地點與訂位電話資料 |
+| 021_roster_member_profile_fields | roster 新增社內職稱、正常/請假/退社狀態、個人電話、公司電話 |
 
 ---
 

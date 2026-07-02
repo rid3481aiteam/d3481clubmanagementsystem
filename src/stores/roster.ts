@@ -9,7 +9,11 @@ export const useRosterStore = defineStore('roster', () => {
 
   async function fetchAll(clubId: string | null) {
     loading.value = true
-    let query = supabase.from('roster').select('*').order('name')
+    let query = supabase
+      .from('roster')
+      .select('*')
+      .order('nick_name', { ascending: true, nullsFirst: false })
+      .order('name')
     if (clubId) query = query.eq('club_id', clubId)
     const { data } = await query
     members.value = data ?? []
@@ -27,7 +31,7 @@ export const useRosterStore = defineStore('roster', () => {
   }
 
   async function setActive(id: string, isActive: boolean) {
-    return update(id, { is_active: isActive })
+    return update(id, { is_active: isActive, member_status: isActive ? 'normal' : 'resigned' })
   }
 
   return { members, loading, fetchAll, insert, update, setActive }

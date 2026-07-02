@@ -19,7 +19,7 @@ onMounted(() => {
 
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin-bottom:24px;">
       <div class="tw" style="padding:18px;">
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">本屆例會數</div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">本月例會數</div>
         <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.meetingCount }}</div>
       </div>
       <div class="tw" style="padding:18px;">
@@ -29,7 +29,7 @@ onMounted(() => {
         </div>
       </div>
       <div class="tw" style="padding:18px;">
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">在職社友人數</div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">社友人數</div>
         <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.memberCount }}</div>
       </div>
     </div>

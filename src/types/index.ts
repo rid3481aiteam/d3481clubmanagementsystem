@@ -145,16 +145,23 @@ export interface MemberAttendanceRate {
 }
 
 // ── 社友名冊 ─────────────────────────────────────────
+export type RosterClubPosition = 'PP' | 'IPP' | 'P' | 'VP' | 'PE' | 'S' | '社友'
+export type RosterMemberStatus = 'normal' | 'leave' | 'resigned'
+
 export interface RosterMember {
   id: string
   club_id: string
   name: string
   nick_name: string | null
+  club_position: RosterClubPosition
+  member_status: RosterMemberStatus
   job_title: string | null
   company: string | null
   classification: string | null
   email: string | null
   phone: string | null
+  personal_phone: string | null
+  company_phone: string | null
   join_date: string | null
   is_active: boolean
   note: string | null
@@ -169,11 +176,15 @@ export type RosterMemberUpdate = Partial<RosterMemberInsert>
 export interface RosterExcelRow {
   姓名: string
   英文名?: string
+  社內職稱?: RosterClubPosition
+  狀態?: string
   職稱?: string
   職業分類?: string
   公司?: string
   Email?: string
   電話?: string
+  個人電話?: string
+  公司電話?: string
   入社日期?: string
 }
 

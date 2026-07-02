@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
-import type { Club, Meeting, ClubOfficerRole } from '@/types'
+import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus } from '@/types'
 
 const route = useRoute()
 const roster = useRosterStore()
@@ -21,7 +21,17 @@ const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
   { role: 'secretary', label: '秘書' },
 ]
 
-const activeMembers = computed(() => roster.members.filter(m => m.is_active))
+const MEMBER_STATUS_LABEL: Record<RosterMemberStatus, string> = {
+  normal: '正常',
+  leave: '請假',
+  resigned: '退社',
+}
+
+function memberStatus(m: RosterMember): RosterMemberStatus {
+  return m.member_status ?? (m.is_active ? 'normal' : 'resigned')
+}
+
+const activeMembers = computed(() => roster.members.filter(m => memberStatus(m) !== 'resigned'))
 
 const classificationBreakdown = computed(() => {
   const map = new Map<string, number>()
@@ -92,8 +102,8 @@ watch(() => route.params.id, load)
 
     <div class="grid">
       <div class="tw card">
-        <h3>社員人數</h3>
-        <p class="stat">{{ activeMembers.length }} <span class="unit">人（在職）</span></p>
+        <h3>社友人數</h3>
+        <p class="stat">{{ activeMembers.length }} <span class="unit">人</span></p>
       </div>
 
       <div class="tw card">
@@ -151,11 +161,14 @@ watch(() => route.params.id, load)
       <table>
         <thead class="th">
           <tr>
-            <th>姓名</th>
-            <th>職稱</th>
+            <th>英文名稱</th>
+            <th>中文姓名</th>
+            <th>社內職稱</th>
             <th>職業分類</th>
             <th>公司</th>
-            <th>電話</th>
+            <th>職稱</th>
+            <th>個人電話</th>
+            <th>公司電話</th>
             <th>Email</th>
             <th>入社日期</th>
             <th>狀態</th>
@@ -163,17 +176,24 @@ watch(() => route.params.id, load)
         </thead>
         <tbody>
           <tr v-for="m in roster.members" :key="m.id">
-            <td>{{ m.name }}<span v-if="m.nick_name" style="color:var(--muted)"> ({{ m.nick_name }})</span></td>
-            <td>{{ m.job_title || '-' }}</td>
+            <td>{{ m.nick_name || '-' }}</td>
+            <td>{{ m.name }}</td>
+            <td>{{ m.club_position || '社友' }}</td>
             <td>{{ m.classification || '-' }}</td>
             <td>{{ m.company || '-' }}</td>
-            <td>{{ m.phone || '-' }}</td>
+            <td>{{ m.job_title || '-' }}</td>
+            <td>{{ m.personal_phone || m.phone || '-' }}</td>
+            <td>{{ m.company_phone || '-' }}</td>
             <td>{{ m.email || '-' }}</td>
             <td>{{ m.join_date || '-' }}</td>
-            <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '在職' : '離職' }}</span></td>
+            <td>
+              <span class="bdg" :class="memberStatus(m) === 'resigned' ? 'b-g' : memberStatus(m) === 'leave' ? 'b-y' : 'b-gr'">
+                {{ MEMBER_STATUS_LABEL[memberStatus(m)] }}
+              </span>
+            </td>
           </tr>
           <tr v-if="!roster.members.length">
-            <td colspan="8" style="text-align:center; color:var(--muted);">該社尚無社友資料</td>
+            <td colspan="11" style="text-align:center; color:var(--muted);">該社尚無社友資料</td>
           </tr>
         </tbody>
       </table>

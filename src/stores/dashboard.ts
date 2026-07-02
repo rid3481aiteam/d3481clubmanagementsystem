@@ -10,6 +10,23 @@ function currentYearTerm(): string {
   return m >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 
+function currentMonthRange() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  return {
+    start: formatLocalDate(start),
+    end: formatLocalDate(end),
+  }
+}
+
+function formatLocalDate(date: Date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export const useDashboardStore = defineStore('dashboard', () => {
   const meetingCount = ref(0)
   const avgRate = ref<number | null>(null)
@@ -21,12 +38,21 @@ export const useDashboardStore = defineStore('dashboard', () => {
   async function load(clubId: string | null) {
     loading.value = true
     const yearTerm = currentYearTerm()
+    const monthRange = currentMonthRange()
 
-    let meetingsQuery = supabase.from('meetings').select('id').eq('year_term', yearTerm)
-    if (clubId) meetingsQuery = meetingsQuery.eq('club_id', clubId)
-    const { data: meetings } = await meetingsQuery
-    const meetingIds = (meetings ?? []).map(m => m.id)
-    meetingCount.value = meetingIds.length
+    let monthlyMeetingsQuery = supabase
+      .from('meetings')
+      .select('id')
+      .gte('date', monthRange.start)
+      .lt('date', monthRange.end)
+    if (clubId) monthlyMeetingsQuery = monthlyMeetingsQuery.eq('club_id', clubId)
+    const { data: monthlyMeetings } = await monthlyMeetingsQuery
+    meetingCount.value = (monthlyMeetings ?? []).length
+
+    let yearMeetingsQuery = supabase.from('meetings').select('id').eq('year_term', yearTerm)
+    if (clubId) yearMeetingsQuery = yearMeetingsQuery.eq('club_id', clubId)
+    const { data: yearMeetings } = await yearMeetingsQuery
+    const meetingIds = (yearMeetings ?? []).map(m => m.id)
 
     if (meetingIds.length) {
       const { data: sessions } = await supabase
