@@ -42,5 +42,19 @@ export const useClubStore = defineStore('club', () => {
     return { error: e1 || e2 }
   }
 
-  return { current, allClubs, loading, fetchCurrent, fetchAll, upsertClub, swapOrder }
+  async function checkDeletable(id: string) {
+    const [rosterRes, accountRes] = await Promise.all([
+      supabase.from('roster').select('id', { count: 'exact', head: true }).eq('club_id', id),
+      supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('club_id', id),
+    ])
+    return { rosterCount: rosterRes.count ?? 0, accountCount: accountRes.count ?? 0 }
+  }
+
+  async function deleteClub(id: string) {
+    const { error } = await supabase.from('clubs').delete().eq('id', id)
+    if (!error) await fetchAll()
+    return { error }
+  }
+
+  return { current, allClubs, loading, fetchCurrent, fetchAll, upsertClub, swapOrder, checkDeletable, deleteClub }
 })

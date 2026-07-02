@@ -68,6 +68,20 @@ function openEdit(c: Club) {
   showModal.value = true
 }
 
+async function removeClub(c: Club) {
+  const { rosterCount, accountCount } = await club.checkDeletable(c.id)
+  if (accountCount > 0) {
+    alert(`「${c.name}」已有 ${accountCount} 個帳號，請先到「帳號邀請 / 管理」停用或刪除該社所有帳號，才能刪除社團。`)
+    return
+  }
+  const warn = rosterCount > 0
+    ? `「${c.name}」已有 ${rosterCount} 筆社友名冊資料，刪除社團會一併清除該社的名冊／例會／出席紀錄，且無法復原。`
+    : `「${c.name}」目前沒有任何名冊資料。`
+  if (!confirm(`${warn}\n\n確定要刪除這個社團嗎？`)) return
+  const { error } = await club.deleteClub(c.id)
+  if (error) alert(error.message)
+}
+
 async function save() {
   if (!form.value.name?.trim() || !form.value.zone?.trim()) return
   if (!editing.value) {
@@ -128,6 +142,7 @@ onMounted(() => {
               <td style="display:flex; gap:6px;">
                 <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社員</RouterLink>
                 <button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button>
+                <button class="btn btn-red btn-sm" @click="removeClub(c)">刪除</button>
               </td>
             </tr>
           </template>
