@@ -28,8 +28,10 @@ function phoneToEmail(phone: string) {
   return `${phone}@${MEMBER_EMAIL_DOMAIN}`
 }
 
+// 用完整手機號碼當初始密碼（帳號也是手機號碼），Supabase Auth 的
+// 最短密碼長度下限是 6 碼，末四碼不夠長；用完整號碼長輩只要記一組數字。
 function defaultPassword(phone: string) {
-  return phone.slice(-4)
+  return phone
 }
 
 Deno.serve(async (req) => {

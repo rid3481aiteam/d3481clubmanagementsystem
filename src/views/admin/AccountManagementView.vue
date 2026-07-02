@@ -117,7 +117,7 @@ async function submitCreateMember() {
   if (error) {
     memberError.value = error.message
   } else {
-    memberSuccess.value = `帳號已建立，初始密碼為手機末四碼「${memberPhone.value.trim().slice(-4)}」`
+    memberSuccess.value = `帳號已建立，初始密碼為完整手機號碼「${memberPhone.value.trim()}」`
     memberName.value = ''
     memberPhone.value = ''
   }
@@ -125,7 +125,7 @@ async function submitCreateMember() {
 }
 
 async function resetMemberPassword(id: string, name: string) {
-  if (!confirm(`確定要把「${name}」的密碼重設回手機末四碼嗎？`)) return
+  if (!confirm(`確定要把「${name}」的密碼重設回完整手機號碼嗎？`)) return
   const { data, error } = await accounts.resetMemberPassword(id)
   if (error) {
     alert(error.message)
@@ -316,7 +316,7 @@ onMounted(async () => {
     <div class="tw" style="padding:20px; margin:24px 0;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:6px;">新增社員帳號</h2>
       <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-        社員用手機號碼登入，不需要 Email，初始密碼為手機末四碼。忘記密碼可由社長／執秘在下方一鍵重設。
+        社員用手機號碼登入，不需要 Email，初始密碼為完整手機號碼（跟帳號一樣）。忘記密碼可由社長／執秘在下方一鍵重設。
       </p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>

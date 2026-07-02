@@ -18,11 +18,13 @@ function errorResponse(message: string, status: number) {
   })
 }
 
+// 用完整手機號碼當預設密碼，跟 create-member-account 一致；
+// Supabase Auth 的最短密碼長度下限是 6 碼，末四碼不夠長。
 function defaultPassword(phone: string) {
-  return phone.slice(-4)
+  return phone
 }
 
-// 社員忘記密碼，由社長／執秘一鍵重設回預設規則（手機號碼末四碼），
+// 社員忘記密碼，由社長／執秘一鍵重設回預設規則（完整手機號碼），
 // 不用社員自己收 email 重設連結。
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {

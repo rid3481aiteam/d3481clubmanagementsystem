@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十二輪，migration `028`、`029` 已在 Supabase 執行完成 ✅；Redirect URLs 也已確認正確（專案本來就有 `/**` 萬用字元規則，涵蓋新加的 `/verify-email`、`/reset-password`）✅；Claude 幫忙把 Confirm signup / Reset Password / Invite user 三個 Email 樣板寫成中文＋扶輪配色版本，使用者正在 Supabase Dashboard 貼上套用中，這步是 Dashboard 操作、不在 git 版控範圍內，貼完不用回來 commit。下一輪回來前，麻煩先跟使用者確認樣板貼了沒、Confirm email 開關跟密碼長度有沒有調，再繼續下面待辦）
+> 最後更新：2026-07-02（第二十三輪，**解除了社員手機號碼帳號的密碼長度死結**：使用者實測發現 Supabase Dashboard 的「Minimum password length」UI 本身就鎖死不給調到 6 以下（`Must be greater or equal to 6`），代表「密碼＝手機末四碼」這個設計從一開始就不可能過關，不是忘了調設定、是設計本身行不通。跟使用者確認後改成「密碼＝完整手機號碼」（帳號密碼都是同一組手機號碼，10 碼原生就滿足 6 碼下限，**不需要改任何 Supabase Dashboard 設定**），`create-member-account`／`reset-member-password` 兩支 Edge Function 已修正並重新部署，前端提示文字也同步改掉。第二十二輪 migration `028`、`029` 已在 Supabase 執行完成 ✅；Redirect URLs 也已確認正確 ✅；Email 樣板中文化使用者正在 Dashboard 貼上套用中，這步不影響 repo 程式碼）
 
 ---
 
@@ -18,8 +18,8 @@
 1. **【第十八輪，社員手機號碼帳號機制】migration + Edge Function 都已完成 ✅，剩下待使用者實測**：
    - ~~在 Supabase SQL Editor 執行 `026_member_phone_accounts.sql`~~ **已完成**
    - ~~部署兩個新 Edge Function~~ **已完成**（2026-07-02，Claude 直接用這台機器上已登入的 Supabase CLI 執行 `supabase link --project-ref xdwqrgthsxyzclnjlmvy` + `supabase functions deploy create-member-account` + `supabase functions deploy reset-member-password`，`supabase functions list` 確認兩支都是 `ACTIVE`，用 curl 打了一次沒帶 token，回傳乾淨的 `401 UNAUTHORIZED_NO_AUTH_HEADER`，不是伺服器錯誤，代表程式碼有正常執行）
-   - **【第二十輪新增，測試前必看，很可能會擋住整個功能】`create-member-account`／`reset-member-password` 把社員密碼設成手機末四碼（只有 4 碼），但 Supabase Auth 預設的最短密碼長度是 6 碼**：`supabase.auth.admin.createUser()`／`updateUserById()` 在密碼太短時會回傳 `Password should be at least 6 characters` 之類的錯誤，兩支 function 都有把這個 `error.message` 原樣往前端丟（不會整個 500 崩潰、也不會靜默失敗），但如果沒有事先調整設定，社長/執秘一建立社員帳號就會直接看到這個錯誤，還沒排查過的人可能會以為是程式碼壞了。**上線前務必先到 Supabase Dashboard → Authentication → Providers → Email（或新版介面的 Authentication → Policies）把「Minimum password length」調降到 4 以下**，才符合「初始密碼＝手機末四碼」這個給長輩用的簡化設計；這步跟前面的 migration/部署一樣，Claude 這邊没有 Dashboard 存取權限，無法代勞
-   - **待實測**：確認上面的密碼長度設定調好、Cloudflare Pages 部署新版前端之後，到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝手機末四碼）、用手機號碼登入、忘記密碼一鍵重設回手機末四碼、停用/刪除社員帳號
+   - ~~密碼長度死結~~ **已解決（第二十三輪）**：原本設計「初始密碼＝手機末四碼」在 Supabase 上完全行不通——使用者親自到 Dashboard 想把「Minimum password length」調到 4，UI 直接擋下來顯示 `Must be greater or equal to 6`，這是 Supabase 平台硬性下限，不是設定沒調對。改成「初始密碼＝完整手機號碼」（帳號、密碼都是同一組手機號碼，10 碼原生滿足 6 碼下限），`create-member-account`／`reset-member-password` 的 `defaultPassword()` 已改成回傳完整 `phone`、`AccountManagementView.vue` 的提示文字也同步改掉，兩支 Edge Function 已用 Supabase CLI 重新部署並 curl 驗證過（回傳乾淨的 401，非崩潰）。**這條路徑完全不需要碰 Supabase Dashboard 的密碼長度設定**
+   - **待實測**：Cloudflare Pages 部署新版前端之後，到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝完整手機號碼）、用手機號碼登入、忘記密碼一鍵重設回完整手機號碼、停用/刪除社員帳號
    - 本機沒有 `.env`（只有 `.env.example`），無法在這個環境跑真實 Supabase 連線驗證登入，只做了 `vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過
 2. **地區/各社切換按鈕沒有顯示——已定位高度可疑根因，待使用者確認並修資料**（延續自第十六輪）：使用者確認測試帳號右上角角色徽章有顯示「＋地區」字樣，代表 `district_access` 已正確載入前端（`isDistrictAdmin` 為 true）。`canSwitchView = isDistrictAdmin && !!clubId`，徽章邏輯只吃 `role`/`isDistrictAdmin`、不吃 `clubId`，所以徽章正常但按鈕不出現，唯一合理解釋是該帳號的 `user_profiles.club_id` 其實是 `NULL`。
    - 回頭查 `supabase/migrations/014_fix_handle_new_user_metadata_source.sql` 的說明文字，發現這正是有前科的 bug：`handle_new_user()` 原本讀錯 metadata 欄位（讀 `raw_app_meta_data`，但 `inviteUserByEmail` 寫入的其實是 `raw_user_meta_data`），導致**在 014 套用之前，每一個被邀請建立的帳號，`club_id` 一律被寫成 NULL**。014 只修好了「以後」新邀請帳號會正確寫入 `club_id`，**不會回頭修正 014 套用之前就已經存在、`club_id` 已經是 NULL 的舊帳號**
