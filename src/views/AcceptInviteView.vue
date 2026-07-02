@@ -1,15 +1,45 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import RotaryWheelIcon from '@/components/RotaryWheelIcon.vue'
 
 const router = useRouter()
 
+const verifying = ref(true)
+const verifyError = ref('')
+
 const password = ref('')
 const confirmPassword = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
+
+// 邀請信連結有三種可能格式：
+// 1. hash 隱含授權 #access_token=...（supabase-js 會自動偵測，不用額外處理）
+// 2. query token_hash + type（Supabase 目前預設的 email 樣板格式，需手動 verifyOtp）
+// 3. query code（PKCE flow，需手動交換 session）
+onMounted(async () => {
+  const params = new URLSearchParams(window.location.search)
+  const tokenHash = params.get('token_hash')
+  const type = params.get('type')
+  const code = params.get('code')
+
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as 'invite' | 'recovery' | 'email' })
+    if (error) verifyError.value = error.message
+  } else if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) verifyError.value = error.message
+  } else {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) verifyError.value = '邀請連結無效或已過期，請聯繫地區秘書處重新發送邀請信'
+  }
+
+  if (!verifyError.value) {
+    router.replace({ path: '/accept-invite' })
+  }
+  verifying.value = false
+})
 
 async function handleSubmit() {
   errorMsg.value = ''
@@ -50,26 +80,37 @@ async function handleSubmit() {
         </div>
       </div>
 
-      <h1 class="invite-title">設定登入密碼</h1>
-      <p class="invite-hint">歡迎加入！請設定您的登入密碼，設定完成後請用 Email + 新密碼重新登入本平台。</p>
+      <template v-if="verifying">
+        <p class="invite-hint">正在驗證邀請連結…</p>
+      </template>
 
-      <form class="invite-form" @submit.prevent="handleSubmit">
-        <div class="form-group">
-          <label class="fl">新密碼</label>
-          <input v-model="password" type="password" class="fi" placeholder="至少 8 個字元" autocomplete="new-password" required />
-        </div>
-        <div class="form-group">
-          <label class="fl">確認密碼</label>
-          <input v-model="confirmPassword" type="password" class="fi" placeholder="再輸入一次" autocomplete="new-password" required />
-        </div>
+      <template v-else-if="verifyError">
+        <h1 class="invite-title">邀請連結無法使用</h1>
+        <p class="invite-error" style="margin-top:8px;">{{ verifyError }}</p>
+      </template>
 
-        <p v-if="errorMsg" class="invite-error">{{ errorMsg }}</p>
+      <template v-else>
+        <h1 class="invite-title">設定登入密碼</h1>
+        <p class="invite-hint">歡迎加入！請設定您的登入密碼，設定完成後請用 Email + 新密碼重新登入本平台。</p>
 
-        <button type="submit" class="btn btn-p invite-btn" :disabled="loading">
-          <span v-if="loading" class="btn-spinner"></span>
-          {{ loading ? '設定中…' : '設定密碼' }}
-        </button>
-      </form>
+        <form class="invite-form" @submit.prevent="handleSubmit">
+          <div class="form-group">
+            <label class="fl">新密碼</label>
+            <input v-model="password" type="password" class="fi" placeholder="至少 8 個字元" autocomplete="new-password" required />
+          </div>
+          <div class="form-group">
+            <label class="fl">確認密碼</label>
+            <input v-model="confirmPassword" type="password" class="fi" placeholder="再輸入一次" autocomplete="new-password" required />
+          </div>
+
+          <p v-if="errorMsg" class="invite-error">{{ errorMsg }}</p>
+
+          <button type="submit" class="btn btn-p invite-btn" :disabled="loading">
+            <span v-if="loading" class="btn-spinner"></span>
+            {{ loading ? '設定中…' : '設定密碼' }}
+          </button>
+        </form>
+      </template>
     </div>
     <div class="invite-bg-stripe"></div>
   </div>
