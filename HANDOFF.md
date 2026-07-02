@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十二輪，使用者確認 `028`、`029` 都已在 Supabase 執行完成 ✅。自助註冊相關的 migration 全數套用完畢，剩下的都是 Supabase Dashboard 設定（Redirect URLs、Email 確認/樣板、密碼長度）跟 Cloudflare Pages 部署，Claude 這邊沒有存取權限，需要使用者自己做，詳見下方待辦）
+> 最後更新：2026-07-02（第二十二輪，migration `028`、`029` 已在 Supabase 執行完成 ✅；Redirect URLs 也已確認正確（專案本來就有 `/**` 萬用字元規則，涵蓋新加的 `/verify-email`、`/reset-password`）✅；Claude 幫忙把 Confirm signup / Reset Password / Invite user 三個 Email 樣板寫成中文＋扶輪配色版本，使用者正在 Supabase Dashboard 貼上套用中，這步是 Dashboard 操作、不在 git 版控範圍內，貼完不用回來 commit。下一輪回來前，麻煩先跟使用者確認樣板貼了沒、Confirm email 開關跟密碼長度有沒有調，再繼續下面待辦）
 
 ---
 
@@ -10,11 +10,11 @@
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`~~ **已完成**（第二十一輪的社長/執秘角色編輯權限已生效）
 2. **【第十七輪，自助註冊功能上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅，程式碼已寫完並推上 GitHub，剩下這幾步無法由 Claude 代勞）：
    - ~~在 Supabase SQL Editor 執行 `025_self_registration.sql`、`027_registration_zone.sql`~~ **已完成**
-   - Authentication → URL Configuration → Redirect URLs 新增兩個網址：`https://d3481clubmanagementsystem.pages.dev/verify-email` 與 `https://d3481clubmanagementsystem.pages.dev/reset-password`（比照既有 `/accept-invite` 的做法）
-   - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）
-   - 確認 Authentication → Email Templates 的「Confirm signup」「Reset Password」樣板都有正常寄送（該地區之前已設定自訂 SMTP，理論上沿用即可，但這兩個樣板可能沒單獨測過）
-   - 部署到 Cloudflare Pages（新增了 4 個路由：`/register`、`/verify-email`、`/forgot-password`、`/reset-password`）
-   - 全部設定完成後，建議實際跑一次完整流程：註冊 → 收驗證信 → 點擊驗證 → 登入 → 地區管理員在「帳號管理」頁看到「自助註冊待審核」名單 → 核准或維持社員
+   - ~~Authentication → URL Configuration → Redirect URLs 新增 `/verify-email`、`/reset-password`~~ **已確認完成**（2026-07-02，使用者截圖確認清單裡已有 `https://d3481clubmanagementsystem.pages.dev/**` 萬用字元規則＋這兩條精確規則，三條並存沒有衝突）
+   - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）——**待使用者確認，本輪尚未回報**
+   - Email 樣板（Confirm signup / Reset Password / Invite user）：**Claude 這輪已提供中文＋扶輪配色版本的 Subject/Body HTML**（深藍 `#17458F`＋金色 `#F7A81B`，跟平台視覺一致），使用者正在 Supabase Dashboard → Authentication → Emails 逐一貼上套用，**貼完後建議跑一次真實測試**（註冊一次、忘記密碼一次，確認收到的信是中文版且連結能正常導向 `/verify-email`、`/reset-password`）——這步是 Dashboard 內容編輯，不影響 repo 程式碼，貼完不用回來 commit
+   - 部署到 Cloudflare Pages（新增了 4 個路由：`/register`、`/verify-email`、`/forgot-password`、`/reset-password`）——**待使用者執行**
+   - 全部設定完成後，建議實際跑一次完整流程：註冊 → 收驗證信（中文版）→ 點擊驗證 → 登入 → 地區管理員在「帳號管理」頁看到「自助註冊待審核」名單 → 核准或維持社員
 1. **【第十八輪，社員手機號碼帳號機制】migration + Edge Function 都已完成 ✅，剩下待使用者實測**：
    - ~~在 Supabase SQL Editor 執行 `026_member_phone_accounts.sql`~~ **已完成**
    - ~~部署兩個新 Edge Function~~ **已完成**（2026-07-02，Claude 直接用這台機器上已登入的 Supabase CLI 執行 `supabase link --project-ref xdwqrgthsxyzclnjlmvy` + `supabase functions deploy create-member-account` + `supabase functions deploy reset-member-password`，`supabase functions list` 確認兩支都是 `ACTIVE`，用 curl 打了一次沒帶 token，回傳乾淨的 `401 UNAUTHORIZED_NO_AUTH_HEADER`，不是伺服器錯誤，代表程式碼有正常執行）
