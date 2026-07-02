@@ -65,7 +65,7 @@ onMounted(() => {
     <div class="ph">
       <h1>地區通訊錄</h1>
       <RouterLink
-        v-if="features.isEnabled('H3_directory_admin') && auth.isDistrictAdmin"
+        v-if="features.isEnabled('H3_directory_admin') && auth.isDistrictView"
         to="/admin/clubs"
         class="btn btn-g btn-sm"
       >管理社團</RouterLink>

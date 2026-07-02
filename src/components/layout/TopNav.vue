@@ -6,7 +6,21 @@
       </button>
       <RotaryWheelIcon class="topnav-wheel" />
       <span class="topnav-title">國際扶輪 3481 地區</span>
-      <span class="topnav-context">{{ interfaceLabel }}</span>
+      <div v-if="auth.canSwitchView" class="view-switch">
+        <button
+          type="button"
+          class="view-switch-btn"
+          :class="{ active: auth.isDistrictView }"
+          @click="auth.setViewScope('district')"
+        >地區管理介面</button>
+        <button
+          type="button"
+          class="view-switch-btn"
+          :class="{ active: !auth.isDistrictView }"
+          @click="auth.setViewScope('club')"
+        >{{ auth.clubName || '本社介面' }}</button>
+      </div>
+      <span v-else class="topnav-context">{{ interfaceLabel }}</span>
     </div>
     <div class="topnav-right">
       <span class="topnav-user" style="cursor:pointer;" title="點擊修改顯示名稱" @click="editName">
@@ -56,7 +70,7 @@ const roleBadgeClass = computed(() => {
 })
 
 const interfaceLabel = computed(() => {
-  if (auth.isDistrictAdmin) return '地區管理介面'
+  if (auth.isDistrictView) return '地區管理介面'
   return auth.clubName || '各社介面'
 })
 
@@ -123,6 +137,7 @@ async function editName() {
   .topnav-title { font-size: 13px; }
   .topnav-context { font-size: 12px; max-width: 120px; }
   .topnav-user { display: none; }
+  .view-switch-btn { font-size: 11px; padding: 4px 8px; max-width: 90px; }
 }
 
 .topnav-wheel {
@@ -148,6 +163,41 @@ async function editName() {
   color: rgba(255,255,255,.82);
   border-left: 1px solid rgba(255,255,255,.24);
   padding-left: 10px;
+}
+
+.view-switch {
+  display: flex;
+  gap: 2px;
+  background: rgba(255,255,255,.08);
+  border-radius: 999px;
+  padding: 2px;
+  margin-left: 4px;
+}
+
+.view-switch-btn {
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,.72);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .12s, color .12s;
+}
+
+.view-switch-btn:hover:not(.active) {
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+
+.view-switch-btn.active {
+  background: var(--gold);
+  color: var(--navy);
+  font-weight: 700;
 }
 
 .topnav-right {

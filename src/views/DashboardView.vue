@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAnnouncementsStore } from '@/stores/announcements'
 import { useDashboardStore } from '@/stores/dashboard'
@@ -13,10 +13,13 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' })
 }
 
-onMounted(() => {
-  if (auth.isDistrictAdmin) dashboard.loadDistrict()
+function loadForCurrentView() {
+  if (auth.isDistrictView) dashboard.loadDistrict()
   else dashboard.load(auth.clubId)
-})
+}
+
+onMounted(loadForCurrentView)
+watch(() => auth.isDistrictView, loadForCurrentView)
 </script>
 
 <template>
@@ -25,7 +28,7 @@ onMounted(() => {
       <h1>儀表板</h1>
     </div>
 
-    <template v-if="auth.isDistrictAdmin">
+    <template v-if="auth.isDistrictView">
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px;">
         <div class="tw" style="padding:18px;">
           <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">當月例會舉行數量</div>
