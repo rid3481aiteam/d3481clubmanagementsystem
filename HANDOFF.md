@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十五輪，Claude 定位地區/各社切換按鈕未顯示的高度可疑根因——疑似該測試帳號是 014 修復前建立的舊帳號，`club_id` 從一開始就是 NULL，待使用者確認並用 SQL 補值）
+> 最後更新：2026-07-02（第十六輪，Claude 找到例會編輯儲存失敗的真正根因並修正——update payload 誤帶了 GENERATED 欄位 `year_term`；地區/各社切換按鈕未顯示問題待使用者確認 `club_id` 是否為 NULL）
 
 ---
 
@@ -14,9 +14,21 @@
    - 這次確認：**不需要支援「單一帳號歸屬多個扶輪社」**，維持現有「地區權限 + 綁定單一 club_id」的雙重視角模式即可
 2. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：見下方「第十二輪」，`supabase/functions/generate-edm/index.ts` 會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）
 3. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
-4. 待使用者實測「例會管理」編輯儲存修正、地區儀表板分區收折後回報結果
+4. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第十六輪）：找到例會編輯儲存失敗的真正根因——GENERATED 欄位 `year_term` 誤入 update payload
+
+使用者在第十三輪修過（加上錯誤提示）之後，回報同一個問題還是存在：例會編輯儲存後，總表仍顯示舊資料。重新檢查發現第十三輪的修正只解決了「失敗時不再靜默」，並沒有真正解決寫入失敗本身。
+
+- 真正根因：`meetings` 表的 `year_term` 是 `005_add_year_term.sql` 建立的 `GENERATED ALWAYS AS (...) STORED` 欄位（依 `date` 自動算出扶輪年度，例如 `2025-2026`），Postgres 明確禁止對 GENERATED 欄位直接寫入，違反會直接拒絕整個 UPDATE/INSERT
+- 但 `src/types/index.ts` 的 `Meeting` 介面完全沒有宣告 `year_term`（跟 `AttendanceSession.rate` 那種有註明「GENERATED column，唯讀」的正確寫法不一致）；第十三輪把 `openEdit()` 改成用解構排除 `id`/`created_at`/`updated_at`，但因為型別裡根本沒有 `year_term`，TypeScript 檢查不出來還漏了它——而 `select('*')` 在執行期真的會把 `year_term` 一起抓回來，所以解構出來的 `rest` 物件其實還是帶著 `year_term`，送進 `meetings.update()` 照樣被 Postgres 拒絕
+- 換句話說：第十三輪加的 `error` 提示理論上這次應該真的有跳出來（因為 UPDATE 被 Postgres 拒絕會回傳明確的 error），但寫入失敗本身完全沒解決，使用者看到的還是「總表沒更新」的症狀
+- 這次修正：
+  1. `src/types/index.ts`：`Meeting` 介面補上 `year_term: string // GENERATED column，唯讀`，`MeetingInsert`/`MeetingUpdate` 的 `Omit` 加入 `'year_term'`，比照 `AttendanceSession` 的既有慣例
+  2. `src/views/meetings/MeetingListView.vue` 的 `openEdit()`：不再用 `{...m}` 或解構排除法從 fetch 回來的 row 整包帶出 payload，改成把每個可編輯欄位明確列出來組成 `form.value`——這樣不管未來 `meetings` 表再加什麼 GENERATED/唯讀欄位，都不會意外夾帶進寫入 payload，不用每次都要記得回來補排除清單
+- `vue-tsc --noEmit`、`npm run build` 皆通過；本地沒有這個專案的 Supabase 連線資訊無法用真實帳號重現原始 500/RLS 錯誤訊息驗證，請使用者這次實測時特別留意：如果編輯儲存還是失敗，畫面現在應該會跳出明確的 `alert` 錯誤訊息（不會再靜默），麻煩把錯誤訊息內容回報，才能確認是否還有其他根因
 
 ## 本次完成（第十二輪）：地區/各社視角切換 + EDM 產生器（Phase 2 第一階段）
 
