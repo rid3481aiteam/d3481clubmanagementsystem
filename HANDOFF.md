@@ -11,6 +11,7 @@
 1. **SQL Editor** 依序執行：
    - `supabase/migrations/012_club_self_manage_accounts.sql`（社長／執秘互相對等管理本社帳號）
    - `supabase/migrations/013_invite_log_club_tier_select.sql`（club_admin 也能看本社邀請紀錄，原本只有 club_secretary 能看）
+   - `supabase/migrations/014_fix_handle_new_user_metadata_source.sql`（**這支最關鍵**，修復每次邀請新帳號 `club_id`/`role` 都寫不進去的問題，詳見下方「本次發現的重大 bug」）
 2. **Edge Functions → invite-user** → 貼上 `supabase/functions/invite-user/index.ts` 最新內容覆蓋、重新 Deploy
    （累積修正：放寬邀請邏輯為社長／執秘對等 + CORS 處理 + `getUser(token)` 修正 401 + 錯誤訊息中文化 + `redirectTo` 指向 `/accept-invite`）
 3. **Edge Functions → 新建** `delete-account`（Function name 務必填對，建立當下就要打對，事後改名字不會變更 slug）→ 貼上 `supabase/functions/delete-account/index.ts` 內容 → Deploy
@@ -21,6 +22,23 @@
    （目前還是 localhost:3000，導致邀請信連結點進去顯示無法連線；改完後**已寄出的舊邀請信連結不會自動更新**，要重新邀請一次）
 
 沒做完這幾步之前：帳號互邀、刪除帳號重測、邀請信連結、中文錯誤訊息都不會正常運作。
+
+### ⚠️ 已知需要手動清理：兩筆測試期間建立的壞資料
+`yhwang0928@hotmail.com`、`erichuang@wowcasa.com.tw` 這兩個帳號是在 014 修復之前邀請的，
+`user_profiles` 已經寫入但 `club_id` 是 NULL、`role` 是 `club_member`（不是原本要邀的社長），
+所以不會出現在「社長／執秘帳號」表格裡，`delete-account` 也找不到它們（該 function 限定
+只能刪 club_admin/club_secretary 角色）。**用不到自己的刪除功能**，最簡單的清法：
+Supabase Dashboard → **Authentication → Users**，直接找到這兩個 email 點刪除即可。
+清掉之後重新邀請，這次 `role`/`club_id` 應該就會正確寫入。
+
+### 本次發現的重大 bug：`handle_new_user()` 讀錯 metadata 欄位
+`invite-user` Edge Function 呼叫 `inviteUserByEmail(email, { data: { club_id, role } })`，
+`data` 參數實際寫入的是 `raw_user_meta_data`（Admin API 固定行為，`inviteUserByEmail`
+也沒有提供設定 `app_metadata` 的選項），但 008 版本的 `handle_new_user()` 讀的是
+`raw_app_meta_data`，兩邊對不上。結果是**從 001 建表以來，每一個透過邀請流程建立的帳號，
+`club_id` 都是 NULL、`role` 都 fallback 成 `club_member`**——只是因為之前一直卡在
+CORS/401/slug 這些問題，從來沒有邀請成功過，所以這個 bug 沒被踩到。
+`014_fix_handle_new_user_metadata_source.sql` 已修復，改讀 `raw_user_meta_data`。
 
 ### 本次新增：永久刪除帳號 + 接受邀請設定密碼頁
 
