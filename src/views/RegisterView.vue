@@ -18,10 +18,33 @@ function zoneRank(zone: string) {
   return i === -1 ? ZONE_ORDER.length : i
 }
 
+// 不屬於任何特定社團的地區辦公室人員，選這個分區選項時直接略過選社團，
+// club_id 存 null（跟 district_admin 帳號原本就允許 club_id 是 null 的做法一致）
+const DISTRICT_OFFICE = '__district_office__'
+
+// 職稱比系統的 UserRole 權限 enum 細很多，這裡另外存成 requested_title（純文字，
+// 只給管理員審核時參考），同時保留一個粗略對應的 requested_role 給既有審核流程的
+// 下拉選單預帶預設值，實際要核准成哪個角色仍由管理員在後台自行決定
+const TITLE_OPTIONS: { code: string; label: string; role: UserRole }[] = [
+  { code: 'DG', label: '總監 DG', role: 'club_member' },
+  { code: 'DS', label: '地區秘書 DS', role: 'club_member' },
+  { code: 'DA', label: '地區助理 DA', role: 'club_member' },
+  { code: 'VDS', label: '副地區秘書 VDS', role: 'club_member' },
+  { code: 'AG', label: '分區助理總監 AG', role: 'club_member' },
+  { code: 'VAG', label: '副分區助理總監 VAG', role: 'club_member' },
+  { code: 'CP', label: '創社社長 CP', role: 'club_admin' },
+  { code: 'PP', label: '前社長 PP', role: 'club_member' },
+  { code: 'P', label: '社長 P', role: 'club_admin' },
+  { code: 'PE', label: '社長當選人 PE', role: 'club_admin' },
+  { code: 'VP', label: '副社長 VP', role: 'club_member' },
+  { code: 'S', label: '秘書 S', role: 'club_secretary' },
+  { code: 'RTN', label: '社友 RTN', role: 'club_member' },
+]
+
 const email = ref('')
 const zone = ref('')
 const clubId = ref('')
-const requestedRole = ref<UserRole>('club_member')
+const requestedTitle = ref('RTN')
 const password = ref('')
 const confirmPassword = ref('')
 const loading = ref(false)
@@ -41,13 +64,16 @@ const zones = computed(() => {
   return [...set].sort((a, b) => zoneRank(a) - zoneRank(b) || a.localeCompare(b))
 })
 
+const isDistrictOffice = computed(() => zone.value === DISTRICT_OFFICE)
 const clubsInZone = computed(() => clubs.value.filter(c => (c.zone || '未分區') === zone.value))
 
 function onZoneChange() {
   clubId.value = ''
 }
 
-const canSubmit = computed(() => !!email.value && !!zone.value && !!clubId.value && !!password.value && !!confirmPassword.value)
+const canSubmit = computed(() =>
+  !!email.value && !!zone.value && (isDistrictOffice.value || !!clubId.value) && !!password.value && !!confirmPassword.value
+)
 
 function translateAuthError(message: string): string {
   if (message.includes('already registered')) return '此 Email 已經註冊過帳號，請直接登入或使用忘記密碼功能。'
@@ -57,7 +83,11 @@ function translateAuthError(message: string): string {
 async function handleSubmit() {
   errorMsg.value = ''
 
-  if (!clubId.value) {
+  if (!zone.value) {
+    errorMsg.value = '請先選擇分區'
+    return
+  }
+  if (!isDistrictOffice.value && !clubId.value) {
     errorMsg.value = '請先選擇所屬社團'
     return
   }
@@ -70,12 +100,18 @@ async function handleSubmit() {
     return
   }
 
+  const titleOption = TITLE_OPTIONS.find(t => t.code === requestedTitle.value)
+
   loading.value = true
   const { error } = await supabase.auth.signUp({
     email: email.value.trim(),
     password: password.value,
     options: {
-      data: { club_id: clubId.value, requested_role: requestedRole.value },
+      data: {
+        club_id: isDistrictOffice.value ? null : clubId.value,
+        requested_role: titleOption?.role ?? 'club_member',
+        requested_title: requestedTitle.value,
+      },
       emailRedirectTo: `${window.location.origin}/verify-email`,
     },
   })
@@ -119,10 +155,11 @@ async function handleSubmit() {
           <label class="fl">分區</label>
           <select v-model="zone" class="fi" required :disabled="clubsLoading" @change="onZoneChange">
             <option value="" disabled>{{ clubsLoading ? '載入中…' : '請選擇' }}</option>
+            <option :value="DISTRICT_OFFICE">3481地區辦公室</option>
             <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" v-if="!isDistrictOffice">
           <label class="fl">所屬社團</label>
           <select v-model="clubId" class="fi" required :disabled="!zone">
             <option value="" disabled>{{ zone ? '請選擇' : '請先選擇分區' }}</option>
@@ -131,10 +168,8 @@ async function handleSubmit() {
         </div>
         <div class="form-group">
           <label class="fl">職稱</label>
-          <select v-model="requestedRole" class="fi">
-            <option value="club_admin">社長</option>
-            <option value="club_secretary">執秘</option>
-            <option value="club_member">社員</option>
+          <select v-model="requestedTitle" class="fi">
+            <option v-for="t in TITLE_OPTIONS" :key="t.code" :value="t.code">{{ t.label }}</option>
           </select>
         </div>
         <div class="form-group">

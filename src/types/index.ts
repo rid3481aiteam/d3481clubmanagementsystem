@@ -16,6 +16,7 @@ export interface UserProfile {
   name: string
   role: UserRole
   requested_role: UserRole | null
+  requested_title: string | null
   district_access: boolean
   is_active: boolean
   phone: string | null

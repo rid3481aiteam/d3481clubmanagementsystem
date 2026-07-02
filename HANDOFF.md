@@ -1,13 +1,14 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十一輪，使用者提三個需求：① 自助註冊帳號的角色由執秘/社長就能在後台編輯，不用每次都找地區管理員；② 「新增社員帳號」只有地區介面才要選分區/社，各社自己開不用選；③ 忘記密碼頁要主動提醒密碼規則，別讓使用者一直亂試。三項都已完成並推上 GitHub，**新增一支 migration `028_club_tier_role_management.sql` 還沒套用**，見下方待辦 0）
+> 最後更新：2026-07-02（第二十二輪，使用者確認 `028` 已在 Supabase 執行完成 ✅；接著加碼兩個需求：① 註冊頁分區選單新增「3481地區辦公室」選項，選了就不用挑社團，`club_id` 存 null；② 職稱下拉全面換成扶輪社真實職稱代碼 DG/DS/DA/VDS/AG/VAG/CP/PP/P/PE/VP/S/RTN。兩項都已完成並推上 GitHub，**新增一支 migration `029_registration_title.sql` 還沒套用**，見下方待辦 0）
 
 ---
 
 ## ⚠️ 待辦
 
-0. **【第二十一輪，新增，優先處理】在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`**：放寬 024 的 `protect_user_profile_privileged_fields()` trigger，讓社長／執秘也能改本社帳號的角色（club_admin/club_secretary/club_member 三者互轉），不套用的話「帳號管理」頁新的角色下拉選單點下去會被 DB 擋掉、跳出「沒有權限變更帳號角色」的錯誤
-1. **【第十七輪，自助註冊功能上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅，程式碼已寫完並推上 GitHub，剩下這幾步無法由 Claude 代勞）：
+0. **【第二十二輪，新增，優先處理】在 Supabase SQL Editor 執行 `supabase/migrations/029_registration_title.sql`**：`user_profiles` 新增 `requested_title text` 欄位（存扶輪社職稱代碼，如 `PP`、`DG`），`handle_new_user()` trigger 同步寫入。不套用的話註冊頁選的職稱代碼不會被存下來（`requested_title` 欄位不存在，`INSERT` 會直接失敗，整個註冊流程會壞掉），**這支比照之前幾支的急迫程度，務必優先執行**
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`~~ **已完成**（第二十一輪的社長/執秘角色編輯權限已生效）
+2. **【第十七輪，自助註冊功能上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅，程式碼已寫完並推上 GitHub，剩下這幾步無法由 Claude 代勞）：
    - ~~在 Supabase SQL Editor 執行 `025_self_registration.sql`、`027_registration_zone.sql`~~ **已完成**
    - Authentication → URL Configuration → Redirect URLs 新增兩個網址：`https://d3481clubmanagementsystem.pages.dev/verify-email` 與 `https://d3481clubmanagementsystem.pages.dev/reset-password`（比照既有 `/accept-invite` 的做法）
    - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）
@@ -31,6 +32,24 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第二十二輪）：註冊頁新增「3481地區辦公室」選項、職稱換成扶輪社真實職稱代碼
+
+延續第二十一輪的自助註冊功能，使用者這輪加兩個需求：
+
+1. 分區選單要多一個「3481地區辦公室」選項，給不屬於特定社團、直接在地區辦公室服務的人註冊時選
+2. 職稱下拉原本只有社長/執秘/社員三個系統角色，要換成扶輪社實際會用的職稱代碼：DG/DS/DA/VDS/AG/VAG/CP/PP/P/PE/VP/S/RTN
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/029_registration_title.sql`（新增，**尚未套用**） | `user_profiles` 新增 `requested_title text` 欄位；`handle_new_user()` trigger 同步從 `raw_user_meta_data->>'requested_title'` 寫入。不動既有的 `requested_role`（enum 型別，還是 `user_role` 那四種），因為這 13 種扶輪社職稱跟系統權限角色本來就對不上、沒必要硬塞進同一個 enum |
+| `src/views/RegisterView.vue` | 新增 `DISTRICT_OFFICE` sentinel 值：「分區」下拉多一個「3481地區辦公室」選項，選了之後「所屬社團」欄位整個隱藏（`v-if="!isDistrictOffice"`），送出時 `club_id` 帶 `null`——沿用 `district_admin` 帳號本來就允許 `club_id` 是 `null` 的既有資料模型，沒有在 `clubs` 表新增一筆假社團（避免通訊錄、社團總覽、名冊等其他吃 `clubs` 表的功能被污染）。職稱下拉改成 `TITLE_OPTIONS`（13 個代碼＋中文標籤），每個代碼對應一個粗略的 `requested_role` 建議值（`P`/`PE`/`CP`→`club_admin`，`S`→`club_secretary`，其餘→`club_member`），送出時 `requested_role` 跟 `requested_title` 兩個欄位都會帶上去 |
+| `src/views/admin/AccountManagementView.vue` | 「自助註冊待審核」的「申請職稱」欄改成優先顯示 `requested_title`（透過 `TITLE_LABELS` 對照表轉中文），沒有的話 fallback 回舊的 `roleLabel(requested_role)`（相容第二十一輪以前、還沒有 `requested_title` 的舊資料）；`clubName()` 補上 `id` 為 `null` 時顯示「3481地區辦公室」，而不是原本的「-」，「社團」欄位才看得出這是地區辦公室的人 |
+| `src/types/index.ts` | `UserProfile` 新增 `requested_title: string \| null` |
+
+**這功能只加在自助註冊頁（`/register`）**，地區管理員在「帳號管理」頁手動建立社員帳號（手機號碼那個流程）沒有加這個選項——那支 `create-member-account` Edge Function 目前 `club_id` 是必填，要讓它也支援「3481地區辦公室」的話要改 Edge Function 邏輯並重新部署，這台環境沒有 Supabase CLI 登入權限無法部署，先沒動；如果也需要這個，麻煩之後另外提出。
+
+**驗證**：`npx vue-tsc --noEmit`、`npm run build` 皆通過。用假的 Supabase 連線資訊起本機 dev server，實際在瀏覽器操作註冊頁：確認「分區」下拉有「3481地區辦公室」選項、選了之後「所屬社團」欄位消失、職稱下拉正確列出 13 個代碼且預設是「社友 RTN」、填完 email/密碼後送出按鈕正確從 disabled 變成可點擊（不需要選社團）。驗證用的臨時 `.env.local` 已刪除。
 
 ## 本次完成（第二十一輪）：社長／執秘可編輯本社帳號角色、新增社員帳號拆分地區/各社流程、忘記密碼頁加提醒
 

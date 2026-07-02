@@ -52,11 +52,24 @@ async function submitInvite() {
 }
 
 function clubName(id: string | null) {
+  if (!id) return '3481地區辦公室'
   return club.allClubs.find(c => c.id === id)?.name ?? '-'
 }
 
 function roleLabel(r: UserRole) {
   return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r === 'club_member' ? '社員' : r
+}
+
+// 跟 RegisterView 的職稱代碼共用同一份對照表，審核名單才看得懂使用者實際填的職稱
+const TITLE_LABELS: Record<string, string> = {
+  DG: '總監 DG', DS: '地區秘書 DS', DA: '地區助理 DA', VDS: '副地區秘書 VDS',
+  AG: '分區助理總監 AG', VAG: '副分區助理總監 VAG', CP: '創社社長 CP', PP: '前社長 PP',
+  P: '社長 P', PE: '社長當選人 PE', VP: '副社長 VP', S: '秘書 S', RTN: '社友 RTN',
+}
+
+function pendingTitleLabel(p: UserProfile) {
+  if (p.requested_title) return TITLE_LABELS[p.requested_title] ?? p.requested_title
+  return p.requested_role ? roleLabel(p.requested_role) : '-'
 }
 
 const pendingChoice = ref<Record<string, UserRole>>({})
@@ -196,7 +209,7 @@ onMounted(async () => {
             <tr v-for="p in accounts.pending" :key="p.id">
               <td>{{ p.name }}</td>
               <td>{{ clubName(p.club_id) }}</td>
-              <td>{{ p.requested_role ? roleLabel(p.requested_role) : '-' }}</td>
+              <td>{{ pendingTitleLabel(p) }}</td>
               <td style="display:flex; gap:6px;">
                 <select
                   class="fi"
