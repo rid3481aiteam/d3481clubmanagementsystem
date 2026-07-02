@@ -15,6 +15,8 @@
 -- 手動確認對應：
 --   第七分區「新店萃英社」 -> 「新北市新店萃英扶輪社」
 --   第十一分區「台北新星社」 -> 「台北新心扶輪社」
+-- 若 DB 內仍保留 Excel 簡稱/舊名，且正式 seed 名稱不存在，會用上述兩筆已確認 alias 更新；
+-- 其他社名仍須精準符合，避免模糊比對誤寫。
 -- ════════════════════════════════════════════
 
 BEGIN;
@@ -146,7 +148,41 @@ VALUES
 DO $$
 DECLARE
   updated_count integer;
+  missing_rows text;
 BEGIN
+  WITH matched_import AS (
+    SELECT DISTINCT i.name, i.zone
+    FROM _020_club_directory_import AS i
+    JOIN clubs AS c ON (
+      (c.name = i.name AND c.zone = i.zone)
+      OR (
+        i.name = '新北市新店萃英扶輪社'
+        AND i.zone = '第七分區'
+        AND c.name = '新店萃英扶輪社'
+        AND c.zone = '第七分區'
+        AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
+      )
+      OR (
+        i.name = '台北新心扶輪社'
+        AND i.zone = '第十一分區'
+        AND c.name = '台北新星扶輪社'
+        AND c.zone = '第十一分區'
+        AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
+      )
+    )
+  )
+  SELECT string_agg(i.zone || '/' || i.name, ', ' ORDER BY i.zone, i.name)
+  INTO missing_rows
+  FROM _020_club_directory_import AS i
+  LEFT JOIN matched_import AS m
+    ON m.name = i.name
+   AND m.zone = i.zone
+  WHERE m.name IS NULL;
+
+  IF missing_rows IS NOT NULL THEN
+    RAISE EXCEPTION '020_seed_club_directory_from_excel cannot find matching clubs: %', missing_rows;
+  END IF;
+
   UPDATE clubs AS c
   SET
     sec_name = i.sec_name,
@@ -159,8 +195,21 @@ BEGIN
     venue_tel = i.venue_tel,
     note = i.note
   FROM _020_club_directory_import AS i
-  WHERE c.name = i.name
-    AND c.zone = i.zone;
+  WHERE (c.name = i.name AND c.zone = i.zone)
+     OR (
+       i.name = '新北市新店萃英扶輪社'
+       AND i.zone = '第七分區'
+       AND c.name = '新店萃英扶輪社'
+       AND c.zone = '第七分區'
+       AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
+     )
+     OR (
+       i.name = '台北新心扶輪社'
+       AND i.zone = '第十一分區'
+       AND c.name = '台北新星扶輪社'
+       AND c.zone = '第十一分區'
+       AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
+     );
 
   GET DIAGNOSTICS updated_count = ROW_COUNT;
 
