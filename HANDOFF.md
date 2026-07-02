@@ -1,11 +1,18 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十六輪，Claude 找到例會編輯儲存失敗的真正根因並修正——update payload 誤帶了 GENERATED 欄位 `year_term`；地區/各社切換按鈕未顯示問題待使用者確認 `club_id` 是否為 NULL）
+> 最後更新：2026-07-02（第十七輪，Claude 新增自助註冊 + 忘記密碼功能，程式碼已完成但**尚未在正式 Supabase 執行 migration、也尚未部署**，需要使用者完成下方待辦才能上線；第十六輪找到例會編輯儲存失敗的真正根因並修正；第十五輪已定位地區/各社切換按鈕未顯示的高度可疑根因，待使用者確認 `club_id` 是否為 NULL）
 
 ---
 
 ## ⚠️ 待辦
 
+0. **【本輪新增，優先處理】自助註冊功能要上線前，需要使用者手動完成以下步驟**（程式碼已寫完並推上 GitHub，但這幾步無法由 Claude 代勞）：
+   - 在 Supabase SQL Editor 執行 `supabase/migrations/025_self_registration.sql`（新增 `user_profiles.requested_role` 欄位、更新 `handle_new_user()` trigger、新增 `public_clubs_for_registration()` function 並開放給 `anon` 角色）
+   - Authentication → URL Configuration → Redirect URLs 新增兩個網址：`https://d3481clubmanagementsystem.pages.dev/verify-email` 與 `https://d3481clubmanagementsystem.pages.dev/reset-password`（比照既有 `/accept-invite` 的做法）
+   - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）
+   - 確認 Authentication → Email Templates 的「Confirm signup」「Reset Password」樣板都有正常寄送（該地區之前已設定自訂 SMTP，理論上沿用即可，但這兩個樣板可能沒單獨測過）
+   - 部署到 Cloudflare Pages（新增了 4 個路由：`/register`、`/verify-email`、`/forgot-password`、`/reset-password`）
+   - 全部設定完成後，建議實際跑一次完整流程：註冊 → 收驗證信 → 點擊驗證 → 登入 → 地區管理員在「帳號管理」頁看到「自助註冊待審核」名單 → 核准或維持社員
 1. **地區/各社切換按鈕沒有顯示——已定位高度可疑根因，待使用者確認並修資料**：使用者確認測試帳號右上角角色徽章有顯示「＋地區」字樣，代表 `district_access` 已正確載入前端（`isDistrictAdmin` 為 true）。`canSwitchView = isDistrictAdmin && !!clubId`，徽章邏輯只吃 `role`/`isDistrictAdmin`、不吃 `clubId`，所以徽章正常但按鈕不出現，唯一合理解釋是該帳號的 `user_profiles.club_id` 其實是 `NULL`。
    - 回頭查 `supabase/migrations/014_fix_handle_new_user_metadata_source.sql` 的說明文字，發現這正是有前科的 bug：`handle_new_user()` 原本讀錯 metadata 欄位（讀 `raw_app_meta_data`，但 `inviteUserByEmail` 寫入的其實是 `raw_user_meta_data`），導致**在 014 套用之前，每一個被邀請建立的帳號，`club_id` 一律被寫成 NULL**。014 只修好了「以後」新邀請帳號會正確寫入 `club_id`，**不會回頭修正 014 套用之前就已經存在、`club_id` 已經是 NULL 的舊帳號**
    - 也就是說：如果這次拿來測試切換功能的帳號，是在 014 套用之前就已經邀請建立的舊帳號（例如很早期的測試帳號），它的 `club_id` 很可能從建立那一刻起就一直是 NULL，之後不管怎麼切換 `district_access` 都不會自動補上
@@ -17,6 +24,28 @@
 4. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第十七輪）：開放自助註冊 + 忘記密碼
+
+使用者提出兩項需求：(1) 登入頁開放自助註冊（email + 選社 + 職稱 + 密碼兩次，送驗證信，驗證後才能登入，沒選社不給送出）；(2) 登入頁加忘記密碼功能（寄信重設密碼）。
+
+事先跟使用者確認過一個關鍵決策：自助註冊選的「職稱」（社長／執秘／社員）**不會**直接授權，一律先建立 `club_member`（最低權限）帳號，職稱只存成 `requested_role` 供地區管理員在「帳號管理」頁決定是否手動核准升級——避免任何人自稱社長就直接拿到整個社的編輯權限，維持原本邀請制的信任模型。
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/025_self_registration.sql` | 新增 `user_profiles.requested_role user_role` 欄位；`handle_new_user()` trigger 同步寫入 `requested_role`（`role` 仍照舊邏輯，沒有 metadata 就 fallback `club_member`，自助註冊流程不會傳 `role`，所以一定是 `club_member`）；新增 `public_clubs_for_registration()`（`SECURITY DEFINER`，只回傳 `id`/`name`）並 `GRANT EXECUTE` 給 `anon`，讓未登入的註冊頁能顯示社團下拉選單，不必把整張 `clubs` 表（含社長電話等聯絡資訊）開放給匿名使用者 |
+| `src/views/RegisterView.vue`（新增） | 註冊表單：email、社團下拉（呼叫 `public_clubs_for_registration` RPC）、職稱下拉、密碼 ×2。沒選社團時送出按鈕直接 disabled，送出呼叫 `supabase.auth.signUp()`，`options.data` 帶 `club_id`/`requested_role`，`emailRedirectTo` 指向 `/verify-email`，成功後導回 `/login?registered=1` |
+| `src/views/VerifyEmailView.vue`（新增） | 驗證信連結的落地頁，比照 `AcceptInviteView` 處理三種連結格式（`token_hash`+`type` / `code` / hash 隱含 session），驗證成功後登出並導回 `/login?verified=1` |
+| `src/views/ForgotPasswordView.vue`（新增） | 輸入 email 呼叫 `resetPasswordForEmail()`，`redirectTo` 指向 `/reset-password`；不論該 email 是否存在都顯示同一句成功訊息，避免帳號列舉 |
+| `src/views/ResetPasswordView.vue`（新增） | 重設密碼信連結的落地頁，邏輯同 `AcceptInviteView` 但用於 `recovery` 類型，設定新密碼後登出並導回 `/login?reset=1` |
+| `src/views/LoginView.vue` | 新增「忘記密碼？」「註冊新帳號」連結；依 query string（`registered`/`verified`/`reset`）顯示對應的綠色提示訊息 |
+| `src/stores/accounts.ts` | 新增 `pending`（`requested_role` 非空的帳號清單）、`fetchPending()`、`approveRole(id, role)`（把 `role` 設成核准的角色並清空 `requested_role`）、`dismissPending(id)`（只清空 `requested_role`，維持 `club_member`） |
+| `src/views/admin/AccountManagementView.vue` | 只有地區管理員看得到的新區塊「自助註冊待審核」，列出姓名/社團/申請職稱，可核准或維持社員 |
+| `src/types/index.ts` | `UserProfile` 新增 `requested_role: UserRole \| null` |
+
+角色升級的權限完全沿用既有機制，沒有新增 Edge Function：`011_invite_deactivate_gaps.sql` 的 `profiles_district_admin_manage` policy 本來就允許地區管理員 `UPDATE` 任何 `user_profiles`，`024` 的 `protect_user_profile_privileged_fields` trigger 也已限制只有 `is_district_admin()` 能改 `role`，所以「帳號管理」頁的核准按鈕直接呼叫 `supabase.from('user_profiles').update(...)` 就會被 RLS 正確擋掉/放行。
+
+本輪只做到程式碼完成 + `npx vue-tsc --noEmit` 與 `npm run build` 都過、UI 用假的 Supabase 金鑰跑過畫面（表單驗證、disabled 邏輯、banner 文字都確認正常），**沒有**用真金鑰跑過完整 signUp → 收信 → 驗證 → 登入的端對端流程，因為這個 session 的 `/tmp` clone 沒有 `.env.local`（不在 repo 裡）也没有 Supabase CLI/MCP 可以直接連正式專案。上線前務必按照上面「待辦 0」跑一次真的流程再放心交給使用者用。
 
 ## 本次完成（第十六輪）：找到例會編輯儲存失敗的真正根因——GENERATED 欄位 `year_term` 誤入 update payload
 

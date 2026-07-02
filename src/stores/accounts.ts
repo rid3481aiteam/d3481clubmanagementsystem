@@ -2,10 +2,11 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import type { UserProfile } from '@/types'
+import type { UserProfile, UserRole } from '@/types'
 
 export const useAccountsStore = defineStore('accounts', () => {
   const managed = ref<UserProfile[]>([])
+  const pending = ref<UserProfile[]>([])
   const loading = ref(false)
 
   async function fetchManaged() {
@@ -16,6 +17,35 @@ export const useAccountsStore = defineStore('accounts', () => {
       .in('role', ['club_admin', 'club_secretary'])
     managed.value = data ?? []
     loading.value = false
+  }
+
+  async function fetchPending() {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .not('requested_role', 'is', null)
+    pending.value = data ?? []
+  }
+
+  async function approveRole(id: string, role: UserRole) {
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ role, requested_role: null })
+      .eq('id', id)
+    if (!error) {
+      pending.value = pending.value.filter(u => u.id !== id)
+      if (role !== 'club_member') await fetchManaged()
+    }
+    return { error }
+  }
+
+  async function dismissPending(id: string) {
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ requested_role: null })
+      .eq('id', id)
+    if (!error) pending.value = pending.value.filter(u => u.id !== id)
+    return { error }
   }
 
   async function setActive(id: string, isActive: boolean) {
@@ -62,5 +92,9 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error: null }
   }
 
-  return { managed, loading, fetchManaged, setActive, setDistrictAccess, deleteAccount }
+  return {
+    managed, pending, loading,
+    fetchManaged, fetchPending, approveRole, dismissPending,
+    setActive, setDistrictAccess, deleteAccount,
+  }
 })

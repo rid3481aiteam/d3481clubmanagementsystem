@@ -43,7 +43,17 @@ function clubName(id: string | null) {
 }
 
 function roleLabel(r: UserRole) {
-  return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r
+  return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : '社員'
+}
+
+async function approveRole(id: string, newRole: UserRole) {
+  const { error } = await accounts.approveRole(id, newRole)
+  if (error) alert(error.message)
+}
+
+async function dismissPending(id: string) {
+  const { error } = await accounts.dismissPending(id)
+  if (error) alert(error.message)
 }
 
 async function toggleActive(id: string, current: boolean) {
@@ -65,6 +75,7 @@ onMounted(async () => {
   await club.fetchAll()
   await invites.fetchLog()
   await accounts.fetchManaged()
+  if (isDistrictAdmin.value) await accounts.fetchPending()
 })
 </script>
 
@@ -106,6 +117,42 @@ onMounted(async () => {
       <p v-if="inviteError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ inviteError }}</p>
       <p v-if="inviteSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">邀請已寄出。</p>
     </div>
+
+    <template v-if="isDistrictAdmin">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">自助註冊待審核</h2>
+      <div class="tw" style="margin-bottom:24px;">
+        <table>
+          <thead class="th">
+            <tr>
+              <th>姓名</th>
+              <th>社團</th>
+              <th>申請職稱</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in accounts.pending" :key="p.id">
+              <td>{{ p.name }}</td>
+              <td>{{ clubName(p.club_id) }}</td>
+              <td>{{ p.requested_role ? roleLabel(p.requested_role) : '-' }}</td>
+              <td style="display:flex; gap:6px;">
+                <button
+                  v-if="p.requested_role && p.requested_role !== 'club_member'"
+                  class="btn btn-gold btn-sm"
+                  @click="approveRole(p.id, p.requested_role)"
+                >
+                  核准為{{ roleLabel(p.requested_role) }}
+                </button>
+                <button class="btn btn-g btn-sm" @click="dismissPending(p.id)">維持社員</button>
+              </td>
+            </tr>
+            <tr v-if="!accounts.pending.length">
+              <td colspan="4" style="text-align:center; color:var(--muted);">尚無待審核註冊</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
 
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy);">邀請紀錄</h2>

@@ -15,6 +15,7 @@ export interface UserProfile {
   club_id: string | null
   name: string
   role: UserRole
+  requested_role: UserRole | null
   district_access: boolean
   is_active: boolean
   created_at: string

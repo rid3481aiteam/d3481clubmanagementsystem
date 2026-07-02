@@ -9,6 +9,8 @@
         </div>
       </div>
 
+      <p v-if="noticeMsg" class="login-notice">{{ noticeMsg }}</p>
+
       <form class="login-form" @submit.prevent="handleLogin">
         <div class="form-group">
           <label class="fl">電子郵件</label>
@@ -41,25 +43,39 @@
         </button>
       </form>
 
-      <p class="login-hint">如需帳號，請聯繫地區秘書處。</p>
+      <p class="login-hint">
+        <router-link to="/forgot-password" class="login-link">忘記密碼？</router-link>
+      </p>
+      <p class="login-hint">
+        還沒有帳號？
+        <router-link to="/register" class="login-link">註冊新帳號</router-link>
+      </p>
     </div>
     <div class="login-bg-stripe"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import RotaryWheelIcon from '@/components/RotaryWheelIcon.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
+
+const noticeMsg = computed(() => {
+  if (route.query.registered) return '註冊成功！請至信箱收信並點擊驗證連結，驗證完成後請在下方輸入帳號密碼登入。'
+  if (route.query.verified) return '信箱已驗證成功，請輸入帳號密碼登入。'
+  if (route.query.reset) return '密碼已重設成功，請用新密碼登入。'
+  return ''
+})
 
 async function handleLogin() {
   loading.value = true
@@ -158,6 +174,16 @@ async function handleLogin() {
   padding: 8px 12px;
 }
 
+.login-notice {
+  font-size: 12px;
+  color: var(--green);
+  background: rgba(42,107,72,.08);
+  border-radius: var(--r);
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
 .login-btn {
   width: 100%;
   justify-content: center;
@@ -183,6 +209,12 @@ async function handleLogin() {
   text-align: center;
   font-size: 11px;
   color: var(--muted);
-  margin-top: 20px;
+  margin-top: 12px;
+}
+
+.login-link {
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: underline;
 }
 </style>
