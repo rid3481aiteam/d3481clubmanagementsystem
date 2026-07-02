@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, watch, ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAnnouncementsStore } from '@/stores/announcements'
 import { useDashboardStore } from '@/stores/dashboard'
@@ -20,6 +20,35 @@ function loadForCurrentView() {
 
 onMounted(loadForCurrentView)
 watch(() => auth.isDistrictView, loadForCurrentView)
+
+const ZONE_ORDER = [
+  '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
+  '第六分區', '第七分區', '第八分區', '第九分區', '第十分區', '第十一分區',
+]
+
+function zoneRank(zone: string) {
+  const i = ZONE_ORDER.indexOf(zone)
+  return i === -1 ? ZONE_ORDER.length : i
+}
+
+const groupedDistrictStats = computed(() => {
+  const groups = new Map<string, typeof dashboard.districtClubStats>()
+  for (const row of dashboard.districtClubStats) {
+    if (!groups.has(row.zone)) groups.set(row.zone, [])
+    groups.get(row.zone)!.push(row)
+  }
+  return [...groups.entries()]
+    .sort((a, b) => zoneRank(a[0]) - zoneRank(b[0]) || a[0].localeCompare(b[0]))
+    .map(([zone, clubs]) => ({ zone, clubs }))
+})
+
+const collapsedZones = ref(new Set<string>())
+function toggleZone(zone: string) {
+  const s = new Set(collapsedZones.value)
+  if (s.has(zone)) s.delete(zone)
+  else s.add(zone)
+  collapsedZones.value = s
+}
 </script>
 
 <template>
@@ -36,57 +65,45 @@ watch(() => auth.isDistrictView, loadForCurrentView)
         </div>
       </div>
 
-      <div class="district-grid">
-        <div>
-          <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">各社出席率</h2>
-          <div class="tw">
-            <table>
-              <thead class="th">
-                <tr>
-                  <th>社名</th>
-                  <th>出席率</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in dashboard.districtClubAttendance" :key="row.clubId">
+      <div>
+        <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">各社出席率 / 入社退社人數</h2>
+        <div class="tw">
+          <table>
+            <thead class="th">
+              <tr>
+                <th>社名</th>
+                <th>出席率</th>
+                <th>申請入社</th>
+                <th>退社</th>
+              </tr>
+            </thead>
+            <tbody v-for="g in groupedDistrictStats" :key="g.zone">
+              <tr class="zone-row" @click="toggleZone(g.zone)">
+                <td colspan="4">
+                  <span class="zone-chevron">{{ collapsedZones.has(g.zone) ? '▸' : '▾' }}</span>
+                  <strong>{{ g.zone }}</strong>
+                  <span style="color:var(--muted); font-weight:400;">（{{ g.clubs.length }} 社）</span>
+                </td>
+              </tr>
+              <template v-if="!collapsedZones.has(g.zone)">
+                <tr v-for="row in g.clubs" :key="row.clubId">
                   <td>{{ row.clubName }}</td>
                   <td>
                     <span class="bdg" :class="row.rate !== null && row.rate < 75 ? 'b-r' : 'b-gr'">
                       {{ row.rate !== null ? row.rate + '%' : '-' }}
                     </span>
                   </td>
-                </tr>
-                <tr v-if="!dashboard.districtClubAttendance.length">
-                  <td colspan="2" style="text-align:center; color:var(--muted);">尚無社團資料</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div>
-          <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">各社申請入社 / 退社人數</h2>
-          <div class="tw">
-            <table>
-              <thead class="th">
-                <tr>
-                  <th>社名</th>
-                  <th>申請入社</th>
-                  <th>退社</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in dashboard.districtClubMovements" :key="row.clubId">
-                  <td>{{ row.clubName }}</td>
                   <td>{{ row.joinedCount }}</td>
                   <td>{{ row.resignedCount }}</td>
                 </tr>
-                <tr v-if="!dashboard.districtClubMovements.length">
-                  <td colspan="3" style="text-align:center; color:var(--muted);">尚無社團資料</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              </template>
+            </tbody>
+            <tbody v-if="!dashboard.districtClubStats.length">
+              <tr>
+                <td colspan="4" style="text-align:center; color:var(--muted);">尚無社團資料</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </template>
@@ -197,10 +214,22 @@ watch(() => auth.isDistrictView, loadForCurrentView)
 </template>
 
 <style scoped>
-.district-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+.zone-row {
+  cursor: pointer;
+  background: var(--gold-p);
+}
+.zone-row:hover td {
+  background: var(--gold-p);
+}
+.zone-row td {
+  font-size: 13px;
+  color: var(--navy);
+  padding: 8px 14px;
+}
+.zone-chevron {
+  display: inline-block;
+  width: 14px;
+  color: var(--muted);
 }
 
 .announcement-list {
@@ -236,10 +265,6 @@ watch(() => auth.isDistrictView, loadForCurrentView)
 }
 
 @media (max-width: 700px) {
-  .district-grid {
-    grid-template-columns: 1fr;
-  }
-
   .announcement-item {
     grid-template-columns: 1fr;
   }

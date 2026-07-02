@@ -1,13 +1,20 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十二輪，Claude 新增地區/各社視角切換 + EDM 產生器第一階段）
+> 最後更新：2026-07-02（第十三輪，Claude 修正例會編輯儲存靜默失敗 + 地區儀表板改分區收折；地區/各社切換按鈕未顯示問題待使用者提供更多資訊排查）
 
 ---
 
 ## ⚠️ 待辦
 
-1. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：本輪新增 `supabase/functions/generate-edm/index.ts`，會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）。這是我在這個環境沒有 Supabase CLI / Dashboard 存取權限、只能寫程式碼的部分
-2. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
+1. **地區/各社切換按鈕沒有顯示（待排查，非本輪修正）**：使用者回報已在「帳號管理」把測試帳號設定 `district_access=true` 且該帳號有綁定 `club_id`，理論上 `TopNav.vue` 的 `auth.canSwitchView` 應為 true 並顯示切換按鈕，但畫面上仍看不到。已完整檢查 `src/stores/auth.ts`（`canSwitchView`/`isDistrictView`/`setViewScope`）、`TopNav.vue`、`024_user_profile_district_access.sql`、`011_invite_deactivate_gaps.sql`（`profiles_district_admin_manage` UPDATE policy）——前端邏輯與 RLS 權限鏈路本身沒有發現程式錯誤，程式碼也已確認整支都推上 GitHub（`git status` 乾淨、與 `origin/main` 同步）。懷疑是環境面問題而非程式碼問題，需要使用者協助確認以下幾點才能繼續排查：
+   - Supabase SQL Editor 執行 `NOTIFY pgrst, 'reload schema';`（或 Dashboard → Settings → API → Reload schema），避免 `024` 新增的 `district_access` 欄位還沒被 PostgREST schema cache 抓到（`select('*')` 在這種情況下會直接漏掉該欄位，不會報錯）
+   - 該測試帳號登出後重新登入（不只是重新整理），確保前端重新抓一次最新的 `user_profiles`
+   - 確認 Cloudflare Pages 最新一次部署對應的 commit 是否已經包含 `6fd267a`（視角切換功能）之後的版本
+   - 順便確認：畫面右上角角色徽章是否有顯示「＋地區」字樣（`TopNav.vue` 的 `roleLabel`）——如果沒有，代表 `district_access` 根本沒有正確載入到前端，問題在資料/環境面；如果有顯示但切換按鈕仍不見，才需要回頭懷疑是程式 bug
+   - 這次確認：**不需要支援「單一帳號歸屬多個扶輪社」**，維持現有「地區權限 + 綁定單一 club_id」的雙重視角模式即可
+2. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：見下方「第十二輪」，`supabase/functions/generate-edm/index.ts` 會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）
+3. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
+4. 待使用者實測「例會管理」編輯儲存修正、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
 
@@ -46,6 +53,26 @@
 **中文 PDF 為什麼用瀏覽器列印而不是 jsPDF**：jsPDF 預設字型（Helvetica 等）不支援中文字形，要嵌入 CJK 字型檔案才能正常顯示中文，成本較高；瀏覽器原生列印（`window.print()` → 另存為 PDF）直接沿用系統字型，中文顯示完全沒問題，也不用多裝套件，是這個情境下最低成本的做法。
 
 **驗證方式**：本機沒有這個專案的 Supabase 連線資訊，用暫時性 `.env`（無效但格式正確的 URL）+ Pinia state 注入方式在瀏覽器內確認：視角切換 pill 按鈕在雙重權限帳號（`club_admin` + `district_access`）下正確顯示並可切換、切換後儀表板/Sidebar 即時改變；EDM 表單、AI 呼叫失敗時的錯誤訊息顯示、產生結果後的預覽/編輯/複製/PDF 按鈕皆正常顯示，`.print-only` 區塊在一般畫面下確認為 `display:none`。驗證用的暫時性修改（`.env`、`main.ts` 的 QA hook）已全部還原，`vue-tsc --noEmit` 確認無型別錯誤。
+
+## 本次完成（第十三輪）：例會編輯儲存靜默失敗 + 地區儀表板改分區收折
+
+使用者一次回報三個問題，本輪處理其中兩個（第三個切換按鈕問題見上方待辦 #1，需要使用者協助排查環境面才能繼續）。
+
+### 例會管理：編輯已存在的例會，按儲存後總表仍顯示舊資料
+
+- `src/views/meetings/MeetingListView.vue` 的 `save()` 呼叫 `meetings.update()`/`meetings.insert()` 都沒有檢查回傳的 `error`，Supabase/RLS 若寫入失敗（例如 `has_permission('meetings','edit')` 為 false），畫面上會照樣關閉 modal、看起來像「存過了」，但資料庫其實完全沒變，等於是靜默失敗——這正是使用者描述的症狀
+- `openEdit(m)` 原本用 `form.value = { ...m }` 整包複製，因為 `MeetingInsert` 型別在結構上允許多餘欄位，實際上會把 `id`/`created_at`/`updated_at` 也一起塞進 update payload（雖然值相同不會造成資料錯誤，但型別不乾淨、容易誤導）
+- 修正：`save()` 改成檢查 `error`，失敗時 `alert()` 顯示錯誤訊息並保留 modal 不關閉；`openEdit()` 改用解構把 `id`/`created_at`/`updated_at` 排除，只留乾淨的 `MeetingInsert` 欄位
+- **這個修正能解決的是「失敗但看起來像成功」的體驗問題，讓真正的錯誤原因會显示出來**；如果實際根因是 RLS 權限判斷本身有問題（例如該帳號的 `role_permissions` 被地區管理員關掉了 `meetings.edit`），使用者下次重現時畫面會跳出明確的錯誤訊息，屆時再依錯誤內容進一步排查
+- 本地沒有這個專案的 Supabase 連線資訊，無法用真實帳號重現/驗證原始 bug，僅完成程式碼層面的檢查（`vue-tsc --noEmit`、`npm run build` 皆通過）；已在 [task_9592cf3f] 標記同一種「儲存不檢查 error」的寫法在 `RosterView.vue` 等其他頁面也存在，列為後續待處理項目（不影響這次的三個回報問題）
+
+### 地區儀表板：出席率 / 入退社人數統計改為依分區收折
+
+- 使用者要求比照「社團總覽」（`ClubListView.vue`）的分區收折樣式：左邊是可收折的分區列，右邊才是出席率、入/退社人數統計欄位
+- `src/stores/dashboard.ts`：`loadDistrict()` 原本回傳兩個分開的陣列 `districtClubAttendance`/`districtClubMovements`，且查 `clubs` 時沒有選 `zone` 欄位；改成合併成單一 `districtClubStats`（含 `zone`），因為畫面上這兩組資料本來就是要合併顯示在同一張表裡
+- `src/views/DashboardView.vue`：地區檢視的「各社出席率」「各社申請入社/退社人數」兩張獨立表格，合併成一張表（欄位：社名｜出席率｜申請入社｜退社），並比照 `ClubListView.vue` 的 `ZONE_ORDER`/`groupedClubs`/`toggleZone` 邏輯做分區收折（同一套慣例，這個專案目前是每個頁面各自複製一份，沒有抽共用 composable）
+- 移除不再使用的 `.district-grid` 雙欄版面 CSS，改用 `.zone-row`/`.zone-chevron`（樣式直接比照 `ClubListView.vue`）
+- 本地沒有 Supabase 連線資訊無法用真實資料截圖驗證畫面，僅完成 `vue-tsc --noEmit` + `npm run build` 確認型別與建置正確；請使用者實際登入後確認分區收折、展開/收合、各社出席率與入退社人數是否正確對應
 
 ## 本次完成（第十一輪）：修正設定密碼頁 `Auth session missing!` 錯誤
 

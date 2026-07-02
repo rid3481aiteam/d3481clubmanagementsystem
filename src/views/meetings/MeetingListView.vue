@@ -38,16 +38,19 @@ function openAdd() {
 
 function openEdit(m: Meeting) {
   editing.value = m
-  form.value = { ...m }
+  const { id, created_at, updated_at, ...rest } = m
+  form.value = rest
   showModal.value = true
 }
 
 async function save() {
   if (!form.value.date) return
-  if (editing.value) {
-    await meetings.update(editing.value.id, form.value)
-  } else {
-    await meetings.insert(form.value)
+  const { error } = editing.value
+    ? await meetings.update(editing.value.id, form.value)
+    : await meetings.insert(form.value)
+  if (error) {
+    alert('儲存失敗：' + error.message)
+    return
   }
   showModal.value = false
   await meetings.fetchAll(auth.clubId)

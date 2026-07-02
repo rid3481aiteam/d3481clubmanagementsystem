@@ -4,16 +4,12 @@ import { supabase } from '@/lib/supabase'
 import { useAnnouncementsStore } from '@/stores/announcements'
 import type { MemberAttendanceRate, ProspectiveMember } from '@/types'
 
-interface DistrictClubAttendance {
+interface DistrictClubStat {
   clubId: string
   clubName: string
+  zone: string
   rate: number | null
   sessionCount: number
-}
-
-interface DistrictClubMovement {
-  clubId: string
-  clubName: string
   joinedCount: number
   resignedCount: number
 }
@@ -48,13 +44,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const memberCount = ref(0)
   const lowAttendance = ref<MemberAttendanceRate[]>([])
   const followUps = ref<ProspectiveMember[]>([])
-  const districtClubAttendance = ref<DistrictClubAttendance[]>([])
-  const districtClubMovements = ref<DistrictClubMovement[]>([])
+  const districtClubStats = ref<DistrictClubStat[]>([])
   const loading = ref(false)
 
   function resetDistrictData() {
-    districtClubAttendance.value = []
-    districtClubMovements.value = []
+    districtClubStats.value = []
   }
 
   async function loadDistrict() {
@@ -68,7 +62,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     const { data: clubs } = await supabase
       .from('clubs')
-      .select('id, name, sort_order')
+      .select('id, name, zone, sort_order')
       .order('sort_order')
       .order('name')
 
@@ -103,16 +97,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
       }
     }
 
-    districtClubAttendance.value = clubRows.map(c => {
-      const rates = rateBuckets.get(c.id) ?? []
-      return {
-        clubId: c.id,
-        clubName: c.name,
-        rate: rates.length ? Math.round((rates.reduce((a, b) => a + b, 0) / rates.length) * 10) / 10 : null,
-        sessionCount: rates.length,
-      }
-    })
-
     const { data: joinedProspects } = await supabase
       .from('prospective_members')
       .select('club_id')
@@ -133,12 +117,18 @@ export const useDashboardStore = defineStore('dashboard', () => {
       resignedCounts.set(m.club_id, (resignedCounts.get(m.club_id) ?? 0) + 1)
     }
 
-    districtClubMovements.value = clubRows.map(c => ({
-      clubId: c.id,
-      clubName: c.name,
-      joinedCount: joinedCounts.get(c.id) ?? 0,
-      resignedCount: resignedCounts.get(c.id) ?? 0,
-    }))
+    districtClubStats.value = clubRows.map(c => {
+      const rates = rateBuckets.get(c.id) ?? []
+      return {
+        clubId: c.id,
+        clubName: c.name,
+        zone: c.zone || '未分區',
+        rate: rates.length ? Math.round((rates.reduce((a, b) => a + b, 0) / rates.length) * 10) / 10 : null,
+        sessionCount: rates.length,
+        joinedCount: joinedCounts.get(c.id) ?? 0,
+        resignedCount: resignedCounts.get(c.id) ?? 0,
+      }
+    })
 
     avgRate.value = null
     memberCount.value = 0
@@ -219,8 +209,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     memberCount,
     lowAttendance,
     followUps,
-    districtClubAttendance,
-    districtClubMovements,
+    districtClubStats,
     loading,
     load,
     loadDistrict,
