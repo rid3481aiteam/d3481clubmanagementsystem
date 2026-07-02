@@ -76,10 +76,12 @@ function openEdit(p: ProspectiveMember) {
 
 async function save() {
   if (!form.value.name.trim()) return
-  if (editing.value) {
-    await prospective.update(editing.value.id, form.value)
-  } else {
-    await prospective.insert(form.value)
+  const { error } = editing.value
+    ? await prospective.update(editing.value.id, form.value)
+    : await prospective.insert(form.value)
+  if (error) {
+    alert('儲存失敗：' + error.message)
+    return
   }
   showModal.value = false
   await prospective.fetchAll(auth.clubId)

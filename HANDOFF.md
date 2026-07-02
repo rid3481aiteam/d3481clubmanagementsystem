@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十三輪，Claude 修正例會編輯儲存靜默失敗 + 地區儀表板改分區收折；地區/各社切換按鈕未顯示問題待使用者提供更多資訊排查）
+> 最後更新：2026-07-02（第十四輪，Claude 清查全站「儲存不檢查 error」寫法並修正 4 個頁面；地區/各社切換按鈕未顯示問題待使用者提供更多資訊排查）
 
 ---
 
@@ -53,6 +53,23 @@
 **中文 PDF 為什麼用瀏覽器列印而不是 jsPDF**：jsPDF 預設字型（Helvetica 等）不支援中文字形，要嵌入 CJK 字型檔案才能正常顯示中文，成本較高；瀏覽器原生列印（`window.print()` → 另存為 PDF）直接沿用系統字型，中文顯示完全沒問題，也不用多裝套件，是這個情境下最低成本的做法。
 
 **驗證方式**：本機沒有這個專案的 Supabase 連線資訊，用暫時性 `.env`（無效但格式正確的 URL）+ Pinia state 注入方式在瀏覽器內確認：視角切換 pill 按鈕在雙重權限帳號（`club_admin` + `district_access`）下正確顯示並可切換、切換後儀表板/Sidebar 即時改變；EDM 表單、AI 呼叫失敗時的錯誤訊息顯示、產生結果後的預覽/編輯/複製/PDF 按鈕皆正常顯示，`.print-only` 區塊在一般畫面下確認為 `display:none`。驗證用的暫時性修改（`.env`、`main.ts` 的 QA hook）已全部還原，`vue-tsc --noEmit` 確認無型別錯誤。
+
+## 本次完成（第十四輪）：清查全站「儲存不檢查 error」寫法
+
+延續第十三輪修 `MeetingListView.vue` 時留下的追蹤項目（同一種寫法在其他頁面也存在），這輪對 `src/views` 底下所有頁面做全面清查：`grep` 所有呼叫 store `insert`/`update` 的地方，找出沒有解構 `{ error }` 就直接往下走的呼叫點，逐一比照 `MeetingListView.vue`/`RosterView.vue` 的 `saveBulkEdit()`（已有的正確寫法）補上錯誤處理。
+
+修正的 4 個檔案：
+
+| 檔案 | 函式 | 修法 |
+|------|------|------|
+| `src/views/roster/RosterView.vue` | `save()` | 新增/編輯社友 modal，改成檢查 `error`，失敗時 `alert()` 並保留 modal 不關閉 |
+| `src/views/roster/RosterView.vue` | `confirmImport()` | Excel 匯入迴圈，改成每筆檢查 `error`，失敗時 `alert()` 標明是第幾列/哪個姓名匯入失敗，並中止迴圈（不繼續匯入後面幾筆造成部分成功、使用者卻不知道匯到哪裡的情況） |
+| `src/views/roster/ProspectiveView.vue` | `save()` | 新增/編輯潛在社友 modal，同 `RosterView.vue` 的 `save()` 修法 |
+| `src/views/club/OfficersView.vue` | `saveSingleRoles()` | 主要幹部（社長/當選人/副社長/秘書）與委員會成員的新增/更新迴圈，原本完全沒檢查任何一次 `insert`/`update` 的結果；改成每次呼叫都檢查 `error`，失敗時 `alert()` 並中止（`saving.value = false`、直接 `return`，不繼續跑後面的幹部/委員，也不會誤觸發 `syncRosterAnnualPositions()`） |
+
+檢查範圍涵蓋 `src/views` 下所有 `.vue` 檔（包含 `admin/`、`club/`、`meetings/`、`roster/`、`directory/`、`edm/` 等子目錄），確認除了上述 4 處，其餘呼叫 store `insert`/`update` 或直接呼叫 `supabase.from().update()` 的地方（如 `ClubDetailView.vue` 的 `changeDistrictAccess()`）都已經有檢查 `error`，不需要額外修正。這次沒有處理 `remove`/`delete` 呼叫（不在這輪清查範圍內，且大多數 `remove` 呼叫是批次收尾的次要操作，失敗風險與影響跟「使用者按儲存卻沒真的存到」不同，留待之後視需要再評估）。
+
+本地沒有這個專案的 Supabase 連線資訊，無法用真實帳號重現/驗證原始情境下的錯誤訊息顯示，僅完成程式碼層面的檢查：`vue-tsc --noEmit`、`npm run build` 皆通過，無型別錯誤。
 
 ## 本次完成（第十三輪）：例會編輯儲存靜默失敗 + 地區儀表板改分區收折
 

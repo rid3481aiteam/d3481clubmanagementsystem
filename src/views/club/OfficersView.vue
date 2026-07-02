@@ -116,9 +116,21 @@ async function saveSingleRoles() {
       continue
     }
     if (existing) {
-      if (existing.name !== name) await officers.update(existing.id, { name })
+      if (existing.name !== name) {
+        const { error } = await officers.update(existing.id, { name })
+        if (error) {
+          alert('儲存失敗：' + error.message)
+          saving.value = false
+          return
+        }
+      }
     } else {
-      await officers.insert({ club_id: auth.clubId, year_term: yearTerm.value, role, name, committee_name: null, note: null })
+      const { error } = await officers.insert({ club_id: auth.clubId, year_term: yearTerm.value, role, name, committee_name: null, note: null })
+      if (error) {
+        alert('儲存失敗：' + error.message)
+        saving.value = false
+        return
+      }
     }
   }
 
@@ -139,10 +151,20 @@ async function saveSingleRoles() {
     if (draft.id) {
       const existing = committeeMembers.value.find(m => m.id === draft.id)
       if (existing && (existing.name !== payload.name || (existing.committee_name || '') !== (payload.committee_name || ''))) {
-        await officers.update(draft.id, payload)
+        const { error } = await officers.update(draft.id, payload)
+        if (error) {
+          alert('儲存失敗：' + error.message)
+          saving.value = false
+          return
+        }
       }
     } else {
-      await officers.insert(payload)
+      const { error } = await officers.insert(payload)
+      if (error) {
+        alert('儲存失敗：' + error.message)
+        saving.value = false
+        return
+      }
     }
   }
 

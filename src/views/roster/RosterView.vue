@@ -274,10 +274,12 @@ function openAdd() {
 async function save() {
   if (!form.value.name.trim()) return
   const payload = withDerivedStatus(form.value)
-  if (editing.value) {
-    await roster.update(editing.value.id, payload)
-  } else {
-    await roster.insert(payload)
+  const { error } = editing.value
+    ? await roster.update(editing.value.id, payload)
+    : await roster.insert(payload)
+  if (error) {
+    alert('儲存失敗：' + error.message)
+    return
   }
   showModal.value = false
   await roster.fetchAll(auth.clubId)
@@ -345,10 +347,13 @@ async function confirmImport() {
   if (!importPreview.value.length || importing.value) return
   importing.value = true
   for (const item of importPreview.value) {
-    if (item.action === 'update' && item.existingId) {
-      await roster.update(item.existingId, item.payload)
-    } else {
-      await roster.insert(item.payload)
+    const { error } = item.action === 'update' && item.existingId
+      ? await roster.update(item.existingId, item.payload)
+      : await roster.insert(item.payload)
+    if (error) {
+      alert(`匯入失敗（第 ${item.rowNo} 列 ${item.payload.name}）：` + error.message)
+      importing.value = false
+      return
     }
   }
   await roster.fetchAll(auth.clubId)
