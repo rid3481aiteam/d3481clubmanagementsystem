@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第七輪，Codex 調整儀表板與社友名冊欄位）
+> 最後更新：2026-07-02（第八輪，Claude 修正邀請信連結被導回登入畫面的問題）
 
 ---
 
@@ -17,7 +17,21 @@
 3. **Edge Functions → invite-user**：確認部署的是最新版本（含 `name` 欄位，commit `61ae44c`），內容見 `supabase/functions/invite-user/index.ts`
 4. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
 5. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
-6. 確認 Authentication → URL Configuration 的 Site URL / Redirect URLs 已改成正式網址（不是 localhost），且自訂 SMTP 已設定並測試成功寄信
+6. **【使用者回報】兩組測試帳號收到邀請信，點連結都被導回登入畫面、沒進到設定密碼頁**：程式碼面已修正一個確認的 bug（見下方「第八輪」），但下列 Supabase Dashboard 設定仍需要人工確認，程式碼無法自動檢查：
+   - Authentication → URL Configuration：**Site URL** 是否為正式網址 `https://d3481clubmanagementsystem.pages.dev`（不是 localhost）
+   - Authentication → URL Configuration → **Redirect URLs** 允許清單，是否包含 `https://d3481clubmanagementsystem.pages.dev/accept-invite`（或萬用字元 `https://d3481clubmanagementsystem.pages.dev/**`）——`invite-user` edge function 用的 `redirectTo` 是這個網址，若不在允許清單內，Supabase 會忽略它、退回 Site URL，邀請信連結就可能連不到 `/accept-invite`
+   - 自訂 SMTP 是否已設定並測試成功寄信（避免用 Supabase 預設寄信額度/延遲影響體驗）
+   - 建議直接點開其中一封邀請信、滑鼠移到連結上看實際網址（或用「複製連結」），確認網址開頭是 `https://d3481clubmanagementsystem.pages.dev/accept-invite`，而不是 localhost 或別的網域
+   - 如果網址正確但還是被導回登入頁：換一個瀏覽器/無痕視窗點同一封邀請信再試一次（如果專案有開 PKCE flow，驗證碼綁定在寄出連結當下的瀏覽器 session，跨瀏覽器/裝置點擊可能會導致驗證失敗）
+
+## 本次完成（第八輪）：修正邀請信連結被導回登入畫面
+
+使用者回報：兩組 Email 帳號收到邀請信後，點擊信件連結都進入登入畫面，沒有進到設定密碼頁面。
+
+- 檢查 `src/router/index.ts` 的全域守衛，發現 `/accept-invite` 路由 `meta` 只有 `bare: true`，沒有 `public: true`（`/login` 有）。守衛邏輯是 `if (!to.meta.public && !auth.isLoggedIn) return { name: 'login' }`，代表使用者從邀請信連結進站時，只要當下 `auth.isLoggedIn` 還沒轉為 true（例如 Supabase 從網址 hash/`code` 建立 session 需要一點時間，或該次因故未能建立 session），守衛就會直接把人導回登入頁，`AcceptInviteView.vue` 完全沒有機會掛載
+- 修正：`src/router/index.ts` 的 `/accept-invite` 加上 `public: true`，讓這個路由不受登入狀態把關；`AcceptInviteView.vue` 本身呼叫的 `supabase.auth.updateUser()` 會自己等待 session 就緒，不需要靠路由守衛先驗證登入
+- 已在本機用暫時性 `.env`（無效但格式正確的 Supabase URL）+ 未登入狀態驗證：修正前 `/accept-invite` 會被導向 `/login`，修正後即使完全沒有 session 也能正常顯示「設定登入密碼」頁面；同時確認其他受保護頁面（如 `/directory`）在未登入時仍正確導向登入頁，守衛沒有被整個繞過
+- **這個修正解決的是「連結有正確帶到 `/accept-invite` 但被守衛攔截」這種情況**。如果實際問題是邀請信連結本身網址就不對（沒帶到 `/accept-invite`，或網域是 localhost），這個修正沒辦法解決，需要照上方待辦 #6 檢查 Supabase Dashboard 的 Site URL / Redirect URLs 設定——這是我在這個環境沒有 Supabase MCP 存取權限、只能看程式碼層面的部分，Dashboard 設定要請使用者自行確認
 
 ## 本次完成（第七輪）：儀表板文案/統計 + 社友名冊欄位調整
 
