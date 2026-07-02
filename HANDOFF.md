@@ -1,12 +1,12 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十二輪，使用者確認 `028` 已在 Supabase 執行完成 ✅；接著加碼兩個需求：① 註冊頁分區選單新增「3481地區辦公室」選項，選了就不用挑社團，`club_id` 存 null；② 職稱下拉全面換成扶輪社真實職稱代碼 DG/DS/DA/VDS/AG/VAG/CP/PP/P/PE/VP/S/RTN。兩項都已完成並推上 GitHub，**新增一支 migration `029_registration_title.sql` 還沒套用**，見下方待辦 0）
+> 最後更新：2026-07-02（第二十二輪，使用者確認 `028`、`029` 都已在 Supabase 執行完成 ✅。自助註冊相關的 migration 全數套用完畢，剩下的都是 Supabase Dashboard 設定（Redirect URLs、Email 確認/樣板、密碼長度）跟 Cloudflare Pages 部署，Claude 這邊沒有存取權限，需要使用者自己做，詳見下方待辦）
 
 ---
 
 ## ⚠️ 待辦
 
-0. **【第二十二輪，新增，優先處理】在 Supabase SQL Editor 執行 `supabase/migrations/029_registration_title.sql`**：`user_profiles` 新增 `requested_title text` 欄位（存扶輪社職稱代碼，如 `PP`、`DG`），`handle_new_user()` trigger 同步寫入。不套用的話註冊頁選的職稱代碼不會被存下來（`requested_title` 欄位不存在，`INSERT` 會直接失敗，整個註冊流程會壞掉），**這支比照之前幾支的急迫程度，務必優先執行**
+0. ~~在 Supabase SQL Editor 執行 `supabase/migrations/029_registration_title.sql`~~ **已完成**（第二十二輪的「3481地區辦公室」選項＋扶輪社職稱代碼已生效）
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`~~ **已完成**（第二十一輪的社長/執秘角色編輯權限已生效）
 2. **【第十七輪，自助註冊功能上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅，程式碼已寫完並推上 GitHub，剩下這幾步無法由 Claude 代勞）：
    - ~~在 Supabase SQL Editor 執行 `025_self_registration.sql`、`027_registration_zone.sql`~~ **已完成**
