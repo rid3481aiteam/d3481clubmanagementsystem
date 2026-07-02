@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useInvitesStore } from '@/stores/invites'
 import { useAccountsStore } from '@/stores/accounts'
 import { useClubStore } from '@/stores/club'
-import type { UserRole } from '@/types'
+import type { UserProfile, UserRole } from '@/types'
 
 const auth = useAuthStore()
 const invites = useInvitesStore()
@@ -12,6 +12,19 @@ const accounts = useAccountsStore()
 const club = useClubStore()
 
 const isDistrictAdmin = computed(() => auth.isDistrictAdmin)
+const isClubTier = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
+const canManagePending = computed(() => isDistrictAdmin.value || isClubTier.value)
+
+// 跟 ClubListView／RegisterView 的分區排序共用同一份順序
+const ZONE_ORDER = [
+  '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
+  '第六分區', '第七分區', '第八分區', '第九分區', '第十分區', '第十一分區',
+]
+
+function zoneRank(zone: string) {
+  const i = ZONE_ORDER.indexOf(zone)
+  return i === -1 ? ZONE_ORDER.length : i
+}
 
 const email = ref('')
 const inviteName = ref('')
@@ -46,13 +59,14 @@ function roleLabel(r: UserRole) {
   return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r === 'club_member' ? '社員' : r
 }
 
-async function approveRole(id: string, newRole: UserRole) {
-  const { error } = await accounts.approveRole(id, newRole)
-  if (error) alert(error.message)
+const pendingChoice = ref<Record<string, UserRole>>({})
+
+function pendingRoleChoice(p: UserProfile) {
+  return pendingChoice.value[p.id] ?? p.requested_role ?? 'club_member'
 }
 
-async function dismissPending(id: string) {
-  const { error } = await accounts.dismissPending(id)
+async function applyPendingRole(p: UserProfile) {
+  const { error } = await accounts.approveRole(p.id, pendingRoleChoice(p))
   if (error) alert(error.message)
 }
 
@@ -62,10 +76,24 @@ async function toggleActive(id: string, current: boolean) {
 
 const memberName = ref('')
 const memberPhone = ref('')
+const memberZone = ref('')
 const memberClubId = ref<string | null>(isDistrictAdmin.value ? null : auth.clubId)
 const creatingMember = ref(false)
 const memberError = ref<string | null>(null)
 const memberSuccess = ref<string | null>(null)
+
+// 只有地區管理員可以幫任何社建立社員帳號，才需要先選分區再選社；
+// 社長／執秘只能建本社帳號，clubId 已經固定，不需要這兩層選單
+const memberZones = computed(() => {
+  const set = new Set(club.allClubs.map(c => c.zone || '未分區'))
+  return [...set].sort((a, b) => zoneRank(a) - zoneRank(b) || a.localeCompare(b))
+})
+
+const memberClubsInZone = computed(() => club.allClubs.filter(c => (c.zone || '未分區') === memberZone.value))
+
+function onMemberZoneChange() {
+  memberClubId.value = null
+}
 
 async function submitCreateMember() {
   if (!memberName.value.trim() || !memberPhone.value.trim() || !memberClubId.value) return
@@ -108,7 +136,7 @@ onMounted(async () => {
   await club.fetchAll()
   await invites.fetchLog()
   await accounts.fetchManaged()
-  if (isDistrictAdmin.value) await accounts.fetchPending()
+  if (canManagePending.value) await accounts.fetchPending()
   await accounts.fetchMembers()
 })
 </script>
@@ -152,7 +180,7 @@ onMounted(async () => {
       <p v-if="inviteSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">邀請已寄出。</p>
     </div>
 
-    <template v-if="isDistrictAdmin">
+    <template v-if="canManagePending">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">自助註冊待審核</h2>
       <div class="tw" style="margin-bottom:24px;">
         <table>
@@ -170,14 +198,17 @@ onMounted(async () => {
               <td>{{ clubName(p.club_id) }}</td>
               <td>{{ p.requested_role ? roleLabel(p.requested_role) : '-' }}</td>
               <td style="display:flex; gap:6px;">
-                <button
-                  v-if="p.requested_role && p.requested_role !== 'club_member'"
-                  class="btn btn-gold btn-sm"
-                  @click="approveRole(p.id, p.requested_role)"
+                <select
+                  class="fi"
+                  :value="pendingRoleChoice(p)"
+                  style="min-width:110px; padding:6px 8px;"
+                  @change="pendingChoice[p.id] = ($event.target as HTMLSelectElement).value as UserRole"
                 >
-                  核准為{{ roleLabel(p.requested_role) }}
-                </button>
-                <button class="btn btn-g btn-sm" @click="dismissPending(p.id)">維持社員</button>
+                  <option value="club_admin">社長</option>
+                  <option value="club_secretary">執秘</option>
+                  <option value="club_member">社員</option>
+                </select>
+                <button class="btn btn-gold btn-sm" @click="applyPendingRole(p)">套用</button>
               </td>
             </tr>
             <tr v-if="!accounts.pending.length">
@@ -283,13 +314,22 @@ onMounted(async () => {
           <label class="fl">手機號碼</label>
           <input v-model="memberPhone" type="tel" class="fi" placeholder="0912345678" style="min-width:160px;" />
         </div>
-        <div v-if="isDistrictAdmin">
-          <label class="fl">所屬社團</label>
-          <select v-model="memberClubId" class="fi" style="min-width:200px;">
-            <option :value="null" disabled>請選擇</option>
-            <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-        </div>
+        <template v-if="isDistrictAdmin">
+          <div>
+            <label class="fl">分區</label>
+            <select v-model="memberZone" class="fi" style="min-width:140px;" @change="onMemberZoneChange">
+              <option value="" disabled>請選擇</option>
+              <option v-for="z in memberZones" :key="z" :value="z">{{ z }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="fl">所屬社團</label>
+            <select v-model="memberClubId" class="fi" style="min-width:200px;" :disabled="!memberZone">
+              <option :value="null" disabled>{{ memberZone ? '請選擇' : '請先選擇分區' }}</option>
+              <option v-for="c in memberClubsInZone" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+        </template>
         <button class="btn btn-gold" :disabled="creatingMember" @click="submitCreateMember">
           {{ creatingMember ? '建立中…' : '建立帳號' }}
         </button>

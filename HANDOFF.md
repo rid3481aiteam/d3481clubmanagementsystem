@@ -1,12 +1,13 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十輪，Claude 對第十七～十九輪合併後的最新程式碼做一次通盤檢查，**發現一個很可能會擋住「社員手機號碼帳號」功能的設定問題**：社員預設密碼只有 4 碼（手機末四碼），但 Supabase Auth 預設最短密碼長度是 6 碼，測試前要先去 Dashboard 調整設定，詳見下方待辦 1；這輪這台機器上的 Supabase CLI／Cloudflare wrangler 都沒有登入，無法像上一輪一樣直接部署，純程式碼審查與文件更新，沒有新增功能）
+> 最後更新：2026-07-02（第二十一輪，使用者提三個需求：① 自助註冊帳號的角色由執秘/社長就能在後台編輯，不用每次都找地區管理員；② 「新增社員帳號」只有地區介面才要選分區/社，各社自己開不用選；③ 忘記密碼頁要主動提醒密碼規則，別讓使用者一直亂試。三項都已完成並推上 GitHub，**新增一支 migration `028_club_tier_role_management.sql` 還沒套用**，見下方待辦 0）
 
 ---
 
 ## ⚠️ 待辦
 
-0. **【第十七輪，自助註冊功能上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅，程式碼已寫完並推上 GitHub，剩下這幾步無法由 Claude 代勞）：
+0. **【第二十一輪，新增，優先處理】在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`**：放寬 024 的 `protect_user_profile_privileged_fields()` trigger，讓社長／執秘也能改本社帳號的角色（club_admin/club_secretary/club_member 三者互轉），不套用的話「帳號管理」頁新的角色下拉選單點下去會被 DB 擋掉、跳出「沒有權限變更帳號角色」的錯誤
+1. **【第十七輪，自助註冊功能上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅，程式碼已寫完並推上 GitHub，剩下這幾步無法由 Claude 代勞）：
    - ~~在 Supabase SQL Editor 執行 `025_self_registration.sql`、`027_registration_zone.sql`~~ **已完成**
    - Authentication → URL Configuration → Redirect URLs 新增兩個網址：`https://d3481clubmanagementsystem.pages.dev/verify-email` 與 `https://d3481clubmanagementsystem.pages.dev/reset-password`（比照既有 `/accept-invite` 的做法）
    - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）
@@ -30,6 +31,23 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第二十一輪）：社長／執秘可編輯本社帳號角色、新增社員帳號拆分地區/各社流程、忘記密碼頁加提醒
+
+使用者提三個需求：
+
+1. 自助註冊的帳號，執秘或有編輯權限的人要能在後台編輯每個帳號的權限（不用每次都找地區管理員）
+2. 各社自己在「帳號管理」頁新增社員帳號，不需要選社團（本來就固定是自己社）；只有地區管理員在地區介面新增社員帳號時，才需要先選分區再選社
+3. 忘記密碼設定新密碼時，頁面要主動提醒密碼至少 8 碼、且不可跟舊密碼相同，避免使用者不斷試錯
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/028_club_tier_role_management.sql`（新增，**尚未套用**） | 放寬 `024_user_profile_district_access.sql` 的 `protect_user_profile_privileged_fields()` trigger：原本只要動到 `role` 欄位就一律要求 `is_district_admin()`；改成社長／執秘（`is_club_tier()`）在**自己社**（`OLD.club_id = current_club_id()`）內，`club_admin`/`club_secretary`/`club_member` 三個角色之間互轉也放行。`club_id`、`district_access` 這兩個欄位維持原樣，只有地區管理員能改，避免社長/執秘藉這個入口把自己的社改掉或拿到地區權限。RLS 這邊不用額外調整——026 的 `profiles_club_tier_manage` policy 本來就已經允許這個範圍的 UPDATE，只是被這支 trigger 擋住 |
+| `src/views/admin/AccountManagementView.vue` | ① 新增 `isClubTier`/`canManagePending` computed，「自助註冊待審核」區塊從 `v-if="isDistrictAdmin"` 改成 `v-if="canManagePending"`，執秘/社長也看得到本社的待審核名單（RLS 的 `profiles_select_club` 本來就只會回傳自己社的資料，不用額外過濾）；核准的操作從「核准為 XX／維持社員」兩顆固定按鈕，改成一個角色下拉（預設帶入使用者申請時選的職稱）+「套用」按鈕，可以自由改成任何一種角色，達到「編輯每個帳號的權限」的需求。② 「新增社員帳號」的社團選擇比照 `RegisterView.vue` 的分區→社兩層下拉，但用 `v-if="isDistrictAdmin"` 整個包起來——社長/執秘完全看不到這兩個欄位（`memberClubId` 在 `<script>` 就已經固定成 `auth.clubId`），只有地區管理員才會看到「分區」「所屬社團」兩個下拉，選分區後才能選社 |
+| `src/stores/accounts.ts` | `approveRole()` 原本只有角色不是 `club_member` 時才 `fetchManaged()`；現在角色下拉可以自由選任何角色，帳號可能在「社長／執秘帳號」跟「社員帳號」兩個列表之間搬動，改成一律 `Promise.all([fetchManaged(), fetchMembers()])`，確保套用完兩個表格都是最新的 |
+| `src/views/ResetPasswordView.vue` | 密碼欄位上方的提示文字補上「密碼至少需要 8 個字元，且不可與目前的密碼相同」；新增 `translateAuthError()`，把 Supabase 在新密碼跟目前密碼相同時回傳的 `should be different from the old password` 錯誤訊息轉成中文 |
+
+**驗證**：`npx vue-tsc --noEmit`、`npm run build` 皆通過。這次額外在 `src/main.ts` 加了一個只在 `import.meta.env.DEV` 生效的暫時性 QA hook（把 `pinia`/`router` 掛到 `window.__qa`），用假的 Supabase URL 起本機 dev server，直接在瀏覽器 console 注入假的 `auth.profile`（分別模擬 `club_secretary` 跟 `district_admin`）與假的 `clubs`/`pending` 資料，實際確認：① 執秘身分能看到「自助註冊待審核」，下拉選單正確預帶申請時選的職稱、也能改選別的角色；② 執秘身分的「新增社員帳號」完全沒有社團/分區欄位，地區管理員身分則有「分區」→「所屬社團」兩層下拉，選分區後社團清單正確被過濾成只剩該分區的社。驗證完已把 `main.ts` 的 QA hook 跟臨時 `.env.local` 全部還原/刪除，`git status` 乾淨。`ResetPasswordView.vue` 的提示文字因為需要真的 Supabase recovery token 才能走到成功畫面，這次沒有另外 mock，是純文字新增、無邏輯風險，用 `vue-tsc`/`build` 通過佐證正確性。
 
 ## 本次完成（第二十輪）：通盤審查第十七～十九輪合併後的程式碼，找到密碼長度設定問題
 

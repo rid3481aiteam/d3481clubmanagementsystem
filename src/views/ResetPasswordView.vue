@@ -38,6 +38,11 @@ onMounted(async () => {
   verifying.value = false
 })
 
+function translateAuthError(message: string): string {
+  if (message.includes('should be different from the old password')) return '新密碼不可與目前的密碼相同，請換一組密碼'
+  return message
+}
+
 async function handleSubmit() {
   errorMsg.value = ''
 
@@ -55,7 +60,7 @@ async function handleSubmit() {
 
   if (error) {
     loading.value = false
-    errorMsg.value = error.message
+    errorMsg.value = translateAuthError(error.message)
     return
   }
 
@@ -90,7 +95,9 @@ async function handleSubmit() {
 
       <template v-else>
         <h1 class="page-title">重新設定密碼</h1>
-        <p class="login-hint" style="margin-top:0; margin-bottom:20px;">請設定新的登入密碼，設定完成後請用新密碼重新登入。</p>
+        <p class="login-hint" style="margin-top:0; margin-bottom:20px;">
+          請設定新的登入密碼，設定完成後請用新密碼重新登入。密碼至少需要 8 個字元，且不可與目前的密碼相同。
+        </p>
 
         <form class="login-form" @submit.prevent="handleSubmit">
           <div class="form-group">

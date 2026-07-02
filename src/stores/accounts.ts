@@ -44,7 +44,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       .eq('id', id)
     if (!error) {
       pending.value = pending.value.filter(u => u.id !== id)
-      if (role !== 'club_member') await fetchManaged()
+      await Promise.all([fetchManaged(), fetchMembers()])
     }
     return { error }
   }
