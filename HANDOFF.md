@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第八輪，Claude 修正邀請信連結被導回登入畫面的問題）
+> 最後更新：2026-07-02（第九輪，Claude 重新設計設定密碼頁版面）
 
 ---
 
@@ -12,17 +12,19 @@
    - `018_club_officers.sql`：新增 `club_officers` 表（社的年度幹部），社團資訊頁的「社的年度成員」跟 `/club/officers` 頁都需要這張表
    - `019_seed_club_leaders.sql`：從外部資料來源補上 100 社的 `pres_name`/`sec_name`，只在欄位為 NULL 時才寫入，不會覆蓋各社自行填的資料
    - `020_seed_club_directory_from_excel.sql`：從 Excel 匯入 105 社 `sec_name`/`email`/`phone`/`addr`/`freq`/`meeting_time`/`venue`/`venue_tel`/`note`，採覆蓋式更新；內建 105 筆 row-count guard，未完整對上會 rollback
-   - `021_roster_member_profile_fields.sql`（本輪新增）：`roster` 新增 `club_position`、`member_status`、`personal_phone`、`company_phone`，並用既有 `phone` 初始化 `personal_phone`
+   - `021_roster_member_profile_fields.sql`：`roster` 新增 `club_position`、`member_status`、`personal_phone`、`company_phone`，並用既有 `phone` 初始化 `personal_phone`
 2. ~~檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名~~ **已修正**：`015`/`019` 尚未執行過正式環境，直接把 seed 社名改成正確的正式社名「台北市和平扶輪社」，`020` 既有的 alias 比對邏輯會自動接上這筆既有資料，不會再產生重複的 `clubs` 列（見下方踩坑紀錄）
-3. **Edge Functions → invite-user**：確認部署的是最新版本（含 `name` 欄位，commit `61ae44c`），內容見 `supabase/functions/invite-user/index.ts`
-4. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
-5. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
-6. **【使用者回報】兩組測試帳號收到邀請信，點連結都被導回登入畫面、沒進到設定密碼頁**：程式碼面已修正一個確認的 bug（見下方「第八輪」），但下列 Supabase Dashboard 設定仍需要人工確認，程式碼無法自動檢查：
-   - Authentication → URL Configuration：**Site URL** 是否為正式網址 `https://d3481clubmanagementsystem.pages.dev`（不是 localhost）
-   - Authentication → URL Configuration → **Redirect URLs** 允許清單，是否包含 `https://d3481clubmanagementsystem.pages.dev/accept-invite`（或萬用字元 `https://d3481clubmanagementsystem.pages.dev/**`）——`invite-user` edge function 用的 `redirectTo` 是這個網址，若不在允許清單內，Supabase 會忽略它、退回 Site URL，邀請信連結就可能連不到 `/accept-invite`
-   - 自訂 SMTP 是否已設定並測試成功寄信（避免用 Supabase 預設寄信額度/延遲影響體驗）
-   - 建議直接點開其中一封邀請信、滑鼠移到連結上看實際網址（或用「複製連結」），確認網址開頭是 `https://d3481clubmanagementsystem.pages.dev/accept-invite`，而不是 localhost 或別的網域
-   - 如果網址正確但還是被導回登入頁：換一個瀏覽器/無痕視窗點同一封邀請信再試一次（如果專案有開 PKCE flow，驗證碼綁定在寄出連結當下的瀏覽器 session，跨瀏覽器/裝置點擊可能會導致驗證失敗）
+3. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
+4. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
+5. ~~邀請信連結被導回登入畫面~~ **已解決**：Site URL / Redirect URLs / 已部署的 `invite-user` 都確認正常，根因是 `src/router/index.ts` 的 `/accept-invite` 路由缺少 `public: true`（見「第八輪」），已修正並由使用者實測確認新邀請信可以正常進入設定密碼頁
+
+## 本次完成（第九輪）：設定密碼頁改版面
+
+使用者確認邀請信連結已能正常進入設定密碼頁，但畫面卡在左上角、比例跟其他頁面不搭。
+
+- 根因：`AcceptInviteView.vue` 沿用給「有側邊選單版面」用的 `.page`/`.tw` 共用 class，但這個路由是 `bare: true`（不掛 TopNav/Sidebar），少了外層 flex/padding 容器，畫面就直接貼在 `#app-root` 左上角
+- `LoginView.vue`（同樣是 bare + public 頁面）本來就有自己一套「滿版置中卡片」樣式（`min-height:100vh` + flex 置中 + navy 底 + 金色斜紋裝飾），改成讓 `AcceptInviteView.vue` 比照這套視覺語言重寫，兩個頁面現在版面調性一致
+- 桌機（1280px）與手機（375px）都截圖確認卡片置中、比例正常
 
 ## 本次完成（第八輪）：修正邀請信連結被導回登入畫面
 
