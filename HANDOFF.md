@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（使用者已在 Supabase SQL Editor 執行完 `025_self_registration.sql`、`026_member_phone_accounts.sql`、`027_registration_zone.sql` 三支 migration；`027` 原始版本因為 Postgres 不准 `CREATE OR REPLACE` 改變 function 回傳型別噴錯，已修成先 `DROP FUNCTION` 再重建，使用者用修好的版本重跑成功。第十九輪修正註冊頁先選分區再選社；第十八輪開發社員手機號碼帳號機制，與第十七輪的 Email 自助註冊機制並存。**接下來還要部署 Edge Functions 跟 Cloudflare Pages 才能真正上線**，見下方待辦）
+> 最後更新：2026-07-02（三支 migration `025`/`026`/`027` 已由使用者在 SQL Editor 執行完成；**Claude 這次意外發現這台機器上的 Supabase CLI 已經登入且連得到 D3481 專案**，直接用 CLI 部署了 `create-member-account`、`reset-member-password` 兩支 Edge Function 並用 curl 打過（回傳正常的 401，不是崩潰），確認上線成功。順便發現 `generate-edm` 也已經是 ACTIVE 狀態、`ANTHROPIC_API_KEY` secret 也已經設定好了——這兩項先前 HANDOFF 列的待辦其實已經完成，只是沒更新記錄。**接下來只剩 Cloudflare Pages 部署跟自助註冊的 Supabase Auth 設定**，見下方待辦）
 
 ---
 
@@ -13,10 +13,10 @@
    - 確認 Authentication → Email Templates 的「Confirm signup」「Reset Password」樣板都有正常寄送（該地區之前已設定自訂 SMTP，理論上沿用即可，但這兩個樣板可能沒單獨測過）
    - 部署到 Cloudflare Pages（新增了 4 個路由：`/register`、`/verify-email`、`/forgot-password`、`/reset-password`）
    - 全部設定完成後，建議實際跑一次完整流程：註冊 → 收驗證信 → 點擊驗證 → 登入 → 地區管理員在「帳號管理」頁看到「自助註冊待審核」名單 → 核准或維持社員
-1. **【第十八輪，社員手機號碼帳號機制上線前還要做】**（migration 已於 2026-07-02 執行完成 ✅）：
+1. **【第十八輪，社員手機號碼帳號機制】migration + Edge Function 都已完成 ✅，剩下待使用者實測**：
    - ~~在 Supabase SQL Editor 執行 `026_member_phone_accounts.sql`~~ **已完成**
-   - 部署兩個新 Edge Function：`supabase functions deploy create-member-account`、`supabase functions deploy reset-member-password`
-   - 部署完成後到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝手機末四碼）、用手機號碼登入、忘記密碼一鍵重設回手機末四碼、停用/刪除社員帳號
+   - ~~部署兩個新 Edge Function~~ **已完成**（2026-07-02，Claude 直接用這台機器上已登入的 Supabase CLI 執行 `supabase link --project-ref xdwqrgthsxyzclnjlmvy` + `supabase functions deploy create-member-account` + `supabase functions deploy reset-member-password`，`supabase functions list` 確認兩支都是 `ACTIVE`，用 curl 打了一次沒帶 token，回傳乾淨的 `401 UNAUTHORIZED_NO_AUTH_HEADER`，不是伺服器錯誤，代表程式碼有正常執行）
+   - **待實測**：Cloudflare Pages 部署新版前端之後，到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝手機末四碼）、用手機號碼登入、忘記密碼一鍵重設回手機末四碼、停用/刪除社員帳號
    - 本機沒有 `.env`（只有 `.env.example`），無法在這個環境跑真實 Supabase 連線驗證登入，只做了 `vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過
 2. **地區/各社切換按鈕沒有顯示——已定位高度可疑根因，待使用者確認並修資料**（延續自第十六輪）：使用者確認測試帳號右上角角色徽章有顯示「＋地區」字樣，代表 `district_access` 已正確載入前端（`isDistrictAdmin` 為 true）。`canSwitchView = isDistrictAdmin && !!clubId`，徽章邏輯只吃 `role`/`isDistrictAdmin`、不吃 `clubId`，所以徽章正常但按鈕不出現，唯一合理解釋是該帳號的 `user_profiles.club_id` 其實是 `NULL`。
    - 回頭查 `supabase/migrations/014_fix_handle_new_user_metadata_source.sql` 的說明文字，發現這正是有前科的 bug：`handle_new_user()` 原本讀錯 metadata 欄位（讀 `raw_app_meta_data`，但 `inviteUserByEmail` 寫入的其實是 `raw_user_meta_data`），導致**在 014 套用之前，每一個被邀請建立的帳號，`club_id` 一律被寫成 NULL**。014 只修好了「以後」新邀請帳號會正確寫入 `club_id`，**不會回頭修正 014 套用之前就已經存在、`club_id` 已經是 NULL 的舊帳號**
@@ -24,8 +24,8 @@
    - **請先確認**：到「帳號管理」頁面看該測試帳號的「社團」欄位，如果顯示空白/`-`，就確定是這個問題
    - **修法**：SQL Editor 執行 `UPDATE user_profiles SET club_id = '<正確的 club id>' WHERE id = '<該帳號的 user id>';` 補上正確的 `club_id`；或者乾脆刪除該測試帳號重新邀請一次（014 已修好，新邀請的帳號 `club_id` 會正確寫入），應該就能看到切換按鈕
    - 這次確認：**不需要支援「單一帳號歸屬多個扶輪社」**，維持現有「地區權限 + 綁定單一 club_id」的雙重視角模式即可
-3. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：見下方「第十二輪」，`supabase/functions/generate-edm/index.ts` 會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）
-4. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
+3. ~~`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret~~ **已完成**（2026-07-02 確認：`supabase functions list` 顯示 `generate-edm` 是 `ACTIVE`，`supabase secrets list` 也看得到 `ANTHROPIC_API_KEY` 已設定，時間點是這次之前，推測是使用者自己或另一個 session 处理的，只是沒回來更新這份記錄）
+4. **`B5_edm` 功能開關預設關閉**：需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結（這步是應用層的操作，Claude 沒有自動處理）
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
