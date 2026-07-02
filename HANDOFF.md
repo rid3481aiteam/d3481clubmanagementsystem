@@ -1,20 +1,30 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第三輪，Claude 建立全地區社團名冊 + 社團總覽改分區顯示 + 自訂排序 + 刪除社團 + 編輯改頁面 + 通訊錄改分區顯示 + 社團資訊儀表板 + 年度幹部 + 幹部/職業分類改下拉選單）
+> 最後更新：2026-07-02（第四輪，Claude 從 vivianrotary-cloud/3481rotarymember 撈回全社社長/執秘姓名並產生匯入 migration）
 
 ---
 
 ## ⚠️ 待辦
-1. **依序執行 `015`～`018` 四支尚未跑過的 migration**（SQL Editor 貼上執行）：
+1. **依序執行 `015`～`019` 五支尚未跑過的 migration**（SQL Editor 貼上執行）：
    - `015_seed_district_clubs.sql`：建立全地區 105 筆社團基本資料（依分區，僅 name + zone）
    - `016_club_sort_order.sql`：新增 `clubs.sort_order`，社團總覽的上/下移按鈕需要這個欄位
    - `017_roster_classification.sql`：`roster` 新增 `classification`（職業分類），社團資訊頁的「領域分布」需要這個欄位，且要各社自行在社友名冊補填才有統計意義
    - `018_club_officers.sql`：新增 `club_officers` 表（社的年度幹部），社團資訊頁的「社的年度成員」跟 `/club/officers` 頁都需要這張表
+   - `019_seed_club_leaders.sql`（本輪新增）：從外部資料來源補上 100 社的 `pres_name`/`sec_name`，只在欄位為 NULL 時才寫入，不會覆蓋各社自行填的資料
 2. **檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名**（見下方踩坑紀錄）
 3. **Edge Functions → invite-user**：確認部署的是最新版本（含 `name` 欄位，commit `61ae44c`），內容見 `supabase/functions/invite-user/index.ts`
 4. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
 5. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
 6. 確認 Authentication → URL Configuration 的 Site URL / Redirect URLs 已改成正式網址（不是 localhost），且自訂 SMTP 已設定並測試成功寄信
+
+## 本次完成（第四輪）：從外部資料來源匯入全社社長/執秘姓名
+
+使用者要求把 `vivianrotary-cloud/3481rotarymember` repo（單檔 HTML 平台，`rotary3481_platform_12.html`，內嵌 `const CLUBS=[...]` 資料陣列）裡各社的社長/執秘姓名，撈回來更新到本專案的社團資料。
+
+- 來源資料共 100 筆，欄位為 `{p:分區, n:社名, pres:社長, sec:執秘}`
+- 比對本專案 `015_seed_district_clubs.sql` 既有 105 筆社名，8 筆因為來源用簡稱（例如「台北文山社」對本專案「台北文山扶輪社」）已手動對照補上「扶輪社」字尾後正確比對
+- 有 5 社（台北人文、台北令和、台北優雅、台北新心、台北智群）本專案有但來源沒有，維持空白待該社自行補齊
+- 新增 `supabase/migrations/019_seed_club_leaders.sql`：100 筆 `UPDATE clubs SET pres_name=..., sec_name=... WHERE name=... AND zone=... AND pres_name IS NULL AND sec_name IS NULL`，刻意加上 `IS NULL` 條件，避免覆蓋掉各社執秘/社長帳號建立後自行填寫的最新資料，可重複執行
 
 ## 本次完成（第三輪）：全地區社團名冊 seed + 社團總覽依分區收折 + 自訂排序
 
