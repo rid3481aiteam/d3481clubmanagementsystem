@@ -30,6 +30,13 @@ const router = useRouter()
 const ui = useUiStore()
 
 const roleLabel = computed(() => {
+  if (auth.role !== 'district_admin' && auth.isDistrictAdmin) {
+    return `${baseRoleLabel.value}＋地區`
+  }
+  return baseRoleLabel.value
+})
+
+const baseRoleLabel = computed(() => {
   switch (auth.role) {
     case 'district_admin':  return '地區管理員'
     case 'club_secretary':  return '執行秘書'
@@ -40,8 +47,8 @@ const roleLabel = computed(() => {
 })
 
 const roleBadgeClass = computed(() => {
+  if (auth.isDistrictAdmin) return 'b-y'
   switch (auth.role) {
-    case 'district_admin': return 'b-y'
     case 'club_secretary': return 'b-n'
     case 'club_admin':     return 'b-gr'
     default:               return 'b-g'
@@ -49,7 +56,7 @@ const roleBadgeClass = computed(() => {
 })
 
 const interfaceLabel = computed(() => {
-  if (auth.role === 'district_admin') return '地區管理介面'
+  if (auth.isDistrictAdmin) return '地區管理介面'
   return auth.clubName || '各社介面'
 })
 

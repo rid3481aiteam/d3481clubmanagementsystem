@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
-import type { ClubOfficerRole } from '@/types'
+import type { ClubOfficerRole, RosterMember } from '@/types'
 
 const auth = useAuthStore()
 const roster = useRosterStore()
@@ -26,11 +26,33 @@ const newMemberName = ref('')
 const saving = ref(false)
 
 const committeeMembers = computed(() => officers.list.filter(o => o.role === 'committee_member'))
-const activeMemberNames = computed(() => roster.members.filter(m => m.is_active).map(m => m.name))
+const activeMembers = computed(() => roster.members.filter(m => m.is_active))
+const activeMemberKeys = computed(() => activeMembers.value.map(memberValue))
 
 function memberOptions(current: string) {
-  if (current && !activeMemberNames.value.includes(current)) return [current, ...activeMemberNames.value]
-  return activeMemberNames.value
+  if (current && !activeMemberKeys.value.includes(current)) return [current, ...activeMemberKeys.value]
+  return activeMemberKeys.value
+}
+
+function memberValue(member: RosterMember) {
+  return member.nick_name?.trim() || member.name
+}
+
+function findMember(value: string) {
+  return roster.members.find(m => m.name === value || m.nick_name === value)
+}
+
+function memberOptionLabel(value: string) {
+  const member = findMember(value)
+  if (!member) return value
+  const englishName = member.nick_name?.trim()
+  if (!englishName) return member.name
+  return member.name && member.name !== englishName ? `${englishName}（${member.name}）` : englishName
+}
+
+function memberDisplayName(value: string) {
+  const member = findMember(value)
+  return member?.nick_name?.trim() || member?.name || value
 }
 
 async function load() {
@@ -105,7 +127,7 @@ watch(yearTerm, load)
           <label class="fl">{{ r.label }}</label>
           <select v-model="singleNames[r.role]" class="fi" :disabled="!canManage">
             <option value="">請選擇</option>
-            <option v-for="n in memberOptions(singleNames[r.role])" :key="n" :value="n">{{ n }}</option>
+            <option v-for="n in memberOptions(singleNames[r.role])" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
           </select>
         </div>
       </div>
@@ -120,14 +142,14 @@ watch(yearTerm, load)
         <thead class="th">
           <tr>
             <th>委員會</th>
-            <th>姓名</th>
+            <th>英文名稱</th>
             <th v-if="canManage"></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="m in committeeMembers" :key="m.id">
             <td>{{ m.committee_name || '-' }}</td>
-            <td>{{ m.name }}</td>
+            <td>{{ memberDisplayName(m.name) }}</td>
             <td v-if="canManage">
               <button class="btn btn-red btn-sm" @click="removeCommitteeMember(m.id)">移除</button>
             </td>
@@ -145,10 +167,10 @@ watch(yearTerm, load)
         <input v-model="newCommitteeName" class="fi" placeholder="例如：會員發展委員會" style="min-width:200px;" />
       </div>
       <div>
-        <label class="fl">姓名</label>
+        <label class="fl">英文名稱</label>
         <select v-model="newMemberName" class="fi" style="min-width:160px;">
           <option value="">請選擇</option>
-          <option v-for="n in activeMemberNames" :key="n" :value="n">{{ n }}</option>
+          <option v-for="n in activeMemberKeys" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
         </select>
       </div>
       <button class="btn btn-g" @click="addCommitteeMember">+ 新增委員</button>

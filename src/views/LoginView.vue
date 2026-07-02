@@ -73,8 +73,7 @@ async function handleLogin() {
   }
 
   // Role-based redirect
-  const role = auth.role
-  if (role === 'district_admin') {
+  if (auth.isDistrictAdmin) {
     router.push('/admin/clubs')
   } else {
     router.push('/roster')

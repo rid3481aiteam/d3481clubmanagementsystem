@@ -27,6 +27,19 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
+  async function setDistrictAccess(id: string, districtAccess: boolean) {
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ district_access: districtAccess })
+      .eq('id', id)
+    if (!error) {
+      managed.value = managed.value.map(u => (
+        u.id === id ? { ...u, district_access: districtAccess } : u
+      ))
+    }
+    return { error }
+  }
+
   async function deleteAccount(id: string) {
     const { error } = await supabase.functions.invoke('delete-account', {
       body: { user_id: id },
@@ -49,5 +62,5 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error: null }
   }
 
-  return { managed, loading, fetchManaged, setActive, deleteAccount }
+  return { managed, loading, fetchManaged, setActive, setDistrictAccess, deleteAccount }
 })

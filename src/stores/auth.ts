@@ -12,7 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
 
   const isLoggedIn = computed(() => !!user.value)
-  const isDistrictAdmin = computed(() => profile.value?.role === 'district_admin')
+  const isDistrictAdmin = computed(() => profile.value?.role === 'district_admin' || profile.value?.district_access === true)
   const clubId = computed(() => profile.value?.club_id ?? null)
   const role = computed<UserRole | null>(() => profile.value?.role ?? null)
 

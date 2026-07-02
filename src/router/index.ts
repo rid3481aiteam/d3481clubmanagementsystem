@@ -141,8 +141,19 @@ router.beforeEach(async (to) => {
   if (!to.meta.public && !auth.isLoggedIn) return { name: 'login' }
 
   // 角色限定路由：非該角色導回首頁
-  if (to.meta.role && auth.role !== to.meta.role) return { name: 'dashboard' }
-  if (to.meta.roles && !(to.meta.roles as string[]).includes(auth.role ?? '')) return { name: 'dashboard' }
+  if (to.meta.role) {
+    if (to.meta.role === 'district_admin') {
+      if (!auth.isDistrictAdmin) return { name: 'dashboard' }
+    } else if (auth.role !== to.meta.role) {
+      return { name: 'dashboard' }
+    }
+  }
+  if (to.meta.roles) {
+    const roles = to.meta.roles as string[]
+    const allowedByRole = roles.includes(auth.role ?? '')
+    const allowedByDistrictAccess = roles.includes('district_admin') && auth.isDistrictAdmin
+    if (!allowedByRole && !allowedByDistrictAccess) return { name: 'dashboard' }
+  }
 
   if (to.meta.feature) {
     const key = to.meta.feature as FeatureKey

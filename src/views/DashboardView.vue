@@ -14,7 +14,8 @@ function formatDate(value: string | null) {
 }
 
 onMounted(() => {
-  dashboard.load(auth.clubId)
+  if (auth.isDistrictAdmin) dashboard.loadDistrict()
+  else dashboard.load(auth.clubId)
 })
 </script>
 
@@ -24,7 +25,71 @@ onMounted(() => {
       <h1>儀表板</h1>
     </div>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin-bottom:24px;">
+    <template v-if="auth.isDistrictAdmin">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px;">
+        <div class="tw" style="padding:18px;">
+          <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">當月例會舉行數量</div>
+          <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.meetingCount }}</div>
+        </div>
+      </div>
+
+      <div class="district-grid">
+        <div>
+          <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">各社出席率</h2>
+          <div class="tw">
+            <table>
+              <thead class="th">
+                <tr>
+                  <th>社名</th>
+                  <th>出席率</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in dashboard.districtClubAttendance" :key="row.clubId">
+                  <td>{{ row.clubName }}</td>
+                  <td>
+                    <span class="bdg" :class="row.rate !== null && row.rate < 75 ? 'b-r' : 'b-gr'">
+                      {{ row.rate !== null ? row.rate + '%' : '-' }}
+                    </span>
+                  </td>
+                </tr>
+                <tr v-if="!dashboard.districtClubAttendance.length">
+                  <td colspan="2" style="text-align:center; color:var(--muted);">尚無社團資料</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">各社申請入社 / 退社人數</h2>
+          <div class="tw">
+            <table>
+              <thead class="th">
+                <tr>
+                  <th>社名</th>
+                  <th>申請入社</th>
+                  <th>退社</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in dashboard.districtClubMovements" :key="row.clubId">
+                  <td>{{ row.clubName }}</td>
+                  <td>{{ row.joinedCount }}</td>
+                  <td>{{ row.resignedCount }}</td>
+                </tr>
+                <tr v-if="!dashboard.districtClubMovements.length">
+                  <td colspan="3" style="text-align:center; color:var(--muted);">尚無社團資料</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template v-else>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin-bottom:24px;">
       <div class="tw" style="padding:18px;">
         <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">本月例會數</div>
         <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.meetingCount }}</div>
@@ -39,9 +104,9 @@ onMounted(() => {
         <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">社友人數</div>
         <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.memberCount }}</div>
       </div>
-    </div>
+      </div>
 
-    <div v-if="auth.clubId" style="margin-bottom:24px;">
+      <div v-if="auth.clubId" style="margin-bottom:24px;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">地區公告欄</h2>
       <div class="tw">
         <div v-if="announcements.districtAnnouncements.length" class="announcement-list">
@@ -57,9 +122,9 @@ onMounted(() => {
           目前沒有地區公告
         </div>
       </div>
-    </div>
+      </div>
 
-    <div v-if="auth.clubId" style="margin-bottom:24px;">
+      <div v-if="auth.clubId" style="margin-bottom:24px;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社內公告欄</h2>
       <div class="tw">
         <div v-if="announcements.clubAnnouncements.length" class="announcement-list">
@@ -75,9 +140,9 @@ onMounted(() => {
           目前沒有社內公告
         </div>
       </div>
-    </div>
+      </div>
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
       <div>
         <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">低出席率警示（&lt;75%）</h2>
         <div class="tw">
@@ -123,11 +188,18 @@ onMounted(() => {
           </table>
         </div>
       </div>
-    </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
+.district-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
 .announcement-list {
   display: grid;
 }
@@ -161,6 +233,10 @@ onMounted(() => {
 }
 
 @media (max-width: 700px) {
+  .district-grid {
+    grid-template-columns: 1fr;
+  }
+
   .announcement-item {
     grid-template-columns: 1fr;
   }

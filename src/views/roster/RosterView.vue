@@ -307,9 +307,10 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table class="roster-table">
+      <table class="roster-table" :class="{ editable: canManage }">
         <thead class="th">
           <tr>
+            <th v-if="canManage" class="col-actions">操作</th>
             <th class="col-index">項次</th>
             <th class="col-english">英文名稱</th>
             <th class="col-name">中文姓名</th>
@@ -322,11 +323,18 @@ onMounted(() => {
             <th>Email</th>
             <th>入社日期</th>
             <th>狀態</th>
-            <th v-if="canManage"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(m, index) in filtered" :key="m.id">
+          <tr
+            v-for="(m, index) in filtered"
+            :key="m.id"
+            :class="{ 'editable-row': canManage }"
+            @click="canManage && openEdit(m)"
+          >
+            <td v-if="canManage" class="col-actions" @click.stop>
+              <button class="btn btn-g btn-sm" @click="openEdit(m)">編輯</button>
+            </td>
             <td>{{ index + 1 }}</td>
             <td>{{ m.nick_name || '-' }}</td>
             <td>{{ m.name }}</td>
@@ -342,9 +350,6 @@ onMounted(() => {
               <span class="bdg" :class="memberStatus(m) === 'resigned' ? 'b-g' : memberStatus(m) === 'leave' ? 'b-y' : 'b-gr'">
                 {{ MEMBER_STATUS_LABEL[memberStatus(m)] }}
               </span>
-            </td>
-            <td v-if="canManage" style="display:flex; gap:6px;">
-              <button class="btn btn-g btn-sm" @click="openEdit(m)">編輯</button>
             </td>
           </tr>
           <tr v-if="!filtered.length">
@@ -475,6 +480,37 @@ onMounted(() => {
 <style scoped>
 .roster-table {
   min-width: 1180px;
+}
+
+.roster-table.editable {
+  min-width: 1240px;
+}
+
+.editable-row {
+  cursor: pointer;
+}
+
+.editable-row:hover td {
+  background: var(--gold-p);
+}
+
+.col-actions {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 82px;
+  min-width: 82px;
+  background: var(--card);
+  box-shadow: 1px 0 0 var(--border);
+}
+
+thead .col-actions {
+  z-index: 3;
+  background: var(--gold-p);
+}
+
+.editable-row:hover .col-actions {
+  background: var(--gold-p);
 }
 
 .col-index {

@@ -8,7 +8,7 @@
       </RouterLink>
 
       <!-- 地區管理員 -->
-      <template v-if="auth.role === 'district_admin'">
+      <template v-if="auth.isDistrictAdmin">
         <div class="nav-section">地區管理</div>
         <RouterLink to="/admin/clubs" class="nav-item">
           <span class="nav-icon">🏢</span>社團總覽

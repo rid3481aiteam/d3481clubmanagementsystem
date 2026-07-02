@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
-import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus } from '@/types'
+import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus, UserProfile, UserRole } from '@/types'
 
 const route = useRoute()
 const roster = useRosterStore()
@@ -12,6 +12,7 @@ const officers = useOfficersStore()
 const club = ref<Club | null>(null)
 const lastMeeting = ref<Meeting | null>(null)
 const avgRate = ref<number | null>(null)
+const registeredAccounts = ref<UserProfile[]>([])
 const yearTerm = currentYearTerm()
 
 const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
@@ -48,6 +49,30 @@ function officerName(role: ClubOfficerRole) {
   return officers.list.find(o => o.role === role)?.name || '-'
 }
 
+function accountRoleLabel(role: UserRole) {
+  if (role === 'district_admin') return '地區管理員'
+  if (role === 'club_admin') return '社長'
+  if (role === 'club_secretary') return '執秘'
+  if (role === 'club_member') return '一般社員'
+  return role
+}
+
+async function changeDistrictAccess(accountId: string, districtAccess: boolean) {
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ district_access: districtAccess })
+    .eq('id', accountId)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  registeredAccounts.value = registeredAccounts.value.map(a => (
+    a.id === accountId ? { ...a, district_access: districtAccess } : a
+  ))
+}
+
 async function load() {
   const id = route.params.id as string
   const { data } = await supabase.from('clubs').select('*').eq('id', id).single()
@@ -55,6 +80,14 @@ async function load() {
 
   await roster.fetchAll(id)
   await officers.fetchAll(id, yearTerm)
+
+  const { data: accounts } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('club_id', id)
+    .order('role')
+    .order('name')
+  registeredAccounts.value = accounts ?? []
 
   const { data: meeting } = await supabase
     .from('meetings')
@@ -154,6 +187,45 @@ watch(() => route.params.id, load)
         </tbody>
       </table>
       <p v-else style="color:var(--muted); font-size:13px;">尚無委員會成員資料</p>
+    </div>
+
+    <h2 class="section-h">已註冊帳號</h2>
+    <div class="tw" style="margin-bottom:24px;">
+      <table>
+        <thead class="th">
+          <tr>
+            <th>姓名</th>
+            <th>角色</th>
+            <th>可見範圍</th>
+            <th>狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="a in registeredAccounts" :key="a.id">
+            <td>{{ a.name }}</td>
+            <td>{{ accountRoleLabel(a.role) }}</td>
+            <td>
+              <select
+                class="fi"
+                :value="a.district_access ? 'district' : 'club'"
+                style="min-width:150px; padding:6px 8px;"
+                @change="changeDistrictAccess(a.id, ($event.target as HTMLSelectElement).value === 'district')"
+              >
+                <option value="club">只能看到各社</option>
+                <option value="district">同步看到地區</option>
+              </select>
+            </td>
+            <td>
+              <span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">
+                {{ a.is_active ? '啟用中' : '已停用' }}
+              </span>
+            </td>
+          </tr>
+          <tr v-if="!registeredAccounts.length">
+            <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無已註冊帳號</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <h2 class="section-h">社員名單</h2>

@@ -11,7 +11,7 @@ const invites = useInvitesStore()
 const accounts = useAccountsStore()
 const club = useClubStore()
 
-const isDistrictAdmin = computed(() => auth.role === 'district_admin')
+const isDistrictAdmin = computed(() => auth.isDistrictAdmin)
 
 const email = ref('')
 const inviteName = ref('')
@@ -43,11 +43,16 @@ function clubName(id: string | null) {
 }
 
 function roleLabel(r: UserRole) {
-  return r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r
+  return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r
 }
 
 async function toggleActive(id: string, current: boolean) {
   await accounts.setActive(id, !current)
+}
+
+async function changeDistrictAccess(id: string, value: boolean) {
+  const { error } = await accounts.setDistrictAccess(id, value)
+  if (error) alert(error.message)
 }
 
 async function removeAccount(id: string, name: string) {
@@ -145,6 +150,7 @@ onMounted(async () => {
             <th>姓名</th>
             <th>角色</th>
             <th>社團</th>
+            <th v-if="isDistrictAdmin">可見範圍</th>
             <th>狀態</th>
             <th></th>
           </tr>
@@ -154,6 +160,17 @@ onMounted(async () => {
             <td>{{ a.name }}</td>
             <td>{{ roleLabel(a.role) }}</td>
             <td>{{ clubName(a.club_id) }}</td>
+            <td v-if="isDistrictAdmin">
+              <select
+                class="fi"
+                :value="a.district_access ? 'district' : 'club'"
+                style="min-width:150px; padding:6px 8px;"
+                @change="changeDistrictAccess(a.id, ($event.target as HTMLSelectElement).value === 'district')"
+              >
+                <option value="club">只能看到各社</option>
+                <option value="district">同步看到地區</option>
+              </select>
+            </td>
             <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
             <td style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="toggleActive(a.id, a.is_active)">
@@ -165,7 +182,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="!accounts.managed.length">
-            <td colspan="5" style="text-align:center; color:var(--muted);">尚無帳號</td>
+            <td :colspan="isDistrictAdmin ? 6 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
           </tr>
         </tbody>
       </table>
