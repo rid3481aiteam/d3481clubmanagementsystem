@@ -45,7 +45,6 @@ function toggleZone(zone: string) {
 }
 
 const showModal = ref(false)
-const editing = ref<Club | null>(null)
 const form = ref<Partial<Club>>(emptyForm())
 
 function emptyForm(): Partial<Club> {
@@ -57,38 +56,15 @@ function emptyForm(): Partial<Club> {
 }
 
 function openAdd() {
-  editing.value = null
   form.value = emptyForm()
   showModal.value = true
 }
 
-function openEdit(c: Club) {
-  editing.value = c
-  form.value = { ...c }
-  showModal.value = true
-}
-
-async function removeClub(c: Club) {
-  const { rosterCount, accountCount } = await club.checkDeletable(c.id)
-  if (accountCount > 0) {
-    alert(`「${c.name}」已有 ${accountCount} 個帳號，請先到「帳號邀請 / 管理」停用或刪除該社所有帳號，才能刪除社團。`)
-    return
-  }
-  const warn = rosterCount > 0
-    ? `「${c.name}」已有 ${rosterCount} 筆社友名冊資料，刪除社團會一併清除該社的名冊／例會／出席紀錄，且無法復原。`
-    : `「${c.name}」目前沒有任何名冊資料。`
-  if (!confirm(`${warn}\n\n確定要刪除這個社團嗎？`)) return
-  const { error } = await club.deleteClub(c.id)
-  if (error) alert(error.message)
-}
-
 async function save() {
   if (!form.value.name?.trim() || !form.value.zone?.trim()) return
-  if (!editing.value) {
-    const inZone = club.allClubs.filter(c => c.zone === form.value.zone)
-    form.value.sort_order = inZone.length ? Math.max(...inZone.map(c => c.sort_order)) + 1 : 1
-  }
-  await club.upsertClub(editing.value ? { id: editing.value.id, ...form.value } : form.value)
+  const inZone = club.allClubs.filter(c => c.zone === form.value.zone)
+  form.value.sort_order = inZone.length ? Math.max(...inZone.map(c => c.sort_order)) + 1 : 1
+  await club.upsertClub(form.value)
   showModal.value = false
 }
 
@@ -140,9 +116,8 @@ onMounted(() => {
               <td>{{ c.email || '-' }}</td>
               <td>{{ c.phone || '-' }}</td>
               <td style="display:flex; gap:6px;">
-                <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社員</RouterLink>
-                <button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button>
-                <button class="btn btn-red btn-sm" @click="removeClub(c)">刪除</button>
+                <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社團資訊</RouterLink>
+                <RouterLink :to="`/admin/clubs/${c.id}/edit`" class="btn btn-g btn-sm">編輯</RouterLink>
               </td>
             </tr>
           </template>
@@ -158,7 +133,7 @@ onMounted(() => {
     <div v-if="showModal" class="mo" @click.self="showModal = false">
       <div class="mb">
         <div class="mb-h">
-          <h3>{{ editing ? '編輯社團' : '新增社團' }}</h3>
+          <h3>新增社團</h3>
           <button class="mb-close" @click="showModal = false">×</button>
         </div>
         <div class="mb-body">
@@ -187,7 +162,7 @@ onMounted(() => {
             <input v-model="form.phone" class="fi" />
           </div>
           <div>
-            <label class="fl">地址</label>
+            <label class="fl">社辦公室地址</label>
             <input v-model="form.addr" class="fi" />
           </div>
           <div>
@@ -199,11 +174,11 @@ onMounted(() => {
             <input v-model="form.meeting_time" class="fi" placeholder="e.g. 12:00" />
           </div>
           <div>
-            <label class="fl">地點</label>
+            <label class="fl">例會地點</label>
             <input v-model="form.venue" class="fi" />
           </div>
           <div>
-            <label class="fl">地點電話</label>
+            <label class="fl">例會地點電話</label>
             <input v-model="form.venue_tel" class="fi" />
           </div>
           <div>

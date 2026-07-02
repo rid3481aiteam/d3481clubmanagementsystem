@@ -76,6 +76,12 @@ const router = createRouter({
       meta: { role: 'district_admin' },
     },
     {
+      path: '/admin/clubs/:id/edit',
+      name: 'admin-club-edit',
+      component: () => import('@/views/admin/ClubEditView.vue'),
+      meta: { role: 'district_admin' },
+    },
+    {
       path: '/admin/permissions',
       name: 'admin-permissions',
       component: () => import('@/views/admin/PermissionMatrixView.vue'),
