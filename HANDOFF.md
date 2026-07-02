@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（三支 migration `025`/`026`/`027` 已由使用者在 SQL Editor 執行完成；**Claude 這次意外發現這台機器上的 Supabase CLI 已經登入且連得到 D3481 專案**，直接用 CLI 部署了 `create-member-account`、`reset-member-password` 兩支 Edge Function 並用 curl 打過（回傳正常的 401，不是崩潰），確認上線成功。順便發現 `generate-edm` 也已經是 ACTIVE 狀態、`ANTHROPIC_API_KEY` secret 也已經設定好了——這兩項先前 HANDOFF 列的待辦其實已經完成，只是沒更新記錄。**接下來只剩 Cloudflare Pages 部署跟自助註冊的 Supabase Auth 設定**，見下方待辦）
+> 最後更新：2026-07-02（第二十輪，Claude 對第十七～十九輪合併後的最新程式碼做一次通盤檢查，**發現一個很可能會擋住「社員手機號碼帳號」功能的設定問題**：社員預設密碼只有 4 碼（手機末四碼），但 Supabase Auth 預設最短密碼長度是 6 碼，測試前要先去 Dashboard 調整設定，詳見下方待辦 1；這輪這台機器上的 Supabase CLI／Cloudflare wrangler 都沒有登入，無法像上一輪一樣直接部署，純程式碼審查與文件更新，沒有新增功能）
 
 ---
 
@@ -16,7 +16,8 @@
 1. **【第十八輪，社員手機號碼帳號機制】migration + Edge Function 都已完成 ✅，剩下待使用者實測**：
    - ~~在 Supabase SQL Editor 執行 `026_member_phone_accounts.sql`~~ **已完成**
    - ~~部署兩個新 Edge Function~~ **已完成**（2026-07-02，Claude 直接用這台機器上已登入的 Supabase CLI 執行 `supabase link --project-ref xdwqrgthsxyzclnjlmvy` + `supabase functions deploy create-member-account` + `supabase functions deploy reset-member-password`，`supabase functions list` 確認兩支都是 `ACTIVE`，用 curl 打了一次沒帶 token，回傳乾淨的 `401 UNAUTHORIZED_NO_AUTH_HEADER`，不是伺服器錯誤，代表程式碼有正常執行）
-   - **待實測**：Cloudflare Pages 部署新版前端之後，到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝手機末四碼）、用手機號碼登入、忘記密碼一鍵重設回手機末四碼、停用/刪除社員帳號
+   - **【第二十輪新增，測試前必看，很可能會擋住整個功能】`create-member-account`／`reset-member-password` 把社員密碼設成手機末四碼（只有 4 碼），但 Supabase Auth 預設的最短密碼長度是 6 碼**：`supabase.auth.admin.createUser()`／`updateUserById()` 在密碼太短時會回傳 `Password should be at least 6 characters` 之類的錯誤，兩支 function 都有把這個 `error.message` 原樣往前端丟（不會整個 500 崩潰、也不會靜默失敗），但如果沒有事先調整設定，社長/執秘一建立社員帳號就會直接看到這個錯誤，還沒排查過的人可能會以為是程式碼壞了。**上線前務必先到 Supabase Dashboard → Authentication → Providers → Email（或新版介面的 Authentication → Policies）把「Minimum password length」調降到 4 以下**，才符合「初始密碼＝手機末四碼」這個給長輩用的簡化設計；這步跟前面的 migration/部署一樣，Claude 這邊没有 Dashboard 存取權限，無法代勞
+   - **待實測**：確認上面的密碼長度設定調好、Cloudflare Pages 部署新版前端之後，到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝手機末四碼）、用手機號碼登入、忘記密碼一鍵重設回手機末四碼、停用/刪除社員帳號
    - 本機沒有 `.env`（只有 `.env.example`），無法在這個環境跑真實 Supabase 連線驗證登入，只做了 `vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過
 2. **地區/各社切換按鈕沒有顯示——已定位高度可疑根因，待使用者確認並修資料**（延續自第十六輪）：使用者確認測試帳號右上角角色徽章有顯示「＋地區」字樣，代表 `district_access` 已正確載入前端（`isDistrictAdmin` 為 true）。`canSwitchView = isDistrictAdmin && !!clubId`，徽章邏輯只吃 `role`/`isDistrictAdmin`、不吃 `clubId`，所以徽章正常但按鈕不出現，唯一合理解釋是該帳號的 `user_profiles.club_id` 其實是 `NULL`。
    - 回頭查 `supabase/migrations/014_fix_handle_new_user_metadata_source.sql` 的說明文字，發現這正是有前科的 bug：`handle_new_user()` 原本讀錯 metadata 欄位（讀 `raw_app_meta_data`，但 `inviteUserByEmail` 寫入的其實是 `raw_user_meta_data`），導致**在 014 套用之前，每一個被邀請建立的帳號，`club_id` 一律被寫成 NULL**。014 只修好了「以後」新邀請帳號會正確寫入 `club_id`，**不會回頭修正 014 套用之前就已經存在、`club_id` 已經是 NULL 的舊帳號**
@@ -29,6 +30,15 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第二十輪）：通盤審查第十七～十九輪合併後的程式碼，找到密碼長度設定問題
+
+使用者請 Claude 查一下最新 repo/HANDOFF 狀態並繼續執行。這台環境的 Supabase CLI（`npx supabase projects list`）跟 Cloudflare `wrangler`（`npx wrangler whoami`）都顯示尚未登入，跟上一輪 HANDOFF 記錄的「已登入」狀態不同（推測是不同執行環境/session，登入狀態不會跨環境保留），所以這輪沒辦法像第十八輪一樣直接用 CLI 部署，只能做程式碼層面的事。
+
+- `npx vue-tsc --noEmit` + `npm run build` 重新確認目前 `origin/main` 最新狀態（含第十九輪的分區註冊、第十八輪的手機帳號）沒有型別錯誤、build 正常
+- 通盤看過 `supabase/functions/create-member-account/index.ts`、`supabase/functions/reset-member-password/index.ts`、`supabase/migrations/026_member_phone_accounts.sql`、`027_registration_zone.sql`、`src/stores/auth.ts` 的 `resolveLoginEmail()`：手機↔合成 email 的轉換邏輯（`<phone>@member.d3481.local`）在建立帳號、登入兩處寫法一致，沒有發現邏輯不一致的問題
+- **發現一個設定面的潛在阻塞**：兩支 Edge Function 都把社員密碼設成 `phone.slice(-4)`（只有 4 碼），但 Supabase Auth 專案預設的「Minimum password length」是 6 碼，`admin.createUser()`/`updateUserById()` 在密碼太短時會直接回傳錯誤（不是隱性失敗——两支 function 都有把 `error.message` 原樣往前端丟，使用者會看到明確錯誤，但如果沒人事先知道要調整 Dashboard 設定，第一次測試「建立社員帳號」大概率會卡在這裡，還以為是程式碼壞了）。這不是程式碼 bug，是 Supabase 專案設定跟這個功能的產品設計（給長輩用的極簡 4 碼密碼）本來就沒有互相配合，需要使用者到 Dashboard 手動調整，Claude 沒有 Dashboard 存取權限無法代勞，詳見上方待辦 1
+- 沒有做任何程式碼修改（審查沒發現需要改程式碼的問題），只更新了這份 HANDOFF
 
 ## 本次完成（第十九輪）：註冊頁改成先選分區、再選社
 
