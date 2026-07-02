@@ -1,9 +1,39 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useClubStore } from '@/stores/club'
 import type { Club } from '@/types'
 
 const club = useClubStore()
+
+const ZONE_ORDER = [
+  '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
+  '第六分區', '第七分區', '第八分區', '第九分區', '第十分區', '第十一分區',
+]
+
+function zoneRank(zone: string) {
+  const i = ZONE_ORDER.indexOf(zone)
+  return i === -1 ? ZONE_ORDER.length : i
+}
+
+const groupedClubs = computed(() => {
+  const groups = new Map<string, Club[]>()
+  for (const c of club.allClubs) {
+    const key = c.zone || '未分區'
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(c)
+  }
+  return [...groups.entries()]
+    .sort((a, b) => zoneRank(a[0]) - zoneRank(b[0]) || a[0].localeCompare(b[0]))
+    .map(([zone, clubs]) => ({ zone, clubs: clubs.slice().sort((a, b) => a.name.localeCompare(b.name)) }))
+})
+
+const collapsedZones = ref(new Set<string>())
+function toggleZone(zone: string) {
+  const s = new Set(collapsedZones.value)
+  if (s.has(zone)) s.delete(zone)
+  else s.add(zone)
+  collapsedZones.value = s
+}
 
 const showModal = ref(false)
 const editing = ref<Club | null>(null)
@@ -60,20 +90,31 @@ onMounted(() => {
             <th></th>
           </tr>
         </thead>
-        <tbody>
-          <tr v-for="c in club.allClubs" :key="c.id">
-            <td>{{ c.name }}</td>
-            <td>{{ c.zone }}</td>
-            <td>{{ c.pres_name || '-' }}</td>
-            <td>{{ c.sec_name || '-' }}</td>
-            <td>{{ c.email || '-' }}</td>
-            <td>{{ c.phone || '-' }}</td>
-            <td style="display:flex; gap:6px;">
-              <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社員</RouterLink>
-              <button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button>
+        <tbody v-for="g in groupedClubs" :key="g.zone">
+          <tr class="zone-row" @click="toggleZone(g.zone)">
+            <td colspan="7">
+              <span class="zone-chevron">{{ collapsedZones.has(g.zone) ? '▸' : '▾' }}</span>
+              <strong>{{ g.zone }}</strong>
+              <span style="color:var(--muted); font-weight:400;">（{{ g.clubs.length }} 社）</span>
             </td>
           </tr>
-          <tr v-if="!club.allClubs.length">
+          <template v-if="!collapsedZones.has(g.zone)">
+            <tr v-for="c in g.clubs" :key="c.id">
+              <td>{{ c.name }}</td>
+              <td>{{ c.zone }}</td>
+              <td>{{ c.pres_name || '-' }}</td>
+              <td>{{ c.sec_name || '-' }}</td>
+              <td>{{ c.email || '-' }}</td>
+              <td>{{ c.phone || '-' }}</td>
+              <td style="display:flex; gap:6px;">
+                <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社員</RouterLink>
+                <button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+        <tbody v-if="!club.allClubs.length">
+          <tr>
             <td colspan="7" style="text-align:center; color:var(--muted);">尚無社團資料</td>
           </tr>
         </tbody>
@@ -144,3 +185,23 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.zone-row {
+  cursor: pointer;
+  background: var(--gold-p);
+}
+.zone-row:hover td {
+  background: var(--gold-p);
+}
+.zone-row td {
+  font-size: 13px;
+  color: var(--navy);
+  padding: 8px 14px;
+}
+.zone-chevron {
+  display: inline-block;
+  width: 14px;
+  color: var(--muted);
+}
+</style>
