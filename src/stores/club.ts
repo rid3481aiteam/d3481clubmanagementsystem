@@ -35,5 +35,12 @@ export const useClubStore = defineStore('club', () => {
     return { error }
   }
 
-  return { current, allClubs, loading, fetchCurrent, fetchAll, upsertClub }
+  async function swapOrder(a: Club, b: Club) {
+    const { error: e1 } = await supabase.from('clubs').update({ sort_order: b.sort_order }).eq('id', a.id)
+    const { error: e2 } = await supabase.from('clubs').update({ sort_order: a.sort_order }).eq('id', b.id)
+    if (!e1 && !e2) await fetchAll()
+    return { error: e1 || e2 }
+  }
+
+  return { current, allClubs, loading, fetchCurrent, fetchAll, upsertClub, swapOrder }
 })

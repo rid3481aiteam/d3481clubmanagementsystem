@@ -35,6 +35,7 @@ export interface Club {
   venue: string | null
   venue_tel: string | null
   note: string | null
+  sort_order: number
   created_at: string
   updated_at: string
 }

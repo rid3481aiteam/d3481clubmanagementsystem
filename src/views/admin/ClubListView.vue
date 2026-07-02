@@ -24,8 +24,17 @@ const groupedClubs = computed(() => {
   }
   return [...groups.entries()]
     .sort((a, b) => zoneRank(a[0]) - zoneRank(b[0]) || a[0].localeCompare(b[0]))
-    .map(([zone, clubs]) => ({ zone, clubs: clubs.slice().sort((a, b) => a.name.localeCompare(b.name)) }))
+    .map(([zone, clubs]) => ({
+      zone,
+      clubs: clubs.slice().sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    }))
 })
+
+async function moveClub(group: Club[], index: number, dir: -1 | 1) {
+  const target = index + dir
+  if (target < 0 || target >= group.length) return
+  await club.swapOrder(group[index], group[target])
+}
 
 const collapsedZones = ref(new Set<string>())
 function toggleZone(zone: string) {
@@ -61,6 +70,10 @@ function openEdit(c: Club) {
 
 async function save() {
   if (!form.value.name?.trim() || !form.value.zone?.trim()) return
+  if (!editing.value) {
+    const inZone = club.allClubs.filter(c => c.zone === form.value.zone)
+    form.value.sort_order = inZone.length ? Math.max(...inZone.map(c => c.sort_order)) + 1 : 1
+  }
   await club.upsertClub(editing.value ? { id: editing.value.id, ...form.value } : form.value)
   showModal.value = false
 }
@@ -99,8 +112,14 @@ onMounted(() => {
             </td>
           </tr>
           <template v-if="!collapsedZones.has(g.zone)">
-            <tr v-for="c in g.clubs" :key="c.id">
-              <td>{{ c.name }}</td>
+            <tr v-for="(c, i) in g.clubs" :key="c.id">
+              <td>
+                <span class="order-btns">
+                  <button class="order-btn" :disabled="i === 0" @click="moveClub(g.clubs, i, -1)">▲</button>
+                  <button class="order-btn" :disabled="i === g.clubs.length - 1" @click="moveClub(g.clubs, i, 1)">▼</button>
+                </span>
+                {{ c.name }}
+              </td>
               <td>{{ c.zone }}</td>
               <td>{{ c.pres_name || '-' }}</td>
               <td>{{ c.sec_name || '-' }}</td>
@@ -203,5 +222,30 @@ onMounted(() => {
   display: inline-block;
   width: 14px;
   color: var(--muted);
+}
+.order-btns {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.order-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1;
+  padding: 1px 3px;
+  cursor: pointer;
+}
+.order-btn:hover:not(:disabled) {
+  color: var(--navy);
+  border-color: var(--navy);
+}
+.order-btn:disabled {
+  opacity: .3;
+  cursor: default;
 }
 </style>
