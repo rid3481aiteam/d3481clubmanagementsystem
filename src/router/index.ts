@@ -16,6 +16,7 @@ const router = createRouter({
       path: '/accept-invite',
       name: 'accept-invite',
       component: () => import('@/views/AcceptInviteView.vue'),
+      meta: { bare: true },
     },
     {
       path: '/',

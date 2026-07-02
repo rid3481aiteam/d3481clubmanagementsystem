@@ -1,7 +1,7 @@
 <template>
   <div id="app-root">
     <template v-if="!auth.loading">
-      <template v-if="auth.isLoggedIn">
+      <template v-if="auth.isLoggedIn && !route.meta.bare">
         <TopNav />
         <div class="layout">
           <Sidebar />
@@ -22,11 +22,13 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import TopNav from '@/components/layout/TopNav.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 
 const auth = useAuthStore()
+const route = useRoute()
 onMounted(() => auth.init())
 </script>
 

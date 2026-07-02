@@ -2,10 +2,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
-const auth = useAuthStore()
 
 const password = ref('')
 const confirmPassword = ref('')
@@ -26,14 +24,17 @@ async function handleSubmit() {
 
   loading.value = true
   const { error } = await supabase.auth.updateUser({ password: password.value })
-  loading.value = false
 
   if (error) {
+    loading.value = false
     errorMsg.value = error.message
     return
   }
 
-  router.push(auth.role === 'district_admin' ? '/admin/clubs' : '/roster')
+  await supabase.auth.signOut()
+  loading.value = false
+  alert('密碼設定成功，請使用新密碼重新登入。')
+  router.push('/login')
 }
 </script>
 
@@ -44,7 +45,7 @@ async function handleSubmit() {
     </div>
     <div class="tw" style="padding:24px;">
       <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">
-        歡迎加入！請設定您的登入密碼，之後即可用 Email + 密碼登入本平台。
+        歡迎加入！請設定您的登入密碼，設定完成後請用 Email + 新密碼重新登入本平台。
       </p>
       <form @submit.prevent="handleSubmit" style="display:flex; flex-direction:column; gap:14px;">
         <div>
@@ -57,7 +58,7 @@ async function handleSubmit() {
         </div>
         <p v-if="errorMsg" style="font-size:12px; color:var(--red); background:rgba(176,48,48,.08); border-radius:var(--r); padding:8px 12px;">{{ errorMsg }}</p>
         <button type="submit" class="btn btn-p" :disabled="loading" style="justify-content:center;">
-          {{ loading ? '設定中…' : '設定密碼並進入平台' }}
+          {{ loading ? '設定中…' : '設定密碼' }}
         </button>
       </form>
     </div>
