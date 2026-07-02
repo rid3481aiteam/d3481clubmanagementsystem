@@ -55,7 +55,7 @@ async function removeAccount(id: string, name: string) {
 }
 
 onMounted(async () => {
-  if (isDistrictAdmin.value) await club.fetchAll()
+  await club.fetchAll()
   await invites.fetchLog()
   await accounts.fetchManaged()
 })
