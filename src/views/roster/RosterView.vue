@@ -13,6 +13,27 @@ const features = useFeaturesStore()
 const permissions = usePermissionsStore()
 const canManage = computed(() => permissions.can('roster', 'edit'))
 
+const CLASSIFICATIONS = [
+  '農林漁牧業',
+  '礦業及土石採取業',
+  '製造業',
+  '電力及燃氣供應業',
+  '用水供應及污染整治業',
+  '營建工程業',
+  '批發及零售業',
+  '運輸及倉儲業',
+  '住宿及餐飲業',
+  '資訊及通訊傳播業',
+  '金融及保險業',
+  '不動產業',
+  '專業、科學及技術服務業',
+  '教育業',
+  '醫療保健及社會工作服務業',
+  '文化、運動及休閒服務業',
+  '公共行政及國防',
+  '其他服務業',
+]
+
 const keyword = ref('')
 const statusFilter = ref<'active' | 'inactive' | 'all'>('active')
 
@@ -212,7 +233,10 @@ onMounted(() => {
           </div>
           <div>
             <label class="fl">職業分類</label>
-            <input v-model="form.classification" class="fi" />
+            <select v-model="form.classification" class="fi">
+              <option :value="null">請選擇</option>
+              <option v-for="c in CLASSIFICATIONS" :key="c" :value="c">{{ c }}</option>
+            </select>
           </div>
           <div>
             <label class="fl">公司</label>

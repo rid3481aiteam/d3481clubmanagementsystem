@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import type { ClubOfficerRole } from '@/types'
 
 const auth = useAuthStore()
+const roster = useRosterStore()
 const officers = useOfficersStore()
 
 const canManage = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
@@ -24,9 +26,16 @@ const newMemberName = ref('')
 const saving = ref(false)
 
 const committeeMembers = computed(() => officers.list.filter(o => o.role === 'committee_member'))
+const activeMemberNames = computed(() => roster.members.filter(m => m.is_active).map(m => m.name))
+
+function memberOptions(current: string) {
+  if (current && !activeMemberNames.value.includes(current)) return [current, ...activeMemberNames.value]
+  return activeMemberNames.value
+}
 
 async function load() {
   if (!auth.clubId) return
+  await roster.fetchAll(auth.clubId)
   await officers.fetchAll(auth.clubId, yearTerm.value)
   const map: Record<string, string> = {}
   for (const { role } of SINGLE_ROLES) {
@@ -94,7 +103,10 @@ watch(yearTerm, load)
       <div style="display:flex; flex-direction:column; gap:12px; max-width:400px;">
         <div v-for="r in SINGLE_ROLES" :key="r.role">
           <label class="fl">{{ r.label }}</label>
-          <input v-model="singleNames[r.role]" class="fi" :disabled="!canManage" />
+          <select v-model="singleNames[r.role]" class="fi" :disabled="!canManage">
+            <option value="">請選擇</option>
+            <option v-for="n in memberOptions(singleNames[r.role])" :key="n" :value="n">{{ n }}</option>
+          </select>
         </div>
       </div>
       <button v-if="canManage" class="btn btn-gold" style="margin-top:14px;" :disabled="saving" @click="saveSingleRoles">
@@ -134,7 +146,10 @@ watch(yearTerm, load)
       </div>
       <div>
         <label class="fl">姓名</label>
-        <input v-model="newMemberName" class="fi" style="min-width:160px;" />
+        <select v-model="newMemberName" class="fi" style="min-width:160px;">
+          <option value="">請選擇</option>
+          <option v-for="n in activeMemberNames" :key="n" :value="n">{{ n }}</option>
+        </select>
       </div>
       <button class="btn btn-g" @click="addCommitteeMember">+ 新增委員</button>
     </div>
