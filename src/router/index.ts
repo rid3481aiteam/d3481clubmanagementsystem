@@ -79,7 +79,7 @@ const router = createRouter({
       path: '/club/invite',
       name: 'account-management',
       component: () => import('@/views/admin/AccountManagementView.vue'),
-      meta: { roles: ['district_admin', 'club_secretary'] },
+      meta: { roles: ['district_admin', 'club_secretary', 'club_admin'] },
     },
     // 404
     {

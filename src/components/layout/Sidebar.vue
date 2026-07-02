@@ -37,11 +37,11 @@
         </RouterLink>
       </template>
 
-      <!-- 執秘限定 -->
-      <template v-if="auth.role === 'club_secretary'">
+      <!-- 執秘 + 社長：本社帳號自行管理 -->
+      <template v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'">
         <div class="nav-section">帳號</div>
         <RouterLink to="/club/invite" class="nav-item">
-          <span class="nav-icon">👤</span>邀請 / 停用社長
+          <span class="nav-icon">👤</span>邀請 / 管理本社帳號
         </RouterLink>
       </template>
 

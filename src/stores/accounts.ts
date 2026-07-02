@@ -7,12 +7,12 @@ export const useAccountsStore = defineStore('accounts', () => {
   const managed = ref<UserProfile[]>([])
   const loading = ref(false)
 
-  async function fetchManaged(targetRole: 'club_secretary' | 'club_admin') {
+  async function fetchManaged() {
     loading.value = true
     const { data } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('role', targetRole)
+      .in('role', ['club_admin', 'club_secretary'])
     managed.value = data ?? []
     loading.value = false
   }

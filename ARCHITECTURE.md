@@ -28,13 +28,16 @@
 
 ## 帳號邀請流程
 
+> 2026-07-02 修訂：權限模型簡化為三層——**地區**（全區檢視、不編輯各社資料）／
+> **各社**（社長與執秘對等，全權編輯本社資料並自行管理本社帳號）／**一般人**（唯讀，Phase 2 再做，見下方 Phase 規劃）。
+> 不再區分「執秘限管社長」這種單向關係，社長與執秘互為對等的「各社層」帳號。
+
 ```
 district_admin
-  └─► 邀請 club_secretary（各社執秘，長期帳號）
+  └─► 為任何社邀請第一組帳號（社長或執秘皆可，新社團 bootstrap 用）
 
-club_secretary
-  └─► 每年邀請當屆 club_admin（社長）
-  └─► 社長卸任後，執秘停用舊帳號
+club_admin / club_secretary（各社層，對等）
+  └─► 互相邀請 / 停用本社的社長或執秘帳號（角色不限，由各社自行決定）
 ```
 
 **邀請機制**：Supabase `auth.admin.inviteUserByEmail()` via Edge Function
@@ -43,10 +46,8 @@ club_secretary
 
 | 動作 | 允許角色 |
 |------|---------|
-| 邀請執秘 | district_admin |
-| 邀請社長 | club_secretary（限本社 club_id） |
-| 停用社長帳號 | club_secretary（限本社）、district_admin |
-| 停用執秘帳號 | district_admin only |
+| 邀請本社帳號（社長或執秘） | district_admin（任何社，bootstrap 用）、club_admin / club_secretary（限本社 club_id） |
+| 停用 / 啟用本社帳號 | district_admin（任何社）、club_admin / club_secretary（限本社，互相對等） |
 
 ---
 
@@ -90,10 +91,8 @@ Feature flag 分兩層：
 | 功能 | district_admin | club_admin | club_secretary |
 |------|:-:|:-:|:-:|
 | **帳號管理** | | | |
-| 邀請執秘 | ✅ | ❌ | ❌ |
-| 邀請社長 | ✅ | ❌ | ✅（本社） |
-| 停用社長帳號 | ✅ | ❌ | ✅（本社） |
-| 停用執秘帳號 | ✅ | ❌ | ❌ |
+| 邀請本社帳號（社長或執秘） | ✅ 任何社（bootstrap） | ✅（本社） | ✅（本社） |
+| 停用 / 啟用本社帳號 | ✅ 任何社 | ✅（本社，互相對等） | ✅（本社，互相對等） |
 | **例會 / 出席** | | | |
 | 查看例會 | ✅ 全區 | ✅ 本社 | ✅ 本社 |
 | 新增 / 編輯例會 | ✅ | ✅ | ✅ |
@@ -158,4 +157,4 @@ Feature flag 分兩層：
 ## Phase 規劃
 
 - **Phase 1**：本文件所有功能
-- **Phase 2**：B5 EDM、D4 社友關懷、社費 / 財務模組
+- **Phase 2**：B5 EDM、D4 社友關懷、社費 / 財務模組、**一般人公開瀏覽層**（各社自訂哪些資料對外公開，需新增公開欄位 + 匿名可讀 RLS + 對外頁面，範圍較大，尚未設計）

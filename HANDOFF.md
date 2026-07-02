@@ -1,23 +1,43 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02
+> 最後更新：2026-07-02（第二輪，Claude 透過 Supabase Dashboard + clone repo 協助除錯與重新設計權限模型）
 
 ---
 
-## ⚠️ 待辦：本次有 2 支 SQL migration + 1 個 Edge Function 尚未在 Supabase 執行/部署
+## ⚠️ 待辦：本次新增 1 支 SQL migration + Edge Function 需重新部署
 
-**這是目前最優先的待辦事項**，前端程式碼已經全部寫完、`npm run build` 通過、也已 commit + push，但功能還無法運作，因為：
+**目前最優先待辦**，程式碼已寫完、`npm run build` 通過、已 commit + push，但功能還無法運作：
 
-1. 到 Supabase dashboard → **SQL Editor**，依序執行：
-   - `supabase/migrations/010_role_permissions.sql`（新增 `role_permissions` 表 + `has_permission()` + 種子資料 + 重寫 roster/prospective_members/meetings/attendance_sessions/attendance_details 的 write policy）
-   - `supabase/migrations/011_invite_deactivate_gaps.sql`（新增 district_admin 可管理 user_profiles 的 UPDATE policy）
-2. 重新部署 `invite-user` Edge Function（改了 club_member 邀請驗證邏輯）：
-   ```bash
-   supabase functions deploy invite-user
-   ```
-   （或用 Supabase dashboard 的 Edge Functions 頁面重新部署這支 function 的最新程式碼）
+1. 到 Supabase dashboard → **SQL Editor**，執行 `supabase/migrations/012_club_self_manage_accounts.sql`
+   （把 006 的「執秘限管社長」單向 policy 換成「社長／執秘互相對等管理本社帳號」）
+2. 到 Supabase dashboard → **Edge Functions → invite-user**，把 `supabase/functions/invite-user/index.ts` 的最新內容貼上覆蓋、重新 Deploy
+   （放寬邀請邏輯：地區可為任何社 bootstrap 邀請、各社社長／執秘可互相邀請本社帳號，不再限制「只有地區能邀執秘」）
 
-沒做這兩步之前：權限矩陣頁面會抓不到資料（`role_permissions` 表不存在）、帳號邀請頁會失敗（Edge Function 邏輯是舊的）。
+沒做這兩步之前：社長帳號還是無法邀請/停用執秘（或反過來），會被舊版 RLS / Edge Function 邏輯擋下。
+
+### 本次除錯過程記錄（給下次遇到類似狀況參考）
+在部署 `invite-user` function 時踩了兩個坑：
+1. **CORS 預檢請求被擋**：Supabase Edge Function 預設不會自動處理瀏覽器的 `OPTIONS` 預檢請求，前端呼叫時如果沒在程式碼裡明確回應 `OPTIONS` 並在每個 Response 加上 `Access-Control-Allow-Origin` 等標頭，瀏覽器會直接擋下請求，前端只會看到「Failed to send a request to the Edge Function」，看不到真正的錯誤內容。
+2. **Function 的 slug 跟預期不符**：透過 Supabase Dashboard 手動建立 function 時，如果建立當下沒有把 Function name 欄位改掉，會被塞一個隨機名稱（例如 `rapid-task`）當作實際路由 slug；之後在 Settings 頁把「Name」改成 `invite-user` **不會**改變 slug／endpoint URL（畫面上會明確提示「Your slug and endpoint URL will remain the same」），所以顯示名稱和實際呼叫網址對不上，前端打 `invite-user` 這個路徑會 404，一樣被瀏覽器判定為 CORS 錯誤。要修正必須刪除重建，並在建立當下就把 Function name 設對。
+
+### 本次權限模型調整
+使用者確認實際需求其實是單純的三層架構，比原本設計的角色邀請鏈更簡單：
+- **地區層**（`district_admin`）：全區最高檢視權限，可看到所有社資料，但不能編輯各社資料（名冊/例會/出席/通訊錄皆須由各社自己編輯，這點原本就已符合）；新增「可為任何社 bootstrap 邀請第一組帳號」的能力，解決新社團剛建立、還沒有任何帳號時的雞生蛋問題
+- **各社層**（`club_admin` + `club_secretary`，兩者對等）：全權編輯本社資料（原本就已符合），**新增**互相邀請 / 停用本社帳號的能力（原本規則是「只有地區能邀執秘」「只有執秘能邀社長」，造成社長沒辦法邀請新執秘、執秘之間也無法互相交接）
+- **一般人層**（公開瀏覽）：目前系統完全沒有這個概念（所有頁面都需要登入），列為 Phase 2，需要另外設計「各社如何標記公開欄位」+ 匿名可讀 RLS + 對外頁面，範圍較大，這次不做
+
+改動檔案：
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/012_club_self_manage_accounts.sql` | 新增 `is_club_tier()` helper（SECURITY DEFINER，比照 009 的安全模式）；把 006 的 `profiles_secretary_manage_admin`（執秘→社長單向）換成 `profiles_club_tier_manage`（社長/執秘互相對等，同社才可管理） |
+| `supabase/functions/invite-user/index.ts` | 移除角色階層限制，改為：district_admin 可為任何社邀請任何角色（bootstrap）；club_admin/club_secretary 只要 `club_id` 跟自己相同就能邀請任何角色（社長或執秘皆可）；同時補上 CORS 處理（`OPTIONS` 預檢 + 所有 Response 加 `corsHeaders`） |
+| `src/router/index.ts` | `/club/invite` 的 `meta.roles` 加入 `club_admin`（原本只有 district_admin、club_secretary 能進） |
+| `src/components/layout/Sidebar.vue` | 「帳號」選單從只有 `club_secretary` 看得到，改成 `club_secretary` 或 `club_admin` 都看得到，連結文字改為「邀請 / 管理本社帳號」 |
+| `src/stores/accounts.ts` | `fetchManaged()` 拿掉 `targetRole` 參數，改成一次查詢本社（或地區看全部）的 `club_admin` + `club_secretary` 兩種角色帳號 |
+| `src/views/admin/AccountManagementView.vue` | 邀請表單新增「角色」下拉選單（執秘／社長皆可選，不再由登入者角色寫死），帳號清單表格新增「角色」欄 |
+| `ARCHITECTURE.md` | 更新帳號邀請流程、安全規則表、角色權限矩陣「帳號管理」列，反映三層對等模型；Phase 2 補上「一般人公開瀏覽層」項目 |
+
+**已用 `npm run build` 驗證通過**（vue-tsc 型別檢查 + vite build 皆無錯誤）。未做瀏覽器實測（需要真實登入帳號與 Supabase 連線，留給下次登入測試時確認）。
 
 ## 本次完成：細粒度權限系統 + 帳號邀請/管理 UI + club_member 角色定義
 

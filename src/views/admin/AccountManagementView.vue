@@ -4,19 +4,18 @@ import { useAuthStore } from '@/stores/auth'
 import { useInvitesStore } from '@/stores/invites'
 import { useAccountsStore } from '@/stores/accounts'
 import { useClubStore } from '@/stores/club'
+import type { UserRole } from '@/types'
 
 const auth = useAuthStore()
 const invites = useInvitesStore()
 const accounts = useAccountsStore()
 const club = useClubStore()
 
-const targetRole = computed<'club_secretary' | 'club_admin'>(() =>
-  auth.role === 'district_admin' ? 'club_secretary' : 'club_admin'
-)
-const targetRoleLabel = computed(() => (targetRole.value === 'club_secretary' ? '執秘' : '社長'))
+const isDistrictAdmin = computed(() => auth.role === 'district_admin')
 
 const email = ref('')
-const clubId = ref<string | null>(auth.role === 'club_secretary' ? auth.clubId : null)
+const role = ref<'club_secretary' | 'club_admin'>('club_secretary')
+const clubId = ref<string | null>(isDistrictAdmin.value ? null : auth.clubId)
 const inviting = ref(false)
 const inviteError = ref<string | null>(null)
 const inviteSuccess = ref(false)
@@ -26,7 +25,7 @@ async function submitInvite() {
   inviting.value = true
   inviteError.value = null
   inviteSuccess.value = false
-  const { error } = await invites.inviteUser(email.value.trim(), targetRole.value, clubId.value)
+  const { error } = await invites.inviteUser(email.value.trim(), role.value, clubId.value)
   if (error) {
     inviteError.value = error.message
   } else {
@@ -40,14 +39,18 @@ function clubName(id: string | null) {
   return club.allClubs.find(c => c.id === id)?.name ?? '-'
 }
 
+function roleLabel(r: UserRole) {
+  return r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r
+}
+
 async function toggleActive(id: string, current: boolean) {
   await accounts.setActive(id, !current)
 }
 
 onMounted(async () => {
-  if (auth.role === 'district_admin') await club.fetchAll()
+  if (isDistrictAdmin.value) await club.fetchAll()
   await invites.fetchLog()
-  await accounts.fetchManaged(targetRole.value)
+  await accounts.fetchManaged()
 })
 </script>
 
@@ -58,13 +61,20 @@ onMounted(async () => {
     </div>
 
     <div class="tw" style="padding:20px; margin-bottom:24px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:14px;">邀請{{ targetRoleLabel }}</h2>
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:14px;">邀請帳號</h2>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>
           <label class="fl">Email</label>
           <input v-model="email" type="email" class="fi" placeholder="邀請對象的 Email" style="min-width:240px;" />
         </div>
-        <div v-if="auth.role === 'district_admin'">
+        <div>
+          <label class="fl">角色</label>
+          <select v-model="role" class="fi" style="min-width:120px;">
+            <option value="club_secretary">執秘</option>
+            <option value="club_admin">社長</option>
+          </select>
+        </div>
+        <div v-if="isDistrictAdmin">
           <label class="fl">所屬社團</label>
           <select v-model="clubId" class="fi" style="min-width:200px;">
             <option :value="null" disabled>請選擇</option>
@@ -94,7 +104,7 @@ onMounted(async () => {
         <tbody>
           <tr v-for="i in invites.log" :key="i.id">
             <td>{{ i.invited_email }}</td>
-            <td>{{ i.role }}</td>
+            <td>{{ roleLabel(i.role) }}</td>
             <td>{{ clubName(i.club_id) }}</td>
             <td>{{ new Date(i.invited_at).toLocaleString() }}</td>
             <td>
@@ -109,12 +119,13 @@ onMounted(async () => {
       </table>
     </div>
 
-    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">{{ targetRoleLabel }}帳號</h2>
+    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社長／執秘帳號</h2>
     <div class="tw">
       <table>
         <thead class="th">
           <tr>
             <th>姓名</th>
+            <th>角色</th>
             <th>社團</th>
             <th>狀態</th>
             <th></th>
@@ -123,6 +134,7 @@ onMounted(async () => {
         <tbody>
           <tr v-for="a in accounts.managed" :key="a.id">
             <td>{{ a.name }}</td>
+            <td>{{ roleLabel(a.role) }}</td>
             <td>{{ clubName(a.club_id) }}</td>
             <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
             <td>
@@ -132,7 +144,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="!accounts.managed.length">
-            <td colspan="4" style="text-align:center; color:var(--muted);">尚無帳號</td>
+            <td colspan="5" style="text-align:center; color:var(--muted);">尚無帳號</td>
           </tr>
         </tbody>
       </table>
