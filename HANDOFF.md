@@ -1,13 +1,13 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十八輪，Claude 開發社員手機號碼帳號機制——社員免 Email 註冊，執秘/社長後台建帳號、一鍵重設密碼，與第十七輪的 Email 自助註冊機制並存、分別對應不同社員的使用情境；兩者的 migration 都還**未套用**、edge functions/路由都還**未部署**，待使用者處理）
+> 最後更新：2026-07-02（第十九輪，Claude 修正註冊頁——先選分區再選社，避免長清單；第十八輪開發社員手機號碼帳號機制——社員免 Email 註冊，執秘/社長後台建帳號、一鍵重設密碼，與第十七輪的 Email 自助註冊機制並存、分別對應不同社員的使用情境；三輪的 migration 都還**未套用**、edge functions/路由都還**未部署**，待使用者處理）
 
 ---
 
 ## ⚠️ 待辦
 
 0. **【第十七輪，優先處理】自助註冊功能要上線前，需要使用者手動完成以下步驟**（程式碼已寫完並推上 GitHub，但這幾步無法由 Claude 代勞）：
-   - 在 Supabase SQL Editor 執行 `supabase/migrations/025_self_registration.sql`（新增 `user_profiles.requested_role` 欄位、更新 `handle_new_user()` trigger、新增 `public_clubs_for_registration()` function 並開放給 `anon` 角色）
+   - 在 Supabase SQL Editor 依序執行 `supabase/migrations/025_self_registration.sql`（新增 `user_profiles.requested_role` 欄位、更新 `handle_new_user()` trigger、新增 `public_clubs_for_registration()` function 並開放給 `anon` 角色）與 `supabase/migrations/027_registration_zone.sql`（第十九輪新增，`public_clubs_for_registration()` 補回傳 `zone` 欄位，讓註冊頁能先選分區再選社）
    - Authentication → URL Configuration → Redirect URLs 新增兩個網址：`https://d3481clubmanagementsystem.pages.dev/verify-email` 與 `https://d3481clubmanagementsystem.pages.dev/reset-password`（比照既有 `/accept-invite` 的做法）
    - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）
    - 確認 Authentication → Email Templates 的「Confirm signup」「Reset Password」樣板都有正常寄送（該地區之前已設定自訂 SMTP，理論上沿用即可，但這兩個樣板可能沒單獨測過）
@@ -29,6 +29,19 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第十九輪）：註冊頁改成先選分區、再選社
+
+使用者回報第十七輪的自助註冊頁「所屬社團」是單一長清單（全地區幾十個社），長輩/一般使用者要在裡面找自己的社不方便。改成跟後台「社團管理」頁一致的兩層結構：先選分區，再選該分區底下的社。
+
+- `supabase/migrations/027_registration_zone.sql`（**尚未套用**）：`public_clubs_for_registration()` 從只回傳 `id`/`name` 改成也回傳 `zone`（`clubs.zone`，跟 `ClubListView.vue` 用的是同一個欄位）
+- `src/views/RegisterView.vue`：
+  - 沿用 `ClubListView.vue` 的 `ZONE_ORDER`／`zoneRank()` 排序邏輯（第一分區～第十一分區依序，沒對到的分區排最後），確保註冊頁的分區順序跟後台「社團管理」頁一致
+  - 新增「分區」下拉（`zones` computed，從載入的 `clubs` 去重＋排序），選了分區後「所屬社團」下拉才會啟用，並用 `clubsInZone` computed 過濾成只顯示該分區的社；切換分區會清空已選的社（`onZoneChange`）
+  - 欄位順序：電子郵件 → 分區 → 所屬社團 → 職稱 → 密碼 → 確認密碼
+  - `canSubmit` 加上 `!!zone.value` 這個條件
+
+**驗證**：`vue-tsc --noEmit` + `npm run build` 皆通過。這次額外在本機建立一個**不會進 git**的臨時 `.env.local`（假的 Supabase URL/anon key，只是為了讓 `createClient()` 不要因為空字串直接丟出例外、讓畫面能跑起來，不是真的連到任何專案），用瀏覽器 preview 實際跑過 `/register` 頁：攔截 `public_clubs_for_registration` 的網路請求、餵假資料（兩個分區＋一個沒對到排序表的怪分區名稱），確認排序正確、選「第一分區」後「所屬社團」正確只出現該分區的兩間社、未選分區前社團下拉維持 disabled。驗證完已刪除該臨時檔案。
 
 ## 本次完成（第十八輪）：社員手機號碼帳號機制——免 Email 註冊/登入
 

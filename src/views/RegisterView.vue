@@ -7,7 +7,19 @@ import type { UserRole } from '@/types'
 
 const router = useRouter()
 
+// 跟 ClubListView 的分區排序共用同一份順序，註冊頁的分區下拉才會跟後台一致
+const ZONE_ORDER = [
+  '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
+  '第六分區', '第七分區', '第八分區', '第九分區', '第十分區', '第十一分區',
+]
+
+function zoneRank(zone: string) {
+  const i = ZONE_ORDER.indexOf(zone)
+  return i === -1 ? ZONE_ORDER.length : i
+}
+
 const email = ref('')
+const zone = ref('')
 const clubId = ref('')
 const requestedRole = ref<UserRole>('club_member')
 const password = ref('')
@@ -15,7 +27,7 @@ const confirmPassword = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 
-const clubs = ref<{ id: string; name: string }[]>([])
+const clubs = ref<{ id: string; name: string; zone: string }[]>([])
 const clubsLoading = ref(true)
 
 onMounted(async () => {
@@ -24,7 +36,18 @@ onMounted(async () => {
   clubsLoading.value = false
 })
 
-const canSubmit = computed(() => !!email.value && !!clubId.value && !!password.value && !!confirmPassword.value)
+const zones = computed(() => {
+  const set = new Set(clubs.value.map(c => c.zone || '未分區'))
+  return [...set].sort((a, b) => zoneRank(a) - zoneRank(b) || a.localeCompare(b))
+})
+
+const clubsInZone = computed(() => clubs.value.filter(c => (c.zone || '未分區') === zone.value))
+
+function onZoneChange() {
+  clubId.value = ''
+}
+
+const canSubmit = computed(() => !!email.value && !!zone.value && !!clubId.value && !!password.value && !!confirmPassword.value)
 
 function translateAuthError(message: string): string {
   if (message.includes('already registered')) return '此 Email 已經註冊過帳號，請直接登入或使用忘記密碼功能。'
@@ -93,10 +116,17 @@ async function handleSubmit() {
           />
         </div>
         <div class="form-group">
-          <label class="fl">所屬社團</label>
-          <select v-model="clubId" class="fi" required :disabled="clubsLoading">
+          <label class="fl">分區</label>
+          <select v-model="zone" class="fi" required :disabled="clubsLoading" @change="onZoneChange">
             <option value="" disabled>{{ clubsLoading ? '載入中…' : '請選擇' }}</option>
-            <option v-for="c in clubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="fl">所屬社團</label>
+          <select v-model="clubId" class="fi" required :disabled="!zone">
+            <option value="" disabled>{{ zone ? '請選擇' : '請先選擇分區' }}</option>
+            <option v-for="c in clubsInZone" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
         <div class="form-group">
