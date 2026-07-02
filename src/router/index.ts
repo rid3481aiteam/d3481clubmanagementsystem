@@ -55,6 +55,12 @@ const router = createRouter({
       component: () => import('@/views/club/OfficersView.vue'),
       meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
     },
+    {
+      path: '/club/announcements',
+      name: 'club-announcements',
+      component: () => import('@/views/club/ClubAnnouncementsView.vue'),
+      meta: { roles: ['club_admin', 'club_secretary'] },
+    },
     // H 通訊錄
     {
       path: '/directory',
@@ -73,6 +79,12 @@ const router = createRouter({
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('@/views/admin/FeatureFlagsView.vue'),
+      meta: { role: 'district_admin' },
+    },
+    {
+      path: '/admin/announcements',
+      name: 'admin-announcements',
+      component: () => import('@/views/admin/DistrictAnnouncementsView.vue'),
       meta: { role: 'district_admin' },
     },
     {

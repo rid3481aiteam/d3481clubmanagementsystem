@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { useAnnouncementsStore } from '@/stores/announcements'
 import type { MemberAttendanceRate, ProspectiveMember } from '@/types'
 
 function currentYearTerm(): string {
@@ -37,6 +38,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   async function load(clubId: string | null) {
     loading.value = true
+    const announcements = useAnnouncementsStore()
     const yearTerm = currentYearTerm()
     const monthRange = currentMonthRange()
 
@@ -85,6 +87,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
     if (clubId) prospectQuery = prospectQuery.eq('club_id', clubId)
     const { data: prospects } = await prospectQuery.limit(10)
     followUps.value = prospects ?? []
+
+    if (clubId) {
+      await Promise.all([
+        announcements.fetchDistrictForClub(),
+        announcements.fetchClubForDashboard(clubId),
+      ])
+    } else {
+      announcements.districtAnnouncements = []
+      announcements.clubAnnouncements = []
+    }
 
     loading.value = false
   }

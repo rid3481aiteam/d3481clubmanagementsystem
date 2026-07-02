@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useAnnouncementsStore } from '@/stores/announcements'
 import { useDashboardStore } from '@/stores/dashboard'
 
 const auth = useAuthStore()
+const announcements = useAnnouncementsStore()
 const dashboard = useDashboardStore()
+
+function formatDate(value: string | null) {
+  if (!value) return ''
+  return new Date(value).toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' })
+}
 
 onMounted(() => {
   dashboard.load(auth.clubId)
@@ -31,6 +38,42 @@ onMounted(() => {
       <div class="tw" style="padding:18px;">
         <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">社友人數</div>
         <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.memberCount }}</div>
+      </div>
+    </div>
+
+    <div v-if="auth.clubId" style="margin-bottom:24px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">地區公告欄</h2>
+      <div class="tw">
+        <div v-if="announcements.districtAnnouncements.length" class="announcement-list">
+          <article v-for="item in announcements.districtAnnouncements" :key="item.id" class="announcement-item">
+            <div>
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.body }}</p>
+            </div>
+            <time>{{ formatDate(item.published_at) }}</time>
+          </article>
+        </div>
+        <div v-else style="padding:18px; text-align:center; color:var(--muted);">
+          目前沒有地區公告
+        </div>
+      </div>
+    </div>
+
+    <div v-if="auth.clubId" style="margin-bottom:24px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社內公告欄</h2>
+      <div class="tw">
+        <div v-if="announcements.clubAnnouncements.length" class="announcement-list">
+          <article v-for="item in announcements.clubAnnouncements" :key="item.id" class="announcement-item">
+            <div>
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.body }}</p>
+            </div>
+            <time>{{ formatDate(item.published_at) }}</time>
+          </article>
+        </div>
+        <div v-else style="padding:18px; text-align:center; color:var(--muted);">
+          目前沒有社內公告
+        </div>
       </div>
     </div>
 
@@ -83,3 +126,43 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.announcement-list {
+  display: grid;
+}
+
+.announcement-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.announcement-item:last-child {
+  border-bottom: none;
+}
+
+.announcement-item h3 {
+  font-size: 14px;
+  color: var(--navy);
+  margin-bottom: 4px;
+}
+
+.announcement-item p {
+  color: var(--text);
+  white-space: pre-line;
+}
+
+.announcement-item time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  .announcement-item {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -8,6 +8,7 @@ import type { UserProfile, UserRole } from '@/types'
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<import('@supabase/supabase-js').User | null>(null)
   const profile = ref<UserProfile | null>(null)
+  const clubName = ref<string | null>(null)
   const loading = ref(true)
 
   const isLoggedIn = computed(() => !!user.value)
@@ -37,6 +38,16 @@ export const useAuthStore = defineStore('auth', () => {
       .eq('id', user.value.id)
       .single()
     profile.value = data
+    clubName.value = null
+
+    if (data?.club_id) {
+      const { data: club } = await supabase
+        .from('clubs')
+        .select('name')
+        .eq('id', data.club_id)
+        .single()
+      clubName.value = club?.name ?? null
+    }
 
     // 取得 profile 後立即載入功能開關與權限矩陣
     const features = useFeaturesStore()
@@ -55,6 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
     await supabase.auth.signOut()
     user.value = null
     profile.value = null
+    clubName.value = null
   }
 
   async function updateName(name: string) {
@@ -64,5 +76,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
-  return { user, profile, loading, isLoggedIn, isDistrictAdmin, clubId, role, init, signIn, signOut, updateName }
+  return { user, profile, clubName, loading, isLoggedIn, isDistrictAdmin, clubId, role, init, signIn, signOut, updateName }
 })

@@ -40,6 +40,47 @@ export interface Club {
   updated_at: string
 }
 
+// ── 公告 ─────────────────────────────────────────────
+export interface DistrictAnnouncement {
+  id: string
+  title: string
+  body: string
+  is_published: boolean
+  published_at: string
+  expires_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type DistrictAnnouncementInsert = Omit<
+  DistrictAnnouncement,
+  'id' | 'created_at' | 'updated_at'
+>
+
+export type DistrictAnnouncementUpdate = Partial<
+  Omit<DistrictAnnouncement, 'id' | 'created_at' | 'updated_at' | 'created_by'>
+>
+
+export interface ClubAnnouncement {
+  id: string
+  club_id: string
+  title: string
+  body: string
+  is_published: boolean
+  published_at: string
+  expires_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ClubAnnouncementInsert = Omit<ClubAnnouncement, 'id' | 'created_at' | 'updated_at'>
+
+export type ClubAnnouncementUpdate = Partial<
+  Omit<ClubAnnouncement, 'id' | 'club_id' | 'created_at' | 'updated_at' | 'created_by'>
+>
+
 // ── 社的年度幹部 ──────────────────────────────────────
 export type ClubOfficerRole =
   | 'president' | 'president_elect' | 'vice_president' | 'secretary' | 'committee_member'

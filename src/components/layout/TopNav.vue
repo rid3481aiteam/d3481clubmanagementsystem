@@ -6,6 +6,7 @@
       </button>
       <RotaryWheelIcon class="topnav-wheel" />
       <span class="topnav-title">國際扶輪 3481 地區</span>
+      <span class="topnav-context">{{ interfaceLabel }}</span>
     </div>
     <div class="topnav-right">
       <span class="topnav-user" style="cursor:pointer;" title="點擊修改顯示名稱" @click="editName">
@@ -45,6 +46,11 @@ const roleBadgeClass = computed(() => {
     case 'club_admin':     return 'b-gr'
     default:               return 'b-g'
   }
+})
+
+const interfaceLabel = computed(() => {
+  if (auth.role === 'district_admin') return '地區管理介面'
+  return auth.clubName || '各社介面'
 })
 
 async function handleSignOut() {
@@ -108,6 +114,7 @@ async function editName() {
 @media (max-width: 900px) {
   .topnav-burger { display: flex; }
   .topnav-title { font-size: 13px; }
+  .topnav-context { font-size: 12px; max-width: 120px; }
   .topnav-user { display: none; }
 }
 
@@ -123,6 +130,17 @@ async function editName() {
   font-size: 15px;
   color: #fff;
   letter-spacing: .3px;
+}
+
+.topnav-context {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(255,255,255,.82);
+  border-left: 1px solid rgba(255,255,255,.24);
+  padding-left: 10px;
 }
 
 .topnav-right {

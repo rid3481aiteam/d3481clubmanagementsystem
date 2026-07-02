@@ -16,6 +16,9 @@
         <RouterLink to="/admin/features" class="nav-item">
           <span class="nav-icon">⚙️</span>功能開關
         </RouterLink>
+        <RouterLink to="/admin/announcements" class="nav-item">
+          <span class="nav-icon">📣</span>地區公告
+        </RouterLink>
         <RouterLink to="/admin/permissions" class="nav-item">
           <span class="nav-icon">🔐</span>權限矩陣
         </RouterLink>
@@ -38,6 +41,9 @@
         </RouterLink>
         <RouterLink to="/club/officers" class="nav-item">
           <span class="nav-icon">🎖️</span>社的年度成員
+        </RouterLink>
+        <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/announcements" class="nav-item">
+          <span class="nav-icon">📣</span>社內公告
         </RouterLink>
       </template>
 
@@ -66,8 +72,7 @@
 
     <div class="sidebar-footer">
       <div class="club-name" v-if="auth.role !== 'district_admin'">
-        <!-- club name placeholder — will be filled by club store -->
-        本社平台
+        {{ auth.clubName || '本社平台' }}
       </div>
     </div>
   </aside>
