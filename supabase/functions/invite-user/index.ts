@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
 
   const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email, {
     data: { club_id, role },
-    redirectTo: `${SITE_URL}/login`,
+    redirectTo: `${SITE_URL}/accept-invite`,
   })
 
   if (error) return errorResponse(translateAuthError(error.message), 400)

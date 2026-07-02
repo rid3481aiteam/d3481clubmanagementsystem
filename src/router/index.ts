@@ -13,6 +13,11 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/accept-invite',
+      name: 'accept-invite',
+      component: () => import('@/views/AcceptInviteView.vue'),
+    },
+    {
       path: '/',
       name: 'dashboard',
       component: () => import('@/views/DashboardView.vue'),
