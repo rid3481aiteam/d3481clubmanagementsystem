@@ -15,7 +15,9 @@
 -- 手動確認對應：
 --   第七分區「新店萃英社」 -> 「新北市新店萃英扶輪社」
 --   第十一分區「台北新星社」 -> 「台北新心扶輪社」
--- 若 DB 內仍保留 Excel 簡稱/舊名，且正式 seed 名稱不存在，會用上述兩筆已確認 alias 更新；
+-- 既有 production 測試資料差異：
+--   第八分區「台北市和平扶輪社」 -> 「台北和平扶輪社」
+-- 若 DB 內仍保留 Excel 簡稱/舊名，且正式 seed 名稱不存在，會用上述已確認 alias 更新；
 -- 其他社名仍須精準符合，避免模糊比對誤寫。
 -- ════════════════════════════════════════════
 
@@ -169,6 +171,13 @@ BEGIN
         AND c.zone = '第十一分區'
         AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
       )
+      OR (
+        i.name = '台北和平扶輪社'
+        AND i.zone = '第八分區'
+        AND c.name = '台北市和平扶輪社'
+        AND c.zone = '第八分區'
+        AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
+      )
     )
   )
   SELECT string_agg(i.zone || '/' || i.name, ', ' ORDER BY i.zone, i.name)
@@ -208,6 +217,13 @@ BEGIN
        AND i.zone = '第十一分區'
        AND c.name = '台北新星扶輪社'
        AND c.zone = '第十一分區'
+       AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
+     )
+     OR (
+       i.name = '台北和平扶輪社'
+       AND i.zone = '第八分區'
+       AND c.name = '台北市和平扶輪社'
+       AND c.zone = '第八分區'
        AND NOT EXISTS (SELECT 1 FROM clubs exact WHERE exact.name = i.name AND exact.zone = i.zone)
      );
 
