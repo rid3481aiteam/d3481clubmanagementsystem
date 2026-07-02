@@ -1,12 +1,12 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十一輪，Claude 修正設定密碼頁 Auth session missing 問題）
+> 最後更新：2026-07-02（第十一輪，Claude 修正設定密碼頁 Auth session missing 問題，使用者已實測通過）
 
 ---
 
 ## ⚠️ 待辦
 
-1. **【待使用者實測確認】設定密碼頁改成主動解析邀請連結，需要用真實邀請信驗證**：見下方「第十一輪」，之前的版本假設 Supabase 會自動把邀請連結轉成登入 session，但實測發現點進頁面後送出密碼會報 `Auth session missing!`；已改成頁面載入時主動解析網址上的 `token_hash`/`code` 參數並呼叫對應的 Supabase 驗證方法。因為本機沒有這個專案的 Supabase 連線資訊，只能用假 token 驗證「驗證失敗時畫面正常顯示錯誤、不會整個掛掉」，沒辦法用真實邀請信驗證「驗證成功時真的能設定密碼」，麻煩使用者送一封新邀請信實測看看
+**目前沒有已知待辦事項。** 邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）已全部修正，使用者用另一組 Email 帳號實測確認整段流程正常。
 
 以下項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成：
 
@@ -15,6 +15,7 @@
 3. ~~Edge Functions → delete-account / invite-user 部署版本、Site URL / Redirect URLs、自訂 SMTP~~ **已確認**：使用者在 Supabase Dashboard 逐項確認皆正常
 4. ~~確認 `012`、`013`、`014` 三支 migration 已執行~~ **已確認**：用診斷 SQL 查詢 `is_club_tier()`、`profiles_club_tier_manage` policy、`invite_log_select` policy、`handle_new_user()` 函式定義，確認三支皆已正確套用
 5. ~~邀請信連結被導回登入畫面~~ **已解決**：Site URL / Redirect URLs / 已部署的 `invite-user` 都確認正常，根因是 `src/router/index.ts` 的 `/accept-invite` 路由缺少 `public: true`（見「第八輪」），已修正並由使用者實測確認新邀請信可以正常進入設定密碼頁
+6. ~~設定密碼頁送出後報 `Auth session missing!`~~ **已解決並實測通過**：見下方「第十一輪」，改成主動解析邀請連結的 `token_hash`/`code` 參數；使用者用另一組 Email 帳號測試整段邀請流程（收信 → 點連結 → 設定密碼）確認沒問題
 
 ## 本次完成（第十一輪）：修正設定密碼頁 `Auth session missing!` 錯誤
 
@@ -22,7 +23,8 @@
 
 - 根因：`AcceptInviteView.vue` 完全沒有主動處理邀請連結網址上的驗證參數，單純假設 `supabase.auth.updateUser()` 呼叫當下已經有登入 session。這個假設只在邀請連結是「hash 隱含授權」格式（`#access_token=...`）時成立，因為 supabase-js 只會自動偵測網址 **hash** 片段建立 session；但 Supabase 目前預設的邀請信樣板改用 `?token_hash=...&type=invite`（query string），這種格式不會被自動處理，需要手動呼叫 `supabase.auth.verifyOtp({ token_hash, type })` 才能建立 session，這正是使用者實際遇到的情況
 - 修正 `AcceptInviteView.vue`：`onMounted` 時解析網址上的 `token_hash`/`type`（呼叫 `verifyOtp`）或 `code`（PKCE flow，呼叫 `exchangeCodeForSession`）；若都沒有則退回檢查是否已有 session（相容舊的 hash 隱含授權格式，這種格式不需要額外處理）。驗證失敗會顯示「邀請連結無法使用」錯誤畫面，而不是讓使用者填完密碼送出才發現失敗；驗證成功後用 `router.replace` 把網址上的 token 參數清掉，避免殘留在瀏覽器紀錄或被重新整理時重複處理
-- 已在本機用假 `token_hash` 驗證錯誤處理路徑：頁面會正確顯示「邀請連結無法使用」+ 錯誤訊息，卡片版面不會跑掉；因為沒有這個專案的真實 Supabase 存取權限，無法驗證「真的收到有效邀請信時能不能成功設定密碼」，需要使用者送新邀請信實測
+- 已在本機用假 `token_hash` 驗證錯誤處理路徑：頁面會正確顯示「邀請連結無法使用」+ 錯誤訊息，卡片版面不會跑掉
+- **使用者用另一組 Email 帳號實測確認整段邀請流程正常**，`Auth session missing!` 問題已解決，不再需要進一步排查
 
 ## 本次完成（第十輪）：018 migration 修正為可重複執行 + 確認 015~021、012~014 全數套用
 
