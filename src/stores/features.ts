@@ -18,10 +18,11 @@ export const useFeaturesStore = defineStore('features', () => {
   // 載入某社的功能開關（先取地區預設，再用社層覆蓋）
   async function load(clubId: string | null) {
     loading.value = true
+    const filter = clubId ? `club_id.is.null,club_id.eq.${clubId}` : 'club_id.is.null'
     const { data } = await supabase
       .from('feature_flags')
       .select('club_id, feature_key, enabled')
-      .or(`club_id.is.null,club_id.eq.${clubId ?? 'null'}`)
+      .or(filter)
 
     if (data) {
       // 先套地區預設，再套社層覆蓋
