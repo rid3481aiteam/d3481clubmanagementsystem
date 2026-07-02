@@ -1,21 +1,51 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十一輪，Claude 修正設定密碼頁 Auth session missing 問題，使用者已實測通過）
+> 最後更新：2026-07-02（第十二輪，Claude 新增地區/各社視角切換 + EDM 產生器第一階段）
 
 ---
 
 ## ⚠️ 待辦
 
-**目前沒有已知待辦事項。** 邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）已全部修正，使用者用另一組 Email 帳號實測確認整段流程正常。
+1. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：本輪新增 `supabase/functions/generate-edm/index.ts`，會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）。這是我在這個環境沒有 Supabase CLI / Dashboard 存取權限、只能寫程式碼的部分
+2. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
 
-以下項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成：
+其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
 
-1. ~~依序執行 `015`～`021` 七支 migration~~ **已完成**：105 筆全地區社團 seed、`sort_order`、`roster.classification`、`club_officers` 表、社長/執秘姓名匯入、Excel 通訊錄匯入、`roster` 社內職稱/狀態/電話欄位全部跑完並確認成功。執行過程中發現 `018_club_officers.sql` 原本不可重複執行（`CREATE TYPE` 沒有保護），已修正成可重複執行版本（見下方「018 修正」）
-2. ~~檢查「台北和平扶輪社」是否要跟舊測試資料「台北市和平扶輪社」合併/改名~~ **已修正**：`015`/`019` 尚未執行過正式環境時就直接把 seed 社名改成正確的正式社名「台北市和平扶輪社」，`020` 既有的 alias 比對邏輯會自動接上這筆既有資料，不會再產生重複的 `clubs` 列（見下方踩坑紀錄）
-3. ~~Edge Functions → delete-account / invite-user 部署版本、Site URL / Redirect URLs、自訂 SMTP~~ **已確認**：使用者在 Supabase Dashboard 逐項確認皆正常
-4. ~~確認 `012`、`013`、`014` 三支 migration 已執行~~ **已確認**：用診斷 SQL 查詢 `is_club_tier()`、`profiles_club_tier_manage` policy、`invite_log_select` policy、`handle_new_user()` 函式定義，確認三支皆已正確套用
-5. ~~邀請信連結被導回登入畫面~~ **已解決**：Site URL / Redirect URLs / 已部署的 `invite-user` 都確認正常，根因是 `src/router/index.ts` 的 `/accept-invite` 路由缺少 `public: true`（見「第八輪」），已修正並由使用者實測確認新邀請信可以正常進入設定密碼頁
-6. ~~設定密碼頁送出後報 `Auth session missing!`~~ **已解決並實測通過**：見下方「第十一輪」，改成主動解析邀請連結的 `token_hash`/`code` 參數；使用者用另一組 Email 帳號測試整段邀請流程（收信 → 點連結 → 設定密碼）確認沒問題
+## 本次完成（第十二輪）：地區/各社視角切換 + EDM 產生器（Phase 2 第一階段）
+
+使用者提出兩項需求：(1) 同時擁有地區與各社權限的人，要能在左上角切換「地區管理介面」/「各社介面」視角；(2) 想開始導入 Phase 2 的 EDM 功能。
+
+### 1. 地區/各社視角切換
+
+`user_profiles.district_access = true` 的社長/執秘/社員，原本一登入就被鎖死在地區檢視（`auth.isDistrictAdmin` 只要為 true 就強制顯示地區儀表板/介面標籤），沒辦法切回自己社的日常畫面。
+
+| 檔案 | 說明 |
+|------|------|
+| `src/stores/auth.ts` | 新增 `viewScope`（`'district' \| 'club'`，依帳號存在 `localStorage`）、`canSwitchView`（同時有地區權限 *且* 有 `club_id` 才能切換）、`isDistrictView`（實際目前檢視的視角）、`setViewScope()` |
+| `src/components/layout/TopNav.vue` | `canSwitchView` 為 true 時，左上角原本靜態的介面文字改成「地區管理介面／XX社」兩顆可點擊切換的 pill 按鈕 |
+| `src/views/DashboardView.vue` | 改依 `auth.isDistrictView`（而非 `auth.isDistrictAdmin`）決定顯示地區儀表板或本社儀表板，並加上 `watch` 讓切換視角時即時重新載入資料，不用整頁重新整理 |
+| `src/components/layout/Sidebar.vue` | 「地區管理」選單區塊改依 `auth.isDistrictView` 顯示/隱藏；「社務管理」區塊維持依實際角色顯示（不受視角影響，跟既有「帳號」區塊在地區/各社都各有一個入口的設計一致） |
+| `src/views/directory/DirectoryView.vue` | 通訊錄頁「管理社團」按鈕改依 `auth.isDistrictView` |
+
+真正的權限（router 守衛、`auth.isDistrictAdmin`、各頁面的 RLS）完全不受這個切換影響 —— 這只是「目前預設看哪個視角」的 UI 開關，純 `district_admin`（沒有 `club_id`）或純各社角色（沒有 `district_access`）不會看到切換按鈕，行為跟改動前一樣。
+
+### 2. EDM 產生器（Phase 2 第一階段）
+
+跟使用者確認過範圍：不寄送 Email（現有 Supabase 自訂 SMTP 主要是給邀請信用，大量群發的穩定性/追蹤功能不足），改成在平台上用 AI 產生 EDM 文案，管理員自行複製文字或列印成 PDF 後用既有管道（Email/Line 群組等）發送。AI 部分先做「協助生成/潤飾文案」，地區公告轉發、例會提醒範本等後續階段再加。
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/functions/generate-edm/index.ts`（新檔案） | 驗證呼叫者角色（地區：`district_admin`/`district_access`；各社：`club_admin`/`club_secretary`，只能產生本社範圍）後，組 prompt 呼叫 Anthropic API（`claude-opus-4-8`，用 `output_config.format` 的 `json_schema` 強制回傳 `{title, body}`），回傳文案給前端。**尚未部署，需設定 `ANTHROPIC_API_KEY` secret（見上方待辦）** |
+| `src/stores/edm.ts`（新檔案） | 呼叫 `supabase.functions.invoke('generate-edm', ...)`，管理 `loading`/`error`/`title`/`body` 狀態 |
+| `src/views/edm/EdmGeneratorView.vue`（新檔案） | 表單：主題（必填）、重點內容、語氣（選填）→「AI 生成文案」；產生後標題/內文可直接編輯，提供「複製文字」（`navigator.clipboard`）與「下載 PDF」（`window.print()`，搭配 `@media print` 只顯示文案內容，其餘表單/按鈕/TopNav/Sidebar 都隱藏，使用者在瀏覽器列印對話框選「另存為 PDF」即可） |
+| `src/router/index.ts` | 新增路由 `/admin/edm`（`district_admin`）、`/club/edm`（`club_admin`/`club_secretary`），兩者皆掛 `feature: 'B5_edm'` |
+| `src/components/layout/Sidebar.vue` | 地區管理／社務管理區塊各加一個「EDM 產生器」連結，皆受 `features.isEnabled('B5_edm')` 控制 |
+| `src/views/admin/FeatureFlagsView.vue` | `B5_edm` 標籤從「EDM 通知（AI 整合）」改成「EDM 文案產生器（AI 輔助）」，更貼近實際行為（不寄信） |
+| `ARCHITECTURE.md` | 更新 Edge Function 列表、`B5_edm` 說明、Phase 2 規劃段落 |
+
+**中文 PDF 為什麼用瀏覽器列印而不是 jsPDF**：jsPDF 預設字型（Helvetica 等）不支援中文字形，要嵌入 CJK 字型檔案才能正常顯示中文，成本較高；瀏覽器原生列印（`window.print()` → 另存為 PDF）直接沿用系統字型，中文顯示完全沒問題，也不用多裝套件，是這個情境下最低成本的做法。
+
+**驗證方式**：本機沒有這個專案的 Supabase 連線資訊，用暫時性 `.env`（無效但格式正確的 URL）+ Pinia state 注入方式在瀏覽器內確認：視角切換 pill 按鈕在雙重權限帳號（`club_admin` + `district_access`）下正確顯示並可切換、切換後儀表板/Sidebar 即時改變；EDM 表單、AI 呼叫失敗時的錯誤訊息顯示、產生結果後的預覽/編輯/複製/PDF 按鈕皆正常顯示，`.print-only` 區塊在一般畫面下確認為 `display:none`。驗證用的暫時性修改（`.env`、`main.ts` 的 QA hook）已全部還原，`vue-tsc --noEmit` 確認無型別錯誤。
 
 ## 本次完成（第十一輪）：修正設定密碼頁 `Auth session missing!` 錯誤
 

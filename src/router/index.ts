@@ -118,6 +118,18 @@ const router = createRouter({
       meta: { role: 'district_admin' },
     },
     {
+      path: '/admin/edm',
+      name: 'admin-edm',
+      component: () => import('@/views/edm/EdmGeneratorView.vue'),
+      meta: { role: 'district_admin', feature: 'B5_edm' as FeatureKey },
+    },
+    {
+      path: '/club/edm',
+      name: 'club-edm',
+      component: () => import('@/views/edm/EdmGeneratorView.vue'),
+      meta: { roles: ['club_admin', 'club_secretary'], feature: 'B5_edm' as FeatureKey },
+    },
+    {
       path: '/club/invite',
       name: 'account-management',
       component: () => import('@/views/admin/AccountManagementView.vue'),

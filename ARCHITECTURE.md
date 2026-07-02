@@ -75,7 +75,7 @@ Feature flag 分兩層：
 | `B2_attendance_summary` | ✅ | 出席彙總 |
 | `B3_attendance_personal` | ✅ | 個人出席率 |
 | `B4_attendance_detail` | ✅ | 逐人簽到 |
-| `B5_edm` | ❌ | EDM 通知（Phase 2） |
+| `B5_edm` | ❌ | EDM 文案產生器（AI 輔助，Phase 2 第一階段） |
 | `D1_roster` | ✅ | 社友名冊 |
 | `D2_roster_excel` | ✅ | Excel 匯入匯出 |
 | `D3_prospective` | ✅ | 潛在社友 |
@@ -151,10 +151,13 @@ Feature flag 分兩層：
 | Function | 說明 |
 |----------|------|
 | `invite-user` | 邀請帳號（驗證角色後呼叫 Supabase admin API） |
+| `generate-edm` | 驗證角色後呼叫 Anthropic API，依主題/重點產生 EDM 標題與內文（不寄信，僅回傳文字供前端複製/列印成 PDF）。需在 Supabase 專案設定 `ANTHROPIC_API_KEY` secret |
 
 ---
 
 ## Phase 規劃
 
 - **Phase 1**：本文件所有功能
-- **Phase 2**：B5 EDM、D4 社友關懷、社費 / 財務模組、**一般人公開瀏覽層**（各社自訂哪些資料對外公開，需新增公開欄位 + 匿名可讀 RLS + 對外頁面，範圍較大，尚未設計）
+- **Phase 2**：
+  - B5 EDM：第一階段已完成 —「EDM 產生器」（`/admin/edm`、`/club/edm`，功能開關 `B5_edm` 預設關）讓地區/各社輸入主題與重點，呼叫 AI 產生文案標題與內文，可直接編輯、複製文字或用瀏覽器列印成 PDF；**不寄送 Email**。後續階段可再加：從既有地區/社內公告一鍵帶入內容、例會提醒範本、歷史紀錄保存
+  - D4 社友關懷、社費 / 財務模組、**一般人公開瀏覽層**（各社自訂哪些資料對外公開，需新增公開欄位 + 匿名可讀 RLS + 對外頁面，範圍較大，尚未設計）尚未開始

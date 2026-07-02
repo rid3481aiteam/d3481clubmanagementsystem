@@ -198,4 +198,11 @@ tr:hover td { background: rgba(23,69,143,.03); }
 .toast-ok  { background: var(--green); }
 .toast-err { background: var(--red); }
 @keyframes slide-in { from { transform: translateX(60px); opacity: 0; } }
+
+/* Print (used by EDM 產生器「下載 PDF」) */
+@media print {
+  .topnav, .sidebar, .sidebar-backdrop { display: none !important; }
+  .layout { padding-top: 0 !important; }
+  .main { overflow: visible !important; padding: 0 !important; }
+}
 </style>

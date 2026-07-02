@@ -28,6 +28,9 @@
         <RouterLink to="/club/invite" class="nav-item">
           <span class="nav-icon">👤</span>帳號邀請 / 管理
         </RouterLink>
+        <RouterLink v-if="features.isEnabled('B5_edm')" to="/admin/edm" class="nav-item">
+          <span class="nav-icon">📧</span>EDM 產生器
+        </RouterLink>
       </template>
 
       <!-- 執秘 + 社長 + 一般社員共用（社員唯讀） -->
@@ -50,6 +53,9 @@
         </RouterLink>
         <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/governor-award" class="nav-item">
           <span class="nav-icon">🏅</span>總監獎項申請
+        </RouterLink>
+        <RouterLink v-if="(auth.role === 'club_secretary' || auth.role === 'club_admin') && features.isEnabled('B5_edm')" to="/club/edm" class="nav-item">
+          <span class="nav-icon">📧</span>EDM 產生器
         </RouterLink>
       </template>
 
