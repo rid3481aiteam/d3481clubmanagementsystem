@@ -4,9 +4,19 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { UserProfile, UserRole } from '@/types'
 
+function unwrapFunctionError(error: unknown) {
+  if (error instanceof FunctionsHttpError) {
+    return error.context.json()
+      .then((body: { error?: string }) => ({ message: body?.error ?? (error as Error).message }))
+      .catch(() => ({ message: (error as Error).message }))
+  }
+  return Promise.resolve({ message: (error as Error).message })
+}
+
 export const useAccountsStore = defineStore('accounts', () => {
   const managed = ref<UserProfile[]>([])
   const pending = ref<UserProfile[]>([])
+  const members = ref<UserProfile[]>([])
   const loading = ref(false)
 
   async function fetchManaged() {
@@ -48,12 +58,43 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
+  async function fetchMembers() {
+    loading.value = true
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('role', 'club_member')
+      .order('name')
+    members.value = data ?? []
+    loading.value = false
+  }
+
+  async function createMember(phone: string, name: string, clubId: string) {
+    const { data, error } = await supabase.functions.invoke('create-member-account', {
+      body: { phone, name, club_id: clubId },
+    })
+    if (error) return { data, error: await unwrapFunctionError(error) }
+    await fetchMembers()
+    return { data, error: null }
+  }
+
+  async function resetMemberPassword(id: string) {
+    const { data, error } = await supabase.functions.invoke('reset-member-password', {
+      body: { user_id: id },
+    })
+    if (error) return { data, error: await unwrapFunctionError(error) }
+    return { data, error: null }
+  }
+
   async function setActive(id: string, isActive: boolean) {
     const { error } = await supabase
       .from('user_profiles')
       .update({ is_active: isActive })
       .eq('id', id)
-    if (!error) managed.value = managed.value.map(u => (u.id === id ? { ...u, is_active: isActive } : u))
+    if (!error) {
+      managed.value = managed.value.map(u => (u.id === id ? { ...u, is_active: isActive } : u))
+      members.value = members.value.map(u => (u.id === id ? { ...u, is_active: isActive } : u))
+    }
     return { error }
   }
 
@@ -75,26 +116,17 @@ export const useAccountsStore = defineStore('accounts', () => {
       body: { user_id: id },
     })
 
-    if (error) {
-      let message = error.message
-      if (error instanceof FunctionsHttpError) {
-        try {
-          const body = await error.context.json()
-          if (body?.error) message = body.error
-        } catch {
-          // 回應不是 JSON，維持預設訊息
-        }
-      }
-      return { error: { message } }
-    }
+    if (error) return { error: await unwrapFunctionError(error) }
 
     managed.value = managed.value.filter(u => u.id !== id)
+    members.value = members.value.filter(u => u.id !== id)
     return { error: null }
   }
 
   return {
-    managed, pending, loading,
+    managed, pending, members, loading,
     fetchManaged, fetchPending, approveRole, dismissPending,
+    fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictAccess, deleteAccount,
   }
 })

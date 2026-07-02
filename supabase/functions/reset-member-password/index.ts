@@ -10,7 +10,6 @@ const corsHeaders = {
 }
 
 const CLUB_TIER_ROLES = ['club_admin', 'club_secretary']
-const DELETABLE_ROLES = ['club_admin', 'club_secretary', 'club_member']
 
 function errorResponse(message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), {
@@ -19,8 +18,12 @@ function errorResponse(message: string, status: number) {
   })
 }
 
-// 永久刪除帳號（auth.users + 級聯刪除 user_profiles），跟「停用」不同：
-// 停用只是關掉登入權限，帳號跟 Email 都還在；這支是真的刪除，Email 才能重新邀請。
+function defaultPassword(phone: string) {
+  return phone.slice(-4)
+}
+
+// 社員忘記密碼，由社長／執秘一鍵重設回預設規則（手機號碼末四碼），
+// 不用社員自己收 email 重設連結。
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -54,28 +57,28 @@ Deno.serve(async (req) => {
 
   const { data: targetProfile } = await adminClient
     .from('user_profiles')
-    .select('role, club_id')
+    .select('role, club_id, phone')
     .eq('id', user_id)
     .single()
 
   if (!targetProfile) return errorResponse('找不到該帳號', 404)
-  if (!DELETABLE_ROLES.includes(targetProfile.role))
-    return errorResponse('只能刪除社長／執秘／社員帳號', 400)
+  if (targetProfile.role !== 'club_member') return errorResponse('只能重設社員帳號的密碼', 400)
+  if (!targetProfile.phone) return errorResponse('該帳號沒有手機號碼，無法重設為預設密碼', 400)
 
   const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_access === true
   const isClubTier = CLUB_TIER_ROLES.includes(callerProfile.role)
 
-  // 地區：可刪除任何社的帳號；各社（社長／執秘對等）：只能刪除本社帳號
   if (!isDistrictAdmin) {
     if (!isClubTier) return errorResponse('沒有權限執行此操作', 403)
     if (callerProfile.club_id !== targetProfile.club_id)
-      return errorResponse('只能刪除本社的帳號', 403)
+      return errorResponse('只能重設本社社員的密碼', 403)
   }
 
-  const { error } = await adminClient.auth.admin.deleteUser(user_id)
+  const newPassword = defaultPassword(targetProfile.phone)
+  const { error } = await adminClient.auth.admin.updateUserById(user_id, { password: newPassword })
   if (error) return errorResponse(error.message, 400)
 
-  return new Response(JSON.stringify({ success: true }), {
+  return new Response(JSON.stringify({ success: true, new_password: newPassword }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   })
 })

@@ -71,8 +71,20 @@ export const useAuthStore = defineStore('auth', () => {
     await permissions.load(data?.role ?? null)
   }
 
-  async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+  // 社長／執秘用 email 登入；一般社員用手機號碼登入（後台建立帳號時
+  // 合成的內部信箱是 <手機號碼>@member.d3481.local，見 create-member-account）。
+  function resolveLoginEmail(identifier: string) {
+    const trimmed = identifier.trim()
+    if (trimmed.includes('@')) return trimmed
+    const phone = trimmed.replace(/\D/g, '')
+    return `${phone}@member.d3481.local`
+  }
+
+  async function signIn(identifier: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: resolveLoginEmail(identifier),
+      password,
+    })
     return { error }
   }
 

@@ -1,29 +1,52 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第十七輪，Claude 新增自助註冊 + 忘記密碼功能，程式碼已完成但**尚未在正式 Supabase 執行 migration、也尚未部署**，需要使用者完成下方待辦才能上線；第十六輪找到例會編輯儲存失敗的真正根因並修正；第十五輪已定位地區/各社切換按鈕未顯示的高度可疑根因，待使用者確認 `club_id` 是否為 NULL）
+> 最後更新：2026-07-02（第十八輪，Claude 開發社員手機號碼帳號機制——社員免 Email 註冊，執秘/社長後台建帳號、一鍵重設密碼，與第十七輪的 Email 自助註冊機制並存、分別對應不同社員的使用情境；兩者的 migration 都還**未套用**、edge functions/路由都還**未部署**，待使用者處理）
 
 ---
 
 ## ⚠️ 待辦
 
-0. **【本輪新增，優先處理】自助註冊功能要上線前，需要使用者手動完成以下步驟**（程式碼已寫完並推上 GitHub，但這幾步無法由 Claude 代勞）：
+0. **【第十七輪，優先處理】自助註冊功能要上線前，需要使用者手動完成以下步驟**（程式碼已寫完並推上 GitHub，但這幾步無法由 Claude 代勞）：
    - 在 Supabase SQL Editor 執行 `supabase/migrations/025_self_registration.sql`（新增 `user_profiles.requested_role` 欄位、更新 `handle_new_user()` trigger、新增 `public_clubs_for_registration()` function 並開放給 `anon` 角色）
    - Authentication → URL Configuration → Redirect URLs 新增兩個網址：`https://d3481clubmanagementsystem.pages.dev/verify-email` 與 `https://d3481clubmanagementsystem.pages.dev/reset-password`（比照既有 `/accept-invite` 的做法）
    - 確認 Authentication → Providers → Email 的「Confirm email」是開啟的（自助註冊需要寄驗證信才能防止亂填 email）
    - 確認 Authentication → Email Templates 的「Confirm signup」「Reset Password」樣板都有正常寄送（該地區之前已設定自訂 SMTP，理論上沿用即可，但這兩個樣板可能沒單獨測過）
    - 部署到 Cloudflare Pages（新增了 4 個路由：`/register`、`/verify-email`、`/forgot-password`、`/reset-password`）
    - 全部設定完成後，建議實際跑一次完整流程：註冊 → 收驗證信 → 點擊驗證 → 登入 → 地區管理員在「帳號管理」頁看到「自助註冊待審核」名單 → 核准或維持社員
-1. **地區/各社切換按鈕沒有顯示——已定位高度可疑根因，待使用者確認並修資料**：使用者確認測試帳號右上角角色徽章有顯示「＋地區」字樣，代表 `district_access` 已正確載入前端（`isDistrictAdmin` 為 true）。`canSwitchView = isDistrictAdmin && !!clubId`，徽章邏輯只吃 `role`/`isDistrictAdmin`、不吃 `clubId`，所以徽章正常但按鈕不出現，唯一合理解釋是該帳號的 `user_profiles.club_id` 其實是 `NULL`。
+1. **【第十八輪新功能，待部署與實測】社員手機號碼帳號機制**：
+   - 使用者到 Supabase SQL Editor 執行 `supabase/migrations/026_member_phone_accounts.sql`（`user_profiles` 加 `phone` 欄位 + 放寬 RLS 讓社長/執秘可管理社員帳號）——**檔名是 026 不是 025**，因為第十七輪已經用掉 `025_self_registration.sql` 這個編號，兩支互不依賴、順序不影響
+   - 部署兩個新 Edge Function：`supabase functions deploy create-member-account`、`supabase functions deploy reset-member-password`
+   - 部署完成後到「帳號管理」頁測試：執秘/社長建立社員帳號（姓名+手機號碼，初始密碼＝手機末四碼）、用手機號碼登入、忘記密碼一鍵重設回手機末四碼、停用/刪除社員帳號
+   - 本機沒有 `.env`（只有 `.env.example`），無法在這個環境跑真實 Supabase 連線驗證登入，只做了 `vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過
+2. **地區/各社切換按鈕沒有顯示——已定位高度可疑根因，待使用者確認並修資料**（延續自第十六輪）：使用者確認測試帳號右上角角色徽章有顯示「＋地區」字樣，代表 `district_access` 已正確載入前端（`isDistrictAdmin` 為 true）。`canSwitchView = isDistrictAdmin && !!clubId`，徽章邏輯只吃 `role`/`isDistrictAdmin`、不吃 `clubId`，所以徽章正常但按鈕不出現，唯一合理解釋是該帳號的 `user_profiles.club_id` 其實是 `NULL`。
    - 回頭查 `supabase/migrations/014_fix_handle_new_user_metadata_source.sql` 的說明文字，發現這正是有前科的 bug：`handle_new_user()` 原本讀錯 metadata 欄位（讀 `raw_app_meta_data`，但 `inviteUserByEmail` 寫入的其實是 `raw_user_meta_data`），導致**在 014 套用之前，每一個被邀請建立的帳號，`club_id` 一律被寫成 NULL**。014 只修好了「以後」新邀請帳號會正確寫入 `club_id`，**不會回頭修正 014 套用之前就已經存在、`club_id` 已經是 NULL 的舊帳號**
    - 也就是說：如果這次拿來測試切換功能的帳號，是在 014 套用之前就已經邀請建立的舊帳號（例如很早期的測試帳號），它的 `club_id` 很可能從建立那一刻起就一直是 NULL，之後不管怎麼切換 `district_access` 都不會自動補上
    - **請先確認**：到「帳號管理」頁面看該測試帳號的「社團」欄位，如果顯示空白/`-`，就確定是這個問題
    - **修法**：SQL Editor 執行 `UPDATE user_profiles SET club_id = '<正確的 club id>' WHERE id = '<該帳號的 user id>';` 補上正確的 `club_id`；或者乾脆刪除該測試帳號重新邀請一次（014 已修好，新邀請的帳號 `club_id` 會正確寫入），應該就能看到切換按鈕
    - 這次確認：**不需要支援「單一帳號歸屬多個扶輪社」**，維持現有「地區權限 + 綁定單一 club_id」的雙重視角模式即可
-2. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：見下方「第十二輪」，`supabase/functions/generate-edm/index.ts` 會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）
-3. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
-4. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
+3. **`generate-edm` Edge Function 尚未部署，且需要設定 `ANTHROPIC_API_KEY` secret**：見下方「第十二輪」，`supabase/functions/generate-edm/index.ts` 會呼叫 Anthropic API（`claude-opus-4-8`）產生 EDM 文案。需要管理員執行 `supabase functions deploy generate-edm` 並在 Supabase 專案設定 `ANTHROPIC_API_KEY`（Dashboard → Edge Functions → Secrets，或 `supabase secrets set ANTHROPIC_API_KEY=...`）
+4. **`B5_edm` 功能開關預設關閉**：部署完成後需要地區管理員到「功能開關管理」把 `EDM 文案產生器（AI 輔助）` 打開，Sidebar 才會出現「EDM 產生器」連結
+5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第十八輪）：社員手機號碼帳號機制——免 Email 註冊/登入
+
+使用者提出：一般社員（`club_member`，之前在 `ARCHITECTURE.md` 標註「暫不開放」）很多是長輩，收 Email、走邀請信設密碼的流程對他們太不方便。討論後確認方向：改成後台由社長/執秘直接建帳號，社員用**手機號碼**登入；初始密碼＝**手機末四碼**；忘記密碼由社長/執秘**一鍵重設回手機末四碼**（不走 email 重設連結）。**這套跟第十七輪剛推上去的 Email 自助註冊機制並存**：懂得用 Email 的社員可以走自助註冊，長輩則由執秘/社長用這套手機號碼機制代為建帳號。
+
+- `supabase/migrations/026_member_phone_accounts.sql`（**尚未套用，需使用者到 SQL Editor 執行**）：`user_profiles` 新增 `phone`（唯一）欄位；放寬 012 的 `profiles_club_tier_manage` UPDATE policy，讓社長/執秘除了能管理本社 `club_admin`/`club_secretary` 帳號外，也能管理本社 `club_member` 帳號（停用/啟用）
+- `supabase/functions/create-member-account/index.ts`（新檔案，**尚未部署**）：跟 `invite-user` 同一套權限模型（地區可建任何社、各社只能建本社），但不寄邀請信——直接呼叫 `admin.createUser()`，`email` 欄位用合成信箱 `<手機號碼>@member.d3481.local`（社員完全不用知道有這個 email 存在），`email_confirm: true` 略過驗證，密碼預設手機末四碼。`handle_new_user()` trigger 會照常從 `user_metadata` 建立 `user_profiles`，這支再補一次 `UPDATE ... SET phone`
+- `supabase/functions/reset-member-password/index.ts`（新檔案，**尚未部署**）：只能重設 `club_member` 角色的密碼，同社或地區管理員才能操作，重設回該帳號 `phone` 的末四碼
+- `supabase/functions/delete-account/index.ts`：`CLUB_TIER_ROLES` 只用來判斷呼叫者權限，新增 `DELETABLE_ROLES` 允許刪除目標帳號的角色放寬到含 `club_member`（原本只能刪社長/執秘）
+- `src/stores/auth.ts` 的 `signIn()`：改吃 `identifier`（email 或手機號碼皆可），內部 `resolveLoginEmail()` 判斷有無 `@`，沒有就正規化成純數字再組合 `<phone>@member.d3481.local` 呼叫 `signInWithPassword`——社長/執秘照舊用 email 登入，社員用手機號碼，同一個登入表單、同一支 function
+- `src/views/LoginView.vue`：欄位改成「帳號（Email 或手機號碼）」單一輸入框，不用另外做分頁籤；跟第十七輪加的「忘記密碼？」「註冊新帳號」連結並存
+- `src/views/admin/AccountManagementView.vue`：新增「新增社員帳號」表單（姓名+手機號碼，地區管理員多一個選社團欄位）與「社員帳號」列表（重設密碼／停用啟用／永久刪除），沿用既有「社長／執秘帳號」表格的 UI 風格，跟第十七輪加的「自助註冊待審核」區塊並存
+- `src/stores/accounts.ts`：新增 `members`、`fetchMembers`、`createMember`、`resetMemberPassword`；`setActive`/`deleteAccount` 改成同時同步 `managed` 與 `members` 兩個列表；跟第十七輪加的 `pending`/`fetchPending`/`approveRole`/`dismissPending` 並存
+- `src/types/index.ts`：`UserProfile` 加上 `phone: string | null`（跟第十七輪加的 `requested_role` 並存）
+
+**這輪推上去時發現的狀況**：push 前 `git fetch` 才發現另一個 session 幾乎同時已經把「Email 自助註冊」推上 `origin/main`（`8b709bb`），改到的檔案高度重疊。已用 `git rebase origin/main` 手動合併兩邊邏輯（不是誰蓋掉誰），並把我的 migration 從 `025` 改名成 `026` 避免編號衝突。合併後重新跑過 `vue-tsc --noEmit` + `npm run build` 確認沒有壞掉。
+
+**驗證方式與限制**：本機沒有 `.env`（只有 `.env.example`，credentials 不會進 git），這個環境連不上真實 Supabase 專案，所以只做了 `npx vue-tsc --noEmit`（通過）與 `npm run build`（通過）靜態驗證；也試著在瀏覽器 preview 開發伺服器，確認是「沒有 `.env`」導致整個 App 連登入頁都出不來（換成 stash 掉本輪修改後、原本的 main 分支一樣是空白畫面，確認不是本輪改動造成的問題，是這個環境本來就沒有連線）。**使用者拿到真實 credentials 後，麻煩務必實測**：套用 migration 026 → 部署兩支新 function → 用社長/執秘帳號建一個測試社員 → 用手機號碼登入 → 測試重設密碼。
 
 ## 本次完成（第十七輪）：開放自助註冊 + 忘記密碼
 

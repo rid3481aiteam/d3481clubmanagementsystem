@@ -43,7 +43,7 @@ function clubName(id: string | null) {
 }
 
 function roleLabel(r: UserRole) {
-  return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : '社員'
+  return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r === 'club_member' ? '社員' : r
 }
 
 async function approveRole(id: string, newRole: UserRole) {
@@ -58,6 +58,39 @@ async function dismissPending(id: string) {
 
 async function toggleActive(id: string, current: boolean) {
   await accounts.setActive(id, !current)
+}
+
+const memberName = ref('')
+const memberPhone = ref('')
+const memberClubId = ref<string | null>(isDistrictAdmin.value ? null : auth.clubId)
+const creatingMember = ref(false)
+const memberError = ref<string | null>(null)
+const memberSuccess = ref<string | null>(null)
+
+async function submitCreateMember() {
+  if (!memberName.value.trim() || !memberPhone.value.trim() || !memberClubId.value) return
+  creatingMember.value = true
+  memberError.value = null
+  memberSuccess.value = null
+  const { error } = await accounts.createMember(memberPhone.value.trim(), memberName.value.trim(), memberClubId.value)
+  if (error) {
+    memberError.value = error.message
+  } else {
+    memberSuccess.value = `帳號已建立，初始密碼為手機末四碼「${memberPhone.value.trim().slice(-4)}」`
+    memberName.value = ''
+    memberPhone.value = ''
+  }
+  creatingMember.value = false
+}
+
+async function resetMemberPassword(id: string, name: string) {
+  if (!confirm(`確定要把「${name}」的密碼重設回手機末四碼嗎？`)) return
+  const { data, error } = await accounts.resetMemberPassword(id)
+  if (error) {
+    alert(error.message)
+  } else {
+    alert(`已重設，新密碼為「${data?.new_password}」`)
+  }
 }
 
 async function changeDistrictAccess(id: string, value: boolean) {
@@ -76,6 +109,7 @@ onMounted(async () => {
   await invites.fetchLog()
   await accounts.fetchManaged()
   if (isDistrictAdmin.value) await accounts.fetchPending()
+  await accounts.fetchMembers()
 })
 </script>
 
@@ -230,6 +264,72 @@ onMounted(async () => {
           </tr>
           <tr v-if="!accounts.managed.length">
             <td :colspan="isDistrictAdmin ? 6 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tw" style="padding:20px; margin:24px 0;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:6px;">新增社員帳號</h2>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+        社員用手機號碼登入，不需要 Email，初始密碼為手機末四碼。忘記密碼可由社長／執秘在下方一鍵重設。
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+        <div>
+          <label class="fl">姓名</label>
+          <input v-model="memberName" type="text" class="fi" placeholder="社員姓名" style="min-width:160px;" />
+        </div>
+        <div>
+          <label class="fl">手機號碼</label>
+          <input v-model="memberPhone" type="tel" class="fi" placeholder="0912345678" style="min-width:160px;" />
+        </div>
+        <div v-if="isDistrictAdmin">
+          <label class="fl">所屬社團</label>
+          <select v-model="memberClubId" class="fi" style="min-width:200px;">
+            <option :value="null" disabled>請選擇</option>
+            <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+        <button class="btn btn-gold" :disabled="creatingMember" @click="submitCreateMember">
+          {{ creatingMember ? '建立中…' : '建立帳號' }}
+        </button>
+      </div>
+      <p v-if="memberError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ memberError }}</p>
+      <p v-if="memberSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">{{ memberSuccess }}</p>
+    </div>
+
+    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社員帳號</h2>
+    <div class="tw">
+      <table>
+        <thead class="th">
+          <tr>
+            <th>姓名</th>
+            <th>手機號碼</th>
+            <th v-if="isDistrictAdmin">社團</th>
+            <th>狀態</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="m in accounts.members" :key="m.id">
+            <td>{{ m.name }}</td>
+            <td>{{ m.phone ?? '-' }}</td>
+            <td v-if="isDistrictAdmin">{{ clubName(m.club_id) }}</td>
+            <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '啟用中' : '已停用' }}</span></td>
+            <td style="display:flex; gap:6px;">
+              <button class="btn btn-g btn-sm" @click="resetMemberPassword(m.id, m.name)">
+                重設密碼
+              </button>
+              <button class="btn btn-g btn-sm" @click="toggleActive(m.id, m.is_active)">
+                {{ m.is_active ? '停用' : '啟用' }}
+              </button>
+              <button class="btn btn-red btn-sm" @click="removeAccount(m.id, m.name)">
+                永久刪除
+              </button>
+            </td>
+          </tr>
+          <tr v-if="!accounts.members.length">
+            <td :colspan="isDistrictAdmin ? 5 : 4" style="text-align:center; color:var(--muted);">尚無社員帳號</td>
           </tr>
         </tbody>
       </table>

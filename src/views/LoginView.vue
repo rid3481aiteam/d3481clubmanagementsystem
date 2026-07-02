@@ -13,13 +13,13 @@
 
       <form class="login-form" @submit.prevent="handleLogin">
         <div class="form-group">
-          <label class="fl">電子郵件</label>
+          <label class="fl">帳號（Email 或手機號碼）</label>
           <input
-            v-model="email"
-            type="email"
+            v-model="identifier"
+            type="text"
             class="fi"
-            placeholder="your@email.com"
-            autocomplete="email"
+            placeholder="your@email.com 或 0912345678"
+            autocomplete="username"
             required
           />
         </div>
@@ -65,7 +65,7 @@ const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const email = ref('')
+const identifier = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
@@ -80,11 +80,11 @@ const noticeMsg = computed(() => {
 async function handleLogin() {
   loading.value = true
   errorMsg.value = ''
-  const { error } = await auth.signIn(email.value, password.value)
+  const { error } = await auth.signIn(identifier.value, password.value)
   loading.value = false
 
   if (error) {
-    errorMsg.value = '電子郵件或密碼錯誤，請再試一次。'
+    errorMsg.value = '帳號或密碼錯誤，請再試一次。'
     return
   }
 

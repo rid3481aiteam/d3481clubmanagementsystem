@@ -18,6 +18,7 @@ export interface UserProfile {
   requested_role: UserRole | null
   district_access: boolean
   is_active: boolean
+  phone: string | null
   created_at: string
   updated_at: string
 }
