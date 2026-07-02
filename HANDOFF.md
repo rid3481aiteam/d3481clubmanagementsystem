@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第四輪，Claude 從 vivianrotary-cloud/3481rotarymember 撈回全社社長/執秘姓名並產生匯入 migration）
+> 最後更新：2026-07-02（第五輪，Claude 加入通訊錄卡片改版 + 側邊選單改手機/平板抽屜式導覽）
 
 ---
 
@@ -16,6 +16,22 @@
 4. **Edge Functions → delete-account**（如果還沒建立）：新建，Function name 務必在建立當下就填對（見下方踩坑紀錄 #1），內容見 `supabase/functions/delete-account/index.ts`
 5. 確認 SQL Editor 已依序執行 `012`、`013`、`014` 三支 migration（如果前面對話已經跑過可以跳過，見下方「Supabase 資料庫」表格）
 6. 確認 Authentication → URL Configuration 的 Site URL / Redirect URLs 已改成正式網址（不是 localhost），且自訂 SMTP 已設定並測試成功寄信
+
+## 本次完成（第五輪）：通訊錄卡片改版 + RWD 側邊選單
+
+使用者參考 `vivianrotary-cloud/3481rotarymember`（來源平台的「各社通訊錄」功能）要求補齊本專案通訊錄欄位；另外也提出要考量手機/平板的呈現方式（來源是頂部選單，本專案是常駐左側選單，寬螢幕以外沒有應對方案）。
+
+| 檔案 | 說明 |
+|------|------|
+| `src/views/directory/DirectoryView.vue` | 從純表格改成依分區分組的卡片 grid（`repeat(auto-fill,minmax(280px,1fr))`），比照來源平台補上執秘、Email、訂位電話欄位（`clubs` 表本來就有 `sec_name`/`email`/`venue_tel`，之前畫面沒有顯示）；搜尋範圍同步納入執秘/Email |
+| `src/stores/ui.ts`（新檔案） | 新增 `sidebarOpen` 狀態的極簡 Pinia store，供 TopNav / Sidebar 共用 |
+| `src/components/layout/TopNav.vue` | 新增漢堡選單按鈕，只在 `max-width:900px` 以下顯示，點擊切換 `ui.sidebarOpen` |
+| `src/components/layout/Sidebar.vue` | ≤900px 時側邊選單改為固定定位的抽屜（`transform:translateX(-100%)` 滑入滑出），加半透明背景遮罩，點選單項目或點遮罩會自動收合；>900px（桌機）維持原本常駐顯示，不受影響 |
+| `src/App.vue` | `.main` 在 ≤900px 縮小 padding；共用 `.tw`/`table` 加上橫向捲動（`overflow:auto` + `min-width:560px`），避免其他頁面的寬表格在手機上被硬擠爆版 |
+
+**RWD 斷點設計**：900px 為單一斷點，同時涵蓋手機直向與平板；桌機（>900px）維持常駐側邊選單，是目前對此專案使用情境（社長/執秘多半用電腦作業，行動裝置多半是查通訊錄/例會資訊）最低成本的做法，且未來如果要再拆平板/手機兩種行為，斷點已經抽成 CSS media query，容易再細分。
+
+**驗證方式**：本機沒有這個專案的 Supabase 連線資訊，無法用真實登入走完整流程；改用暫時的 fetch 攔截 + DOM 注入方式在瀏覽器內確認卡片版型、RWD 斷點、抽屜選單開關行為皆正常（桌機 1280px / 平板 768px / 手機 375px 皆截圖確認），驗證用的暫時性修改（`.env`、auth 繞過、mock 資料)已全部還原，`git diff` 只保留上述 5 個檔案的正式改動，並跑過 `vue-tsc --noEmit` 確認無型別錯誤。
 
 ## 本次完成（第四輪）：從外部資料來源匯入全社社長/執秘姓名
 

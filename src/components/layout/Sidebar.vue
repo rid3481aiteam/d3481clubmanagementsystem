@@ -1,6 +1,7 @@
 <template>
-  <aside class="sidebar">
-    <nav class="sidebar-nav">
+  <div class="sidebar-backdrop" v-if="ui.sidebarOpen" @click="ui.closeSidebar"></div>
+  <aside class="sidebar" :class="{ open: ui.sidebarOpen }">
+    <nav class="sidebar-nav" @click="ui.closeSidebar">
       <div class="nav-section">總覽</div>
       <RouterLink to="/" class="nav-item">
         <span class="nav-icon">📊</span>儀表板
@@ -75,9 +76,11 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
 import { useFeaturesStore } from '@/stores/features'
+import { useUiStore } from '@/stores/ui'
 
 const auth = useAuthStore()
 const features = useFeaturesStore()
+const ui = useUiStore()
 </script>
 
 <style scoped>
@@ -141,5 +144,35 @@ const features = useFeaturesStore()
 .club-name {
   font-size: 11px;
   color: var(--muted);
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    top: var(--topnav-h);
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,.15);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    top: var(--topnav-h);
+    left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 55;
+  }
 }
 </style>

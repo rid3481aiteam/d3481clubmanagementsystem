@@ -71,6 +71,10 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg)
   padding: 24px;
 }
 
+@media (max-width: 900px) {
+  .main { padding: 16px; }
+}
+
 /* Splash loading */
 .splash {
   display: flex;
@@ -124,8 +128,8 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg)
 .b-gr{ background: rgba(42,107,72,.1);  color: var(--green); }
 
 /* Table */
-.tw { background: var(--card); border-radius: var(--r); border: 1px solid var(--border); overflow: hidden; }
-table { width: 100%; border-collapse: collapse; }
+.tw { background: var(--card); border-radius: var(--r); border: 1px solid var(--border); overflow: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 560px; }
 .th { background: var(--gold-p); }
 th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
 th { font-weight: 600; color: var(--navy); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }

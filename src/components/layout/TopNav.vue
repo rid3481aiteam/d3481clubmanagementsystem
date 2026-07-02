@@ -1,6 +1,9 @@
 <template>
   <header class="topnav">
     <div class="topnav-left">
+      <button class="topnav-burger" aria-label="開啟選單" @click="ui.toggleSidebar">
+        <span></span><span></span><span></span>
+      </button>
       <RotaryWheelIcon class="topnav-wheel" />
       <span class="topnav-title">國際扶輪 3481 地區</span>
     </div>
@@ -18,10 +21,12 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import RotaryWheelIcon from '@/components/RotaryWheelIcon.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const ui = useUiStore()
 
 const roleLabel = computed(() => {
   switch (auth.role) {
@@ -76,6 +81,34 @@ async function editName() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.topnav-burger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.topnav-burger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+}
+
+@media (max-width: 900px) {
+  .topnav-burger { display: flex; }
+  .topnav-title { font-size: 13px; }
+  .topnav-user { display: none; }
 }
 
 .topnav-wheel {
