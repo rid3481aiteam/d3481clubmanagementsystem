@@ -4,16 +4,31 @@
 
 ---
 
-## ⚠️ 待辦：本次新增 1 支 SQL migration + Edge Function 需重新部署
+## ⚠️ 待辦：Supabase Dashboard 這邊要做的事（截至本輪，累積清單）
 
-**目前最優先待辦**，程式碼已寫完、`npm run build` 通過、已 commit + push，但功能還無法運作：
+**目前最優先待辦**，前端程式碼都已寫完、`npm run build` 通過、已 commit + push，但下面幾步都還沒在 Supabase 執行：
 
-1. 到 Supabase dashboard → **SQL Editor**，執行 `supabase/migrations/012_club_self_manage_accounts.sql`
-   （把 006 的「執秘限管社長」單向 policy 換成「社長／執秘互相對等管理本社帳號」）
-2. 到 Supabase dashboard → **Edge Functions → invite-user**，把 `supabase/functions/invite-user/index.ts` 的最新內容貼上覆蓋、重新 Deploy
-   （放寬邀請邏輯：地區可為任何社 bootstrap 邀請、各社社長／執秘可互相邀請本社帳號，不再限制「只有地區能邀執秘」）
+1. **SQL Editor** 依序執行：
+   - `supabase/migrations/012_club_self_manage_accounts.sql`（社長／執秘互相對等管理本社帳號）
+   - `supabase/migrations/013_invite_log_club_tier_select.sql`（club_admin 也能看本社邀請紀錄，原本只有 club_secretary 能看）
+2. **Edge Functions → invite-user** → 貼上 `supabase/functions/invite-user/index.ts` 最新內容覆蓋、重新 Deploy
+   （累積修正：放寬邀請邏輯為社長／執秘對等 + CORS 處理 + `getUser(token)` 修正 401 + 錯誤訊息中文化 + `redirectTo` 指向 `/accept-invite`）
+3. **Edge Functions → 新建** `delete-account`（Function name 務必填對，建立當下就要打對，事後改名字不會變更 slug）→ 貼上 `supabase/functions/delete-account/index.ts` 內容 → Deploy
+   （永久刪除帳號用，跟「停用」不同，這支會真的刪掉 `auth.users`，讓同一個 Email 可以重新邀請 —— 測試邀請功能時很需要這支，不然同一個 Email 測過一次就會卡住）
+4. **Authentication → URL Configuration**：
+   - Site URL 改成 `https://d3481clubmanagementsystem.pages.dev`
+   - Redirect URLs 加入 `https://d3481clubmanagementsystem.pages.dev/**`
+   （目前還是 localhost:3000，導致邀請信連結點進去顯示無法連線；改完後**已寄出的舊邀請信連結不會自動更新**，要重新邀請一次）
 
-沒做這兩步之前：社長帳號還是無法邀請/停用執秘（或反過來），會被舊版 RLS / Edge Function 邏輯擋下。
+沒做完這幾步之前：帳號互邀、刪除帳號重測、邀請信連結、中文錯誤訊息都不會正常運作。
+
+### 本次新增：永久刪除帳號 + 接受邀請設定密碼頁
+
+- **`supabase/functions/delete-account/index.ts`**（新）：跟 `invite-user` 同一套授權邏輯（地區可刪任何社、各社社長／執秘可刪本社帳號），呼叫 `adminClient.auth.admin.deleteUser(user_id)` 真的刪除 `auth.users`（級聯刪除 `user_profiles`）。用途：測試邀請功能時，同一個 Email 邀請失敗過一次就會卡在「已經註冊過」，需要這支才能刪掉重測；正式環境也可用於帳號真的離職、不需要保留紀錄的情境（一般離任建議用「停用」而非刪除，保留稽核軌跡）。
+- **`src/stores/accounts.ts`**：新增 `deleteAccount(id)`，呼叫上述 function，並解析錯誤 JSON 顯示中文訊息（跟 `invites.ts` 同樣的解析模式）。
+- **`src/views/admin/AccountManagementView.vue`**：帳號清單新增「永久刪除」紅色按鈕，`confirm()` 二次確認。
+- **`src/views/AcceptInviteView.vue`**（新）+ `src/router/index.ts` 新增 `/accept-invite` 路由：被邀請人點信件連結後設定登入密碼（`supabase.auth.updateUser({ password })`），完成後導向對應角色首頁。原本系統完全沒有這個頁面，邀請流程實質上無法完成（點連結後只有一次性 session，沒地方設密碼）。
+- **`supabase/migrations/013_invite_log_club_tier_select.sql`**（新）：修正 007 的 policy，`club_admin` 原本看不到本社邀請紀錄（只有 `club_secretary` 看得到），改用 `is_club_tier()`（012 新增的 helper）讓兩者對等。
 
 ### 本次除錯過程記錄（給下次遇到類似狀況參考）
 在部署 `invite-user` function 時踩了兩個坑：

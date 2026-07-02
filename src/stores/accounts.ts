@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { UserProfile } from '@/types'
 
@@ -26,5 +27,27 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
-  return { managed, loading, fetchManaged, setActive }
+  async function deleteAccount(id: string) {
+    const { error } = await supabase.functions.invoke('delete-account', {
+      body: { user_id: id },
+    })
+
+    if (error) {
+      let message = error.message
+      if (error instanceof FunctionsHttpError) {
+        try {
+          const body = await error.context.json()
+          if (body?.error) message = body.error
+        } catch {
+          // 回應不是 JSON，維持預設訊息
+        }
+      }
+      return { error: { message } }
+    }
+
+    managed.value = managed.value.filter(u => u.id !== id)
+    return { error: null }
+  }
+
+  return { managed, loading, fetchManaged, setActive, deleteAccount }
 })

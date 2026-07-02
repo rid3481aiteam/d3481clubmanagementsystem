@@ -47,6 +47,12 @@ async function toggleActive(id: string, current: boolean) {
   await accounts.setActive(id, !current)
 }
 
+async function removeAccount(id: string, name: string) {
+  if (!confirm(`確定要永久刪除「${name}」的帳號嗎？此動作無法復原，該 Email 之後可以重新邀請。`)) return
+  const { error } = await accounts.deleteAccount(id)
+  if (error) alert(error.message)
+}
+
 onMounted(async () => {
   if (isDistrictAdmin.value) await club.fetchAll()
   await invites.fetchLog()
@@ -137,9 +143,12 @@ onMounted(async () => {
             <td>{{ roleLabel(a.role) }}</td>
             <td>{{ clubName(a.club_id) }}</td>
             <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
-            <td>
+            <td style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="toggleActive(a.id, a.is_active)">
                 {{ a.is_active ? '停用' : '啟用' }}
+              </button>
+              <button class="btn btn-red btn-sm" @click="removeAccount(a.id, a.name)">
+                永久刪除
               </button>
             </td>
           </tr>
