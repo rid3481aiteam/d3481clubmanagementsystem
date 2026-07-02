@@ -38,8 +38,18 @@ function openAdd() {
 
 function openEdit(m: Meeting) {
   editing.value = m
-  const { id, created_at, updated_at, ...rest } = m
-  form.value = rest
+  form.value = {
+    club_id: m.club_id,
+    date: m.date,
+    session_no: m.session_no,
+    title: m.title,
+    speaker_name: m.speaker_name,
+    speaker_title: m.speaker_title,
+    speaker_email: m.speaker_email,
+    speaker_phone: m.speaker_phone,
+    venue: m.venue,
+    note: m.note,
+  }
   showModal.value = true
 }
 

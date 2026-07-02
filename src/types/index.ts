@@ -177,11 +177,12 @@ export interface Meeting {
   speaker_phone: string | null
   venue: string | null
   note: string | null
+  year_term: string     // GENERATED column，唯讀
   created_at: string
   updated_at: string
 }
 
-export type MeetingInsert = Omit<Meeting, 'id' | 'created_at' | 'updated_at'>
+export type MeetingInsert = Omit<Meeting, 'id' | 'year_term' | 'created_at' | 'updated_at'>
 export type MeetingUpdate = Partial<MeetingInsert>
 
 // ── 出席 ─────────────────────────────────────────────
