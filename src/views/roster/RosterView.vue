@@ -49,6 +49,10 @@ const MEMBER_STATUS_LABEL: Record<RosterMemberStatus, string> = {
 
 const keyword = ref('')
 const statusFilter = ref<RosterMemberStatus | 'all'>('normal')
+const bulkEditing = ref(false)
+const bulkSaving = ref(false)
+
+type RosterDraft = RosterMemberInsert & { id: string }
 
 type ImportAction = 'insert' | 'update'
 interface ImportPreviewItem {
@@ -104,7 +108,10 @@ const filtered = computed(() => {
   }).slice().sort(compareRosterMembers)
 })
 
-function compareRosterMembers(a: RosterMember, b: RosterMember) {
+function compareRosterMembers(
+  a: Pick<RosterMember, 'name' | 'nick_name'>,
+  b: Pick<RosterMember, 'name' | 'nick_name'>,
+) {
   const aEnglish = (a.nick_name || '').trim()
   const bEnglish = (b.nick_name || '').trim()
   if (aEnglish || bEnglish) {
@@ -112,6 +119,126 @@ function compareRosterMembers(a: RosterMember, b: RosterMember) {
     if (byEnglish !== 0) return byEnglish
   }
   return a.name.localeCompare(b.name, 'zh-Hant')
+}
+
+const draftRows = ref<RosterDraft[]>([])
+
+const filteredDraftRows = computed(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  return draftRows.value.filter(m => {
+    if (statusFilter.value !== 'all' && m.member_status !== statusFilter.value) return false
+    if (!kw) return true
+    return [
+      m.nick_name,
+      m.name,
+      m.club_position,
+      m.job_title,
+      m.company,
+      m.classification,
+      m.email,
+      m.personal_phone,
+      m.company_phone,
+      m.phone,
+    ]
+      .some(v => v?.toLowerCase().includes(kw))
+  }).slice().sort(compareRosterMembers)
+})
+
+function toDraft(m: RosterMember): RosterDraft {
+  return {
+    id: m.id,
+    club_id: m.club_id,
+    name: m.name,
+    nick_name: m.nick_name,
+    club_position: m.club_position ?? '社友',
+    member_status: memberStatus(m),
+    job_title: m.job_title,
+    company: m.company,
+    classification: m.classification,
+    email: m.email,
+    phone: m.phone,
+    personal_phone: m.personal_phone,
+    company_phone: m.company_phone,
+    join_date: m.join_date,
+    is_active: activeFromStatus(memberStatus(m)),
+    note: m.note,
+  }
+}
+
+function normalizeDraft(row: RosterDraft): RosterMemberInsert {
+  return withDerivedStatus({
+    club_id: row.club_id,
+    name: row.name.trim(),
+    nick_name: row.nick_name?.trim() || null,
+    club_position: row.club_position,
+    member_status: row.member_status,
+    job_title: row.job_title?.trim() || null,
+    company: row.company?.trim() || null,
+    classification: row.classification || null,
+    email: row.email?.trim() || null,
+    phone: row.phone?.trim() || null,
+    personal_phone: row.personal_phone?.trim() || null,
+    company_phone: row.company_phone?.trim() || null,
+    join_date: row.join_date || null,
+    is_active: activeFromStatus(row.member_status),
+    note: row.note?.trim() || null,
+  })
+}
+
+function comparableRow(row: RosterMember | RosterDraft) {
+  return JSON.stringify({
+    name: row.name,
+    nick_name: row.nick_name ?? null,
+    club_position: row.club_position ?? '社友',
+    member_status: 'member_status' in row ? (row.member_status ?? 'normal') : memberStatus(row),
+    job_title: row.job_title ?? null,
+    company: row.company ?? null,
+    classification: row.classification ?? null,
+    email: row.email ?? null,
+    personal_phone: row.personal_phone ?? row.phone ?? null,
+    company_phone: row.company_phone ?? null,
+    join_date: row.join_date ?? null,
+    note: row.note ?? null,
+  })
+}
+
+function startBulkEdit() {
+  draftRows.value = roster.members.map(toDraft)
+  statusFilter.value = 'all'
+  bulkEditing.value = true
+}
+
+function cancelBulkEdit() {
+  draftRows.value = []
+  bulkEditing.value = false
+}
+
+async function saveBulkEdit() {
+  if (bulkSaving.value) return
+  if (draftRows.value.some(row => !row.name.trim())) {
+    alert('中文姓名不可空白')
+    return
+  }
+
+  bulkSaving.value = true
+  const original = new Map(roster.members.map(m => [m.id, m]))
+  for (const row of draftRows.value) {
+    const before = original.get(row.id)
+    if (!before) continue
+    const payload = normalizeDraft(row)
+    if (comparableRow(before) !== comparableRow({ ...row, ...payload })) {
+      const { error } = await roster.update(row.id, payload)
+      if (error) {
+        alert(error.message)
+        bulkSaving.value = false
+        return
+      }
+    }
+  }
+  await roster.fetchAll(auth.clubId)
+  bulkSaving.value = false
+  bulkEditing.value = false
+  draftRows.value = []
 }
 
 const showModal = ref(false)
@@ -141,12 +268,6 @@ function emptyForm(): RosterMemberInsert {
 function openAdd() {
   editing.value = null
   form.value = emptyForm()
-  showModal.value = true
-}
-
-function openEdit(m: RosterMember) {
-  editing.value = m
-  form.value = { ...m }
   showModal.value = true
 }
 
@@ -286,13 +407,22 @@ onMounted(() => {
     <div class="ph">
       <h1>社友名冊</h1>
       <div v-if="canManage" style="display:flex; gap:8px;">
-        <template v-if="features.isEnabled('D2_roster_excel')">
+        <template v-if="features.isEnabled('D2_roster_excel') && !bulkEditing">
           <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImport" />
           <button class="btn btn-g btn-sm" @click="downloadTemplate">下載範本</button>
           <button class="btn btn-g btn-sm" @click="triggerImport">匯入 Excel</button>
           <button class="btn btn-g btn-sm" @click="handleExport">匯出 Excel</button>
         </template>
-        <button class="btn btn-gold" @click="openAdd">+ 新增社友</button>
+        <template v-if="bulkEditing">
+          <button class="btn btn-g btn-sm" :disabled="bulkSaving" @click="cancelBulkEdit">取消編輯</button>
+          <button class="btn btn-gold" :disabled="bulkSaving" @click="saveBulkEdit">
+            {{ bulkSaving ? '儲存中…' : '儲存名冊' }}
+          </button>
+        </template>
+        <template v-else>
+          <button class="btn btn-g btn-sm" @click="startBulkEdit">編輯名冊</button>
+          <button class="btn btn-gold" @click="openAdd">+ 新增社友</button>
+        </template>
       </div>
     </div>
 
@@ -307,10 +437,9 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table class="roster-table" :class="{ editable: canManage }">
+      <table class="roster-table" :class="{ editing: bulkEditing }">
         <thead class="th">
           <tr>
-            <th v-if="canManage" class="col-actions">操作</th>
             <th class="col-index">項次</th>
             <th class="col-english">英文名稱</th>
             <th class="col-name">中文姓名</th>
@@ -325,16 +454,49 @@ onMounted(() => {
             <th>狀態</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody v-if="bulkEditing">
           <tr
-            v-for="(m, index) in filtered"
+            v-for="(m, index) in filteredDraftRows"
             :key="m.id"
-            :class="{ 'editable-row': canManage }"
-            @click="canManage && openEdit(m)"
           >
-            <td v-if="canManage" class="col-actions" @click.stop>
-              <button class="btn btn-g btn-sm" @click="openEdit(m)">編輯</button>
+            <td>{{ index + 1 }}</td>
+            <td>
+              <input v-model="m.nick_name" class="fi table-input" />
             </td>
+            <td>
+              <input v-model="m.name" class="fi table-input required-input" />
+            </td>
+            <td>
+              <select v-model="m.club_position" class="fi table-input">
+                <option v-for="p in CLUB_POSITIONS" :key="p" :value="p">{{ p }}</option>
+              </select>
+            </td>
+            <td>
+              <select v-model="m.classification" class="fi table-input">
+                <option :value="null">-</option>
+                <option v-for="c in CLASSIFICATIONS" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </td>
+            <td><input v-model="m.company" class="fi table-input" /></td>
+            <td><input v-model="m.job_title" class="fi table-input" /></td>
+            <td><input v-model="m.personal_phone" class="fi table-input" /></td>
+            <td><input v-model="m.company_phone" class="fi table-input" /></td>
+            <td><input v-model="m.email" class="fi table-input email-input" /></td>
+            <td><input v-model="m.join_date" type="date" class="fi table-input date-input" /></td>
+            <td>
+              <select v-model="m.member_status" class="fi table-input status-input">
+                <option value="normal">正常</option>
+                <option value="leave">請假</option>
+                <option value="resigned">退社</option>
+              </select>
+            </td>
+          </tr>
+          <tr v-if="!filteredDraftRows.length">
+            <td colspan="12" style="text-align:center; color:var(--muted);">查無資料</td>
+          </tr>
+        </tbody>
+        <tbody v-else>
+          <tr v-for="(m, index) in filtered" :key="m.id">
             <td>{{ index + 1 }}</td>
             <td>{{ m.nick_name || '-' }}</td>
             <td>{{ m.name }}</td>
@@ -353,7 +515,7 @@ onMounted(() => {
             </td>
           </tr>
           <tr v-if="!filtered.length">
-            <td :colspan="canManage ? 13 : 12" style="text-align:center; color:var(--muted);">查無資料</td>
+            <td colspan="12" style="text-align:center; color:var(--muted);">查無資料</td>
           </tr>
         </tbody>
       </table>
@@ -482,35 +644,27 @@ onMounted(() => {
   min-width: 1180px;
 }
 
-.roster-table.editable {
-  min-width: 1240px;
+.roster-table.editing {
+  min-width: 1320px;
 }
 
-.editable-row {
-  cursor: pointer;
+.table-input {
+  min-width: 96px;
+  padding: 6px 8px;
+  font-size: 12px;
 }
 
-.editable-row:hover td {
-  background: var(--gold-p);
+.required-input {
+  min-width: 112px;
 }
 
-.col-actions {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  width: 82px;
-  min-width: 82px;
-  background: var(--card);
-  box-shadow: 1px 0 0 var(--border);
+.email-input {
+  min-width: 190px;
 }
 
-thead .col-actions {
-  z-index: 3;
-  background: var(--gold-p);
-}
-
-.editable-row:hover .col-actions {
-  background: var(--gold-p);
+.date-input,
+.status-input {
+  min-width: 118px;
 }
 
 .col-index {

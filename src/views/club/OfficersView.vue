@@ -20,10 +20,28 @@ const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
   { role: 'secretary', label: '秘書' },
 ]
 
+const ROLE_POSITION: Partial<Record<ClubOfficerRole, 'P' | 'PE' | 'VP' | 'S'>> = {
+  president: 'P',
+  president_elect: 'PE',
+  vice_president: 'VP',
+  secretary: 'S',
+}
+const ANNUAL_POSITIONS = new Set(['P', 'PE', 'VP', 'S'])
+
+interface CommitteeDraft {
+  key: string
+  id: string | null
+  committee_name: string
+  name: string
+}
+
 const singleNames = ref<Record<string, string>>({})
+const draftSingleNames = ref<Record<string, string>>({})
+const draftCommitteeMembers = ref<CommitteeDraft[]>([])
 const newCommitteeName = ref('')
 const newMemberName = ref('')
 const saving = ref(false)
+const editing = ref(false)
 
 const committeeMembers = computed(() => officers.list.filter(o => o.role === 'committee_member'))
 const activeMembers = computed(() => roster.members.filter(m => m.is_active))
@@ -55,6 +73,27 @@ function memberDisplayName(value: string) {
   return member?.nick_name?.trim() || member?.name || value
 }
 
+function startEdit() {
+  draftSingleNames.value = { ...singleNames.value }
+  draftCommitteeMembers.value = committeeMembers.value.map(m => ({
+    key: m.id,
+    id: m.id,
+    committee_name: m.committee_name || '',
+    name: m.name,
+  }))
+  newCommitteeName.value = ''
+  newMemberName.value = ''
+  editing.value = true
+}
+
+function cancelEdit() {
+  draftSingleNames.value = {}
+  draftCommitteeMembers.value = []
+  newCommitteeName.value = ''
+  newMemberName.value = ''
+  editing.value = false
+}
+
 async function load() {
   if (!auth.clubId) return
   await roster.fetchAll(auth.clubId)
@@ -70,7 +109,7 @@ async function saveSingleRoles() {
   if (!auth.clubId) return
   saving.value = true
   for (const { role } of SINGLE_ROLES) {
-    const name = singleNames.value[role]?.trim() ?? ''
+    const name = draftSingleNames.value[role]?.trim() ?? ''
     const existing = officers.list.find(o => o.role === role)
     if (!name) {
       if (existing) await officers.remove(existing.id)
@@ -82,28 +121,75 @@ async function saveSingleRoles() {
       await officers.insert({ club_id: auth.clubId, year_term: yearTerm.value, role, name, committee_name: null, note: null })
     }
   }
+
+  const keptCommitteeIds = new Set(draftCommitteeMembers.value.flatMap(m => (m.id ? [m.id] : [])))
+  for (const existing of committeeMembers.value) {
+    if (!keptCommitteeIds.has(existing.id)) await officers.remove(existing.id)
+  }
+  for (const draft of draftCommitteeMembers.value) {
+    const payload = {
+      club_id: auth.clubId,
+      year_term: yearTerm.value,
+      role: 'committee_member' as ClubOfficerRole,
+      name: draft.name.trim(),
+      committee_name: draft.committee_name.trim() || null,
+      note: null,
+    }
+    if (!payload.name) continue
+    if (draft.id) {
+      const existing = committeeMembers.value.find(m => m.id === draft.id)
+      if (existing && (existing.name !== payload.name || (existing.committee_name || '') !== (payload.committee_name || ''))) {
+        await officers.update(draft.id, payload)
+      }
+    } else {
+      await officers.insert(payload)
+    }
+  }
+
+  await syncRosterAnnualPositions()
   saving.value = false
+  editing.value = false
   await load()
+}
+
+async function syncRosterAnnualPositions() {
+  const selected = new Map<string, 'P' | 'PE' | 'VP' | 'S'>()
+  for (const { role } of SINGLE_ROLES) {
+    const value = draftSingleNames.value[role]?.trim()
+    const position = ROLE_POSITION[role]
+    if (!value || !position) continue
+    const member = findMember(value)
+    if (member) selected.set(member.id, position)
+  }
+
+  for (const member of roster.members.filter(m => m.is_active)) {
+    const nextPosition = selected.get(member.id)
+    if (nextPosition) {
+      if (member.club_position !== nextPosition) {
+        const { error } = await roster.update(member.id, { club_position: nextPosition })
+        if (error) alert(error.message)
+      }
+    } else if (ANNUAL_POSITIONS.has(member.club_position)) {
+      const { error } = await roster.update(member.id, { club_position: '社友' })
+      if (error) alert(error.message)
+    }
+  }
 }
 
 async function addCommitteeMember() {
-  if (!auth.clubId || !newMemberName.value.trim()) return
-  await officers.insert({
-    club_id: auth.clubId,
-    year_term: yearTerm.value,
-    role: 'committee_member',
+  if (!auth.clubId || !editing.value || !newMemberName.value.trim()) return
+  draftCommitteeMembers.value.push({
+    key: `new-${Date.now()}-${newMemberName.value}`,
+    id: null,
     name: newMemberName.value.trim(),
-    committee_name: newCommitteeName.value.trim() || null,
-    note: null,
+    committee_name: newCommitteeName.value.trim(),
   })
   newCommitteeName.value = ''
   newMemberName.value = ''
-  await load()
 }
 
-async function removeCommitteeMember(id: string) {
-  await officers.remove(id)
-  await load()
+function removeCommitteeMember(key: string) {
+  draftCommitteeMembers.value = draftCommitteeMembers.value.filter(m => m.key !== key)
 }
 
 onMounted(load)
@@ -114,9 +200,18 @@ watch(yearTerm, load)
   <div class="page">
     <div class="ph">
       <h1>社的年度成員</h1>
-      <div>
+      <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
         <label class="fl" style="display:inline-block; margin-right:6px;">年度</label>
-        <input v-model="yearTerm" class="fi" style="width:120px; display:inline-block;" placeholder="2025-2026" />
+        <input v-model="yearTerm" class="fi" style="width:120px; display:inline-block;" :disabled="editing" placeholder="2025-2026" />
+        <template v-if="canManage">
+          <button v-if="!editing" class="btn btn-gold" @click="startEdit">編輯年度成員</button>
+          <template v-else>
+            <button class="btn btn-g btn-sm" :disabled="saving" @click="cancelEdit">取消</button>
+            <button class="btn btn-gold" :disabled="saving" @click="saveSingleRoles">
+              {{ saving ? '儲存中…' : '儲存年度成員' }}
+            </button>
+          </template>
+        </template>
       </div>
     </div>
 
@@ -125,15 +220,13 @@ watch(yearTerm, load)
       <div style="display:flex; flex-direction:column; gap:12px; max-width:400px;">
         <div v-for="r in SINGLE_ROLES" :key="r.role">
           <label class="fl">{{ r.label }}</label>
-          <select v-model="singleNames[r.role]" class="fi" :disabled="!canManage">
+          <select v-if="editing" v-model="draftSingleNames[r.role]" class="fi">
             <option value="">請選擇</option>
-            <option v-for="n in memberOptions(singleNames[r.role])" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
+            <option v-for="n in memberOptions(draftSingleNames[r.role])" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
           </select>
+          <div v-else class="readonly-field">{{ memberOptionLabel(singleNames[r.role] || '') || '-' }}</div>
         </div>
       </div>
-      <button v-if="canManage" class="btn btn-gold" style="margin-top:14px;" :disabled="saving" @click="saveSingleRoles">
-        {{ saving ? '儲存中…' : '儲存主要幹部' }}
-      </button>
     </div>
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">委員會成員</h2>
@@ -143,25 +236,39 @@ watch(yearTerm, load)
           <tr>
             <th>委員會</th>
             <th>英文名稱</th>
-            <th v-if="canManage"></th>
+            <th v-if="editing"></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody v-if="editing">
+          <tr v-for="m in draftCommitteeMembers" :key="m.key">
+            <td><input v-model="m.committee_name" class="fi table-input" /></td>
+            <td>
+              <select v-model="m.name" class="fi table-input">
+                <option value="">請選擇</option>
+                <option v-for="n in memberOptions(m.name)" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
+              </select>
+            </td>
+            <td>
+              <button class="btn btn-red btn-sm" @click="removeCommitteeMember(m.key)">移除</button>
+            </td>
+          </tr>
+          <tr v-if="!draftCommitteeMembers.length">
+            <td colspan="3" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>
+          </tr>
+        </tbody>
+        <tbody v-else>
           <tr v-for="m in committeeMembers" :key="m.id">
             <td>{{ m.committee_name || '-' }}</td>
             <td>{{ memberDisplayName(m.name) }}</td>
-            <td v-if="canManage">
-              <button class="btn btn-red btn-sm" @click="removeCommitteeMember(m.id)">移除</button>
-            </td>
           </tr>
           <tr v-if="!committeeMembers.length">
-            <td :colspan="canManage ? 3 : 2" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>
+            <td colspan="2" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div v-if="canManage" style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:flex-end;">
+    <div v-if="canManage && editing" style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:flex-end;">
       <div>
         <label class="fl">委員會名稱</label>
         <input v-model="newCommitteeName" class="fi" placeholder="例如：會員發展委員會" style="min-width:200px;" />
@@ -177,3 +284,20 @@ watch(yearTerm, load)
     </div>
   </div>
 </template>
+
+<style scoped>
+.readonly-field {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--text);
+}
+
+.table-input {
+  min-width: 180px;
+}
+</style>
