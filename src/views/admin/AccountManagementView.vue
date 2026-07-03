@@ -140,13 +140,13 @@ async function changeDistrictRole(id: string, value: string) {
   if (error) alert(error.message)
 }
 
-// 社員預設「僅檢視」，這裡直接升級成執秘/社長就等於給了編輯權限
-// （套用既有的權限矩陣，不用另外做一套細部欄位）；升級後帳號會
+// 社員預設「檢視」，選「可編輯」就直接升級成執秘（套用既有的權限矩陣，
+// 不用另外做一套細部欄位、也不需要讓使用者選職稱）；升級後帳號會
 // 從這張「社員帳號」表格移到上面的「社長／執秘帳號」表格。
-async function changeMemberPermission(id: string, name: string, newRole: UserRole) {
-  if (newRole === 'club_member') return
-  if (!confirm(`確定要把「${name}」的權限從「僅檢視」改成「${roleLabel(newRole)}（有編輯權限）」嗎？`)) return
-  const { error } = await accounts.approveRole(id, newRole)
+async function changeMemberPermission(id: string, name: string, value: string) {
+  if (value !== 'edit') return
+  if (!confirm(`確定要把「${name}」的權限從「檢視」改成「可編輯」嗎？`)) return
+  const { error } = await accounts.approveRole(id, 'club_secretary')
   if (error) {
     alert(error.message)
   } else {
@@ -388,13 +388,12 @@ onMounted(async () => {
             <td>
               <select
                 class="fi"
-                :value="m.role"
-                style="min-width:170px; padding:6px 8px;"
-                @change="changeMemberPermission(m.id, m.name, ($event.target as HTMLSelectElement).value as UserRole)"
+                :value="'view'"
+                style="min-width:120px; padding:6px 8px;"
+                @change="changeMemberPermission(m.id, m.name, ($event.target as HTMLSelectElement).value)"
               >
-                <option value="club_member">僅檢視（社員）</option>
-                <option value="club_secretary">編輯權限（執秘）</option>
-                <option value="club_admin">編輯權限（社長）</option>
+                <option value="view">檢視</option>
+                <option value="edit">可編輯</option>
               </select>
             </td>
             <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '啟用中' : '已停用' }}</span></td>
