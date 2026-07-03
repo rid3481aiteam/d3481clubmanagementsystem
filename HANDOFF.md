@@ -1,10 +1,18 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-03（第三十一輪，**修掉「升級成執秘後沒有救援管道」的缺口，`reset-member-password` 已由使用者手動部署完成**——第三十輪重構帳號總覽時發現：手機號碼建立的帳號一旦被開關升級成「可編輯」，`reset-member-password` 就會拒絕重設密碼（寫死只能重設 `club_member`），而這類帳號的登入信箱是系統合成的、沒有真實收件匣，等於完全沒有救援管道。這輪把 Edge Function 的角色限制拿掉、改成只看有沒有手機號碼，前端「重設密碼」按鈕也同步從 `role==='club_member'` 改成只看 `a.phone`。這台環境的 Supabase CLI 壞掉（`ENOTDIR` 沙盒路徑衝突）沒辦法直接部署，**使用者已在自己的機器上手動部署完成，這條路徑已經全部生效**）
+> 最後更新：2026-07-04（第三十二輪，**角色模型簡化成 3 級 + 地區帳號總覽精簡 + 社團資訊頁補齊社務資料**——使用者的核心精神是「地區只管地區的事，各社的事交給各社」。把畫面上一直分開顯示的「社長」「執秘」合併成「各社管理員」（`club_admin`/`club_secretary` 在 RLS/Edge Function/`role_permissions` 早就是等價角色，這次純粹是顯示層合併，沒動 DB／migration）；帳號邀請表單改成「邀請社友」、角色欄位移到所屬社團後面、從社長/執秘下拉改成檢視/編輯二選一（新增能力：現在 Email 邀請也能建立唯讀社友帳號）；地區帳號總覽現在只顯示已經有地區權限的帳號，權限開關在地區視角下改成控制地區的檢視/編輯，各社自己視角不受影響；`ClubDetailView.vue`（社團總覽→查看社團資訊）新增「潛在社友」「例會管理」兩個唯讀區塊，不含社內公告）
 
 ---
 
 ## ⚠️ 待辦
+
+**【第三十二輪，待實測】角色模型簡化 + 帳號總覽精簡 + 社團資訊頁補齊，已推上正式站，麻煩使用者實測**：
+1. 權限矩陣頁只剩 3 列角色（地區管理員/各社管理員/一般社友），點擊「各社管理員」列的允許/禁止，確認底層 `club_admin`/`club_secretary` 兩筆資料真的同步更新（沒有其中一個角色權限跟另一個跑掉）
+2. 帳號邀請表單：標題「邀請社友」、欄位順序 Email→姓名→所屬社團→角色（檢視/編輯開關），送出「檢視」時建立的帳號角色應該是 `club_member`
+3. 帳號總覽：地區視角下應該只列出已經有地區權限（`district_role` 有值）的帳號，權限開關對應「檢視/編輯」是在切地區權限（`view`/`admin`），不是切各社內部權限；各社自己（非地區視角）的帳號總覽應該完全沒變
+4. 社團總覽 → 查看社團資訊，確認「潛在社友」「例會管理」兩個新區塊有正確顯示該社資料，沒有社內公告區塊
+
+這台環境沒有真實帳號密碼，只做到型別/build 驗證跟本機 dev server 的靜態渲染檢查，沒有用真帳號登入正式站測試互動流程。
 
 **【第三十一輪】`reset-member-password` Edge Function** ~~程式碼已改好並推上 GitHub，但尚未部署~~ **使用者已手動部署完成 ✅**：手機號碼帳號升級成執秘後仍能用「重設密碼」還原回手機號碼，救援管道缺口已修好。
 
@@ -46,6 +54,22 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第三十二輪）：角色模型簡化成 3 級 + 地區帳號總覽精簡 + 社團資訊頁補齊社務資料
+
+使用者提出四項調整，核心精神是「地區只管地區的事，各社的事交給各社」。進 plan mode 先派兩個 Explore agent 查清楚現況：確認 `club_admin`（社長）跟 `club_secretary`（執秘）在 RLS（12 處 `IN ('club_admin','club_secretary')`）、Edge Function（`CLUB_TIER_ROLES` 常數）、`role_permissions` 資料表（migration 010 種子資料兩者數值完全相同）全部當作等價角色處理，**唯一差異只在畫面上的中文標籤**，所以這次全部是前端顯示層調整，沒有動 migration/RLS/Edge Function。
+
+| 檔案 | 說明 |
+|------|------|
+| `src/views/admin/AccountManagementView.vue` | `roleLabel()` 合併 `club_admin`/`club_secretary` → 「各社管理員」、`club_member` → 「一般社友」；「帳號審核」角色下拉從 3 選項（社長/執秘/社員）改 2 選項；「邀請社友（Email）」表單重排欄位順序（Email→姓名→所屬社團→角色），角色從下拉選單改成跟「帳號總覽」一致的 `.toggle-switch`（檢視→寫入 `club_member`、編輯→寫入 `club_secretary`，**這是新增能力**：Email 邀請現在也能直接建立唯讀社友帳號，之前只能建立編輯權帳號）；`allAccounts` computed 加上地區視角過濾：`isDistrictAdminView` 時只保留 `district_role` 有值的帳號；移除「可見範圍」三段式分段控制欄位，「權限」欄位改成依視角分支：地區視角切 `district_role`（view/admin），各社自己視角維持原本的 `togglePermission()`（club_member/club_secretary）不變；要新增或撤銷地區權限，改到 `ClubDetailView.vue` 針對單一社團操作 |
+| `src/views/admin/ClubDetailView.vue` | `accountRoleLabel()` 同樣合併角色標籤；新增「潛在社友」「例會管理」兩個唯讀區塊，沿用這個檔案本來就在用的「`store.fetchAll(id)` 打特定社團資料、渲染成唯讀表格」模式（跟既有的「社員名單」「社的年度成員」一樣），呼叫 `useProspectiveStore().fetchAll(id)`、`useMeetingsStore().fetchAll(id)`——這兩個 store 的 `fetchAll(clubId)` 本來就是通用的，不用改 store。明確**沒有**加「社內公告」區塊（使用者要求不顯示） |
+| `src/views/admin/PermissionMatrixView.vue` | 這裡比較特別：`role_permissions` 對 `club_admin`/`club_secretary` 是兩筆獨立但數值相同的資料列，合併顯示成一列「各社管理員」後，點擊 toggle 要同時更新兩筆底層資料才不會讓兩個角色的權限悄悄跑掉。新增 `DisplayRole` 型別（`district_admin`/`club_tier`/`club_member`）跟 `cellsForRole()`/`isAllowed()` 輔助函式同時查兩個角色的資料列，`toggle()` 同時 `setPermission` 兩筆 |
+| `src/components/layout/TopNav.vue` | `baseRoleLabel`/`roleBadgeClass` 合併角色徽章文字跟顏色 |
+| `src/components/layout/Sidebar.vue` | 順手拿掉一個死連結：`role === 'club_admin'` 限定、指向不存在路由 `/club/reports` 的「出席統計」連結（調查時發現的唯一一處把 club_admin/club_secretary 當不同角色處理的地方，路由根本沒建） |
+
+明確不動的部分：`clubs.pres_name`/`sec_name`（社團聯絡資訊，`ClubListView.vue`/`ClubEditView.vue` 的社長/執秘欄位）是完全不同的概念（社團的聯絡窗口，不是平台帳號角色），`OfficersView.vue`/`RegisterView.vue` 的社內職稱/扶輪職稱代碼也是另一回事，都沒有動。
+
+**驗證**：`npx vue-tsc --noEmit`、`npm run build` 皆通過。本機用假 Supabase 金鑰起 dev server 確認登入頁沒有因為新 import（`useProspectiveStore`/`useMeetingsStore`）跑出 console 錯誤。這台環境沒有真實帳號密碼，沒辦法登入正式站測試互動流程（尤其是權限矩陣頁的雙寫同步、地區帳號總覽的過濾邏輯），麻煩使用者實測，見上方待辦。
 
 ## 本次完成（第三十一輪）：修掉「執秘帳號重設密碼」的既有缺口
 

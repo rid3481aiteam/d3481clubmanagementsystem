@@ -36,7 +36,7 @@
         </template>
       </template>
 
-      <!-- 執秘 + 社長 + 一般社員共用（社員唯讀） -->
+      <!-- 各社管理員（club_secretary/club_admin）+ 一般社友共用（社友唯讀） -->
       <template v-if="auth.role === 'club_secretary' || auth.role === 'club_admin' || auth.role === 'club_member'">
         <div class="nav-section">社務管理</div>
         <RouterLink v-if="features.isEnabled('D1_roster')" to="/roster" class="nav-item">
@@ -62,19 +62,11 @@
         </RouterLink>
       </template>
 
-      <!-- 執秘 + 社長：本社帳號自行管理 -->
+      <!-- 各社管理員（club_secretary/club_admin）：本社帳號自行管理 -->
       <template v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'">
         <div class="nav-section">帳號</div>
         <RouterLink to="/club/invite" class="nav-item">
           <span class="nav-icon">👤</span>邀請 / 管理本社帳號
-        </RouterLink>
-      </template>
-
-      <!-- 社長限定 -->
-      <template v-if="auth.role === 'club_admin'">
-        <div class="nav-section">報表</div>
-        <RouterLink to="/club/reports" class="nav-item">
-          <span class="nav-icon">📊</span>出席統計
         </RouterLink>
       </template>
 

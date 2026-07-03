@@ -28,7 +28,7 @@ function zoneRank(zone: string) {
 
 const email = ref('')
 const inviteName = ref('')
-const role = ref<'club_secretary' | 'club_admin'>('club_secretary')
+const role = ref<'club_member' | 'club_secretary'>('club_secretary')
 const clubId = ref<string | null>(isDistrictAdminView.value ? null : auth.clubId)
 const inviting = ref(false)
 const inviteError = ref<string | null>(null)
@@ -57,7 +57,7 @@ function clubName(id: string | null) {
 }
 
 function roleLabel(r: UserRole) {
-  return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' ? '執秘' : r === 'club_admin' ? '社長' : r === 'club_member' ? '社員' : r
+  return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' || r === 'club_admin' ? '各社管理員' : r === 'club_member' ? '一般社友' : r
 }
 
 // 跟 RegisterView 的職稱代碼共用同一份對照表，審核名單才看得懂使用者實際填的職稱
@@ -75,7 +75,10 @@ function pendingTitleLabel(p: UserProfile) {
 const pendingChoice = ref<Record<string, UserRole>>({})
 
 function pendingRoleChoice(p: UserProfile) {
-  return pendingChoice.value[p.id] ?? p.requested_role ?? 'club_member'
+  const choice = pendingChoice.value[p.id] ?? p.requested_role ?? 'club_member'
+  // 申請職稱對到的 requested_role 可能是舊資料的 club_admin，角色只剩
+  // 「各社管理員／一般社友」兩種，顯示上把 club_admin 併進 club_secretary
+  return choice === 'club_admin' ? 'club_secretary' : choice
 }
 
 async function applyPendingRole(p: UserProfile) {
@@ -96,7 +99,7 @@ const memberError = ref<string | null>(null)
 const memberSuccess = ref<string | null>(null)
 
 // 只有地區管理員可以幫任何社建立社員帳號，才需要先選分區再選社；
-// 社長／執秘只能建本社帳號，clubId 已經固定，不需要這兩層選單
+// 各社管理員只能建本社帳號，clubId 已經固定，不需要這兩層選單
 const memberZones = computed(() => {
   const set = new Set(club.allClubs.map(c => c.zone || '未分區'))
   return [...set].sort((a, b) => zoneRank(a) - zoneRank(b) || a.localeCompare(b))
@@ -140,24 +143,31 @@ async function changeDistrictRole(id: string, value: string) {
   if (error) alert(error.message)
 }
 
-// 帳號總覽：社長/執秘/社員合併成一張表，用同一個開關雙向切換
-// 檢視（club_member）／可編輯（club_secretary）。approveRole() 本來
+// 帳號總覽：各社管理員/一般社友合併成一張表，用同一個開關雙向切換
+// 檢視（club_member）／編輯（club_secretary）。approveRole() 本來
 // 就是通用的雙向 role 更新，RLS（028_club_tier_role_management.sql）
 // 也已經放行 club_admin/club_secretary/club_member 三者互轉，之前
 // 只是 UI 沒做關閉編輯權限的路徑。
-// 社長（club_admin）關閉編輯權限後會變成社員，之後若重新打開，固定
-// 變成執秘（不會恢復社長身分）——社長身分本來就該透過「帳號邀請」
-// 重新指派，不透過這個開關復原。
-const allAccounts = computed(() =>
-  [...accounts.managed, ...accounts.members].sort((a, b) => a.name.localeCompare(b.name))
-)
+// 社長（club_admin，舊資料殘留角色，畫面上跟 club_secretary 都顯示
+// 「各社管理員」）關閉編輯權限後會變成一般社友，之後若重新打開，
+// 固定變成 club_secretary（不會恢復 club_admin）——那本來就該透過
+// 「帳號邀請」重新指派，不透過這個開關復原。
+//
+// 地區視角（isDistrictAdminView）下，這張表只該管「誰有地區權限、
+// 是唯讀還是可編輯」，不管各社內部給了誰什麼權限，所以過濾成只顯示
+// district_role 有值的帳號；要新增/撤銷地區權限，改到 ClubDetailView
+// 那邊針對單一社團操作。
+const allAccounts = computed(() => {
+  const merged = [...accounts.managed, ...accounts.members].sort((a, b) => a.name.localeCompare(b.name))
+  return isDistrictAdminView.value ? merged.filter(a => a.district_role) : merged
+})
 
 async function togglePermission(a: UserProfile) {
   const turningOn = a.role === 'club_member'
   const nextRole: UserRole = turningOn ? 'club_secretary' : 'club_member'
   const msg = turningOn
-    ? `確定要把「${a.name}」的權限從「檢視」改成「可編輯」嗎？`
-    : `確定要把「${a.name}」的權限從「可編輯」改回「檢視」嗎？`
+    ? `確定要把「${a.name}」的權限從「檢視」改成「編輯」嗎？`
+    : `確定要把「${a.name}」的權限從「編輯」改回「檢視」嗎？`
   if (!confirm(msg)) return
   const { error } = await accounts.approveRole(a.id, nextRole)
   if (error) alert(error.message)
@@ -187,7 +197,7 @@ onMounted(async () => {
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號邀請</h2>
 
     <div class="tw" style="padding:20px; margin-bottom:14px;">
-      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:14px;">邀請社長／執秘（Email）</h3>
+      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:14px;">邀請社友（Email）</h3>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>
           <label class="fl">Email</label>
@@ -197,19 +207,26 @@ onMounted(async () => {
           <label class="fl">姓名（選填）</label>
           <input v-model="inviteName" type="text" class="fi" placeholder="不填則預設用 Email 前段" style="min-width:160px;" />
         </div>
-        <div>
-          <label class="fl">角色</label>
-          <select v-model="role" class="fi" style="min-width:120px;">
-            <option value="club_secretary">執秘</option>
-            <option value="club_admin">社長</option>
-          </select>
-        </div>
         <div v-if="isDistrictAdminView">
           <label class="fl">所屬社團</label>
           <select v-model="clubId" class="fi" style="min-width:200px;">
             <option :value="null" disabled>請選擇</option>
             <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
+        </div>
+        <div>
+          <label class="fl">角色</label>
+          <button
+            type="button"
+            class="toggle-switch"
+            role="switch"
+            :aria-checked="role === 'club_secretary'"
+            aria-label="角色：檢視／編輯"
+            @click="role = role === 'club_member' ? 'club_secretary' : 'club_member'"
+          >
+            <span class="track"><span class="knob"></span></span>
+            <span class="label">{{ role === 'club_member' ? '檢視' : '編輯' }}</span>
+          </button>
         </div>
         <button class="btn btn-gold" :disabled="inviting" @click="submitInvite">
           {{ inviting ? '邀請中…' : '送出邀請' }}
@@ -222,7 +239,7 @@ onMounted(async () => {
     <div class="tw" style="padding:20px; margin-bottom:14px;">
       <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:6px;">新增社員帳號（手機號碼）</h3>
       <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-        社員用手機號碼登入，不需要 Email，初始密碼為完整手機號碼（跟帳號一樣）。忘記密碼可由社長／執秘在「帳號總覽」一鍵重設。
+        社員用手機號碼登入，不需要 Email，初始密碼為完整手機號碼（跟帳號一樣）。忘記密碼可由各社管理員在「帳號總覽」一鍵重設。
       </p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>
@@ -316,9 +333,8 @@ onMounted(async () => {
                   style="min-width:110px; padding:6px 8px;"
                   @change="pendingChoice[p.id] = ($event.target as HTMLSelectElement).value as UserRole"
                 >
-                  <option value="club_admin">社長</option>
-                  <option value="club_secretary">執秘</option>
-                  <option value="club_member">社員</option>
+                  <option value="club_secretary">各社管理員</option>
+                  <option value="club_member">一般社友</option>
                 </select>
                 <button class="btn btn-gold btn-sm" @click="applyPendingRole(p)">套用</button>
               </td>
@@ -339,7 +355,6 @@ onMounted(async () => {
             <th>姓名</th>
             <th v-if="isDistrictAdminView">社團</th>
             <th>手機號碼</th>
-            <th v-if="isDistrictAdminView">可見範圍</th>
             <th>權限</th>
             <th>狀態</th>
             <th></th>
@@ -350,39 +365,30 @@ onMounted(async () => {
             <td>{{ a.name }}</td>
             <td v-if="isDistrictAdminView">{{ clubName(a.club_id) }}</td>
             <td>{{ a.phone ?? '-' }}</td>
-            <td v-if="isDistrictAdminView">
-              <div class="segmented" role="group" aria-label="可見範圍">
-                <button
-                  type="button"
-                  class="seg-btn"
-                  :class="{ active: (a.district_role ?? 'club') === 'club' }"
-                  @click="changeDistrictRole(a.id, 'club')"
-                >只能看到各社</button>
-                <button
-                  type="button"
-                  class="seg-btn"
-                  :class="{ active: a.district_role === 'view' }"
-                  @click="changeDistrictRole(a.id, 'view')"
-                >地區（唯讀）</button>
-                <button
-                  type="button"
-                  class="seg-btn"
-                  :class="{ active: a.district_role === 'admin' }"
-                  @click="changeDistrictRole(a.id, 'admin')"
-                >地區管理員</button>
-              </div>
-            </td>
             <td>
               <button
+                v-if="isDistrictAdminView"
+                type="button"
+                class="toggle-switch"
+                role="switch"
+                :aria-checked="a.district_role === 'admin'"
+                aria-label="地區權限：檢視／編輯"
+                @click="changeDistrictRole(a.id, a.district_role === 'admin' ? 'view' : 'admin')"
+              >
+                <span class="track"><span class="knob"></span></span>
+                <span class="label">{{ a.district_role === 'admin' ? '編輯' : '檢視' }}</span>
+              </button>
+              <button
+                v-else
                 type="button"
                 class="toggle-switch"
                 role="switch"
                 :aria-checked="a.role !== 'club_member'"
-                aria-label="權限：檢視／可編輯"
+                aria-label="權限：檢視／編輯"
                 @click="togglePermission(a)"
               >
                 <span class="track"><span class="knob"></span></span>
-                <span class="label">{{ a.role === 'club_member' ? '檢視' : '可編輯' }}</span>
+                <span class="label">{{ a.role === 'club_member' ? '檢視' : '編輯' }}</span>
               </button>
             </td>
             <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
@@ -399,7 +405,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="!allAccounts.length">
-            <td :colspan="isDistrictAdminView ? 7 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
+            <td :colspan="isDistrictAdminView ? 6 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
           </tr>
         </tbody>
       </table>

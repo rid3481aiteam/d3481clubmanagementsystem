@@ -5,17 +5,37 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
-import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus, UserProfile, UserRole } from '@/types'
+import { useProspectiveStore } from '@/stores/prospective'
+import { useMeetingsStore } from '@/stores/meetings'
+import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus, UserProfile, UserRole, ProspectStatus } from '@/types'
 
 const route = useRoute()
 const auth = useAuthStore()
 const roster = useRosterStore()
 const officers = useOfficersStore()
+const prospective = useProspectiveStore()
+const meetingsStore = useMeetingsStore()
 const club = ref<Club | null>(null)
 const lastMeeting = ref<Meeting | null>(null)
 const avgRate = ref<number | null>(null)
 const registeredAccounts = ref<UserProfile[]>([])
 const yearTerm = currentYearTerm()
+
+const PROSPECT_STATUS_LABEL: Record<ProspectStatus, string> = {
+  not_invited: '尚未邀請',
+  invited: '已邀請',
+  joined: '已入社',
+  no_reply: '無回應',
+  declined: '婉拒',
+}
+
+const PROSPECT_STATUS_BADGE: Record<ProspectStatus, string> = {
+  not_invited: 'b-g',
+  invited: 'b-n',
+  joined: 'b-gr',
+  no_reply: 'b-y',
+  declined: 'b-r',
+}
 
 const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
   { role: 'president', label: '社長' },
@@ -53,9 +73,8 @@ function officerName(role: ClubOfficerRole) {
 
 function accountRoleLabel(role: UserRole) {
   if (role === 'district_admin') return '地區管理員'
-  if (role === 'club_admin') return '社長'
-  if (role === 'club_secretary') return '執秘'
-  if (role === 'club_member') return '一般社員'
+  if (role === 'club_admin' || role === 'club_secretary') return '各社管理員'
+  if (role === 'club_member') return '一般社友'
   return role
 }
 
@@ -83,6 +102,8 @@ async function load() {
 
   await roster.fetchAll(id)
   await officers.fetchAll(id, yearTerm)
+  await prospective.fetchAll(id)
+  await meetingsStore.fetchAll(id)
 
   const { data: accounts } = await supabase
     .from('user_profiles')
@@ -190,6 +211,60 @@ watch(() => route.params.id, load)
         </tbody>
       </table>
       <p v-else style="color:var(--muted); font-size:13px;">尚無委員會成員資料</p>
+    </div>
+
+    <h2 class="section-h">潛在社友</h2>
+    <div class="tw" style="margin-bottom:24px;">
+      <table>
+        <thead class="th">
+          <tr>
+            <th>姓名</th>
+            <th>職稱</th>
+            <th>公司</th>
+            <th>推薦人</th>
+            <th>追蹤日</th>
+            <th>狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="p in prospective.prospects" :key="p.id">
+            <td>{{ p.name }}</td>
+            <td>{{ p.job_title || '-' }}</td>
+            <td>{{ p.company || '-' }}</td>
+            <td>{{ p.ref_name || '-' }}</td>
+            <td>{{ p.follow_up_date || '-' }}</td>
+            <td><span class="bdg" :class="PROSPECT_STATUS_BADGE[p.status]">{{ PROSPECT_STATUS_LABEL[p.status] }}</span></td>
+          </tr>
+          <tr v-if="!prospective.prospects.length">
+            <td colspan="6" style="text-align:center; color:var(--muted);">該社尚無潛在社友資料</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-h">例會管理</h2>
+    <div class="tw" style="margin-bottom:24px;">
+      <table>
+        <thead class="th">
+          <tr>
+            <th>日期</th>
+            <th>主題</th>
+            <th>講者</th>
+            <th>地點</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="m in meetingsStore.meetings" :key="m.id">
+            <td>{{ m.date }}</td>
+            <td>{{ m.title || '-' }}</td>
+            <td>{{ m.speaker_name || '-' }}</td>
+            <td>{{ m.venue || '-' }}</td>
+          </tr>
+          <tr v-if="!meetingsStore.meetings.length">
+            <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無例會紀錄</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <template v-if="auth.isDistrictAdminView">

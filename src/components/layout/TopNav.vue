@@ -53,9 +53,9 @@ const roleLabel = computed(() => {
 const baseRoleLabel = computed(() => {
   switch (auth.role) {
     case 'district_admin':  return '地區管理員'
-    case 'club_secretary':  return '執行秘書'
-    case 'club_admin':      return '社長'
-    case 'club_member':     return '社員'
+    case 'club_secretary':
+    case 'club_admin':      return '各社管理員'
+    case 'club_member':     return '一般社友'
     default:                return ''
   }
 })
@@ -63,8 +63,8 @@ const baseRoleLabel = computed(() => {
 const roleBadgeClass = computed(() => {
   if (auth.isDistrictViewer) return 'b-y'
   switch (auth.role) {
-    case 'club_secretary': return 'b-n'
-    case 'club_admin':     return 'b-gr'
+    case 'club_secretary':
+    case 'club_admin':     return 'b-n'
     default:               return 'b-g'
   }
 })

@@ -14,26 +14,42 @@ const RESOURCE_LABELS: Record<string, string> = {
   attendance: '出席（彙總 + 明細）',
 }
 
-const ROLE_LABELS: Record<UserRole, string> = {
+// club_admin／club_secretary 在 RLS、Edge Function、role_permissions
+// 資料本身都是等價角色（migration 010 的種子資料兩者數值完全相同），
+// 這裡合併顯示成一列「各社管理員」，但底層 role_permissions 還是兩筆
+// 獨立資料，toggle 時要兩筆一起更新，不然畫面上合併的兩個角色權限
+// 會悄悄跑掉。
+type DisplayRole = 'district_admin' | 'club_tier' | 'club_member'
+
+const ROLE_LABELS: Record<DisplayRole, string> = {
   district_admin: '地區管理員',
-  club_secretary: '執秘',
-  club_admin: '社長',
-  club_member: '一般社員',
+  club_tier: '各社管理員',
+  club_member: '一般社友',
 }
 
-const ROLES: UserRole[] = ['district_admin', 'club_secretary', 'club_admin', 'club_member']
+const ROLES: DisplayRole[] = ['district_admin', 'club_tier', 'club_member']
 const ACTIONS = ['view', 'edit'] as const
 
-function cell(resource: string, role: UserRole, action: string) {
-  return permissions.allPermissions.find(
-    p => p.resource === resource && p.role === role && p.action === action
-  )
+function underlyingRoles(role: DisplayRole): UserRole[] {
+  return role === 'club_tier' ? ['club_admin', 'club_secretary'] : [role]
 }
 
-async function toggle(resource: string, role: UserRole, action: string) {
-  const row = cell(resource, role, action)
-  if (!row) return
-  await permissions.setPermission(row.id, !row.allowed, auth.user?.id ?? null)
+function cellsForRole(resource: string, role: DisplayRole, action: string) {
+  return underlyingRoles(role)
+    .map(r => permissions.allPermissions.find(p => p.resource === resource && p.role === r && p.action === action))
+    .filter((p): p is NonNullable<typeof p> => !!p)
+}
+
+function isAllowed(resource: string, role: DisplayRole, action: string) {
+  const rows = cellsForRole(resource, role, action)
+  return rows.length > 0 && rows.every(r => r.allowed)
+}
+
+async function toggle(resource: string, role: DisplayRole, action: string) {
+  const rows = cellsForRole(resource, role, action)
+  if (!rows.length) return
+  const next = !isAllowed(resource, role, action)
+  await Promise.all(rows.map(r => permissions.setPermission(r.id, next, auth.user?.id ?? null)))
 }
 
 onMounted(() => {
@@ -65,10 +81,10 @@ onMounted(() => {
               <td v-for="action in ACTIONS" :key="action">
                 <span
                   class="bdg"
-                  :class="cell(resource, role, action)?.allowed ? 'b-gr' : 'b-g'"
+                  :class="isAllowed(resource, role, action) ? 'b-gr' : 'b-g'"
                   style="cursor:pointer;"
                   @click="toggle(resource, role, action)"
-                >{{ cell(resource, role, action)?.allowed ? '允許' : '禁止' }}</span>
+                >{{ isAllowed(resource, role, action) ? '允許' : '禁止' }}</span>
               </td>
             </tr>
           </tbody>
