@@ -24,8 +24,12 @@ function defaultPassword(phone: string) {
   return phone
 }
 
-// 社員忘記密碼，由社長／執秘一鍵重設回預設規則（完整手機號碼），
-// 不用社員自己收 email 重設連結。
+// 用手機號碼登入的帳號忘記密碼，由社長／執秘一鍵重設回預設規則
+// （完整手機號碼），不用收 email 重設連結。原本限定只能重設
+// club_member 角色，但用手機號碼建立的帳號一旦被「帳號總覽」的
+// 權限開關升級成執秘（可編輯），登入信箱是系統合成的
+// <手機號碼>@member.d3481.local，沒有真實收件匣，完全沒有救援
+// 管道；改成只看「有沒有手機號碼」，不管角色是什麼。
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -64,7 +68,6 @@ Deno.serve(async (req) => {
     .single()
 
   if (!targetProfile) return errorResponse('找不到該帳號', 404)
-  if (targetProfile.role !== 'club_member') return errorResponse('只能重設社員帳號的密碼', 400)
   if (!targetProfile.phone) return errorResponse('該帳號沒有手機號碼，無法重設為預設密碼', 400)
 
   const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'

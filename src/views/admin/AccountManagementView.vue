@@ -387,7 +387,7 @@ onMounted(async () => {
             </td>
             <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
             <td style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button v-if="a.role === 'club_member' && a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a.id, a.name)">
+              <button v-if="a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a.id, a.name)">
                 重設密碼
               </button>
               <button class="btn btn-g btn-sm" @click="toggleActive(a.id, a.is_active)">
