@@ -1,10 +1,12 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十六輪，權限模型重新整理成 4 級，新增第 3 級「地區（唯讀）」：1. 一般社友（唯讀）2. 各社管理員（社長/執秘，可編輯本社）3. 地區（唯讀，可看地區儀表板/社團總覽含名冊幹部/地區公告/總監獎彙總/EDM，不能編輯）4. 地區管理員（原本的地區權限）。**`030_district_view_tier.sql` 使用者已在 SQL Editor 執行成功 ✅（用 CLI 確認 `district_role` 欄位已存在、`district_access` 已消失）；Claude 接著直接用本機已登入的 Supabase CLI 重新部署了 5 支 Edge Function（`invite-user`/`delete-account`/`create-member-account`/`reset-member-password`/`generate-edm`），curl 打過都回傳正常的 401（非崩潰），確認上線成功**。**剩下只差 Cloudflare Pages 部署前端**，之後請實測一次地區唯讀帳號的畫面。第二十五輪「社員帳號」表格新增「權限」欄；第二十四輪修正帳號管理頁視角判斷 bug；第二十三輪解除密碼長度死結）
+> 最後更新：2026-07-02（第二十七輪，**EDM 產生器「AI 生成文案」失敗的真正原因找到了：不是程式碼問題，是 Anthropic 帳號額度用完**——`generate-edm` 呼叫 Anthropic API 收到 `400 invalid_request_error: Your credit balance is too low`。這條路徑本身沒有 bug，程式碼、部署、權限判斷都正常；純粹是這個 Supabase 專案設定的 `ANTHROPIC_API_KEY` 所屬 Anthropic 帳號要去 [console.anthropic.com](https://console.anthropic.com) → Plans & Billing 加值/升級方案，Claude 這邊沒有帳務存取權限、無法代為處理。第二十六輪權限模型重新整理成 4 級，新增第 3 級「地區（唯讀）」，migration 030 已執行、5 支 Edge Function 已重新部署，只差 Cloudflare Pages 部署前端）
 
 ---
 
 ## ⚠️ 待辦
+
+**【第二十七輪，優先】EDM 產生器：Anthropic 帳號額度用完，需要使用者到 [console.anthropic.com](https://console.anthropic.com) → Plans & Billing 加值或升級方案**——程式碼跟部署都沒問題，純粹帳務問題，Claude 這邊無法代為處理。加值完成後直接重試「AI 生成文案」即可，不用重新部署。
 
 **【第二十六輪，權限模型改成 4 級，新增地區唯讀角色】migration + Edge Function 都已完成 ✅，剩下部署前端 + 實測**：
 1. ~~使用者到 Supabase SQL Editor 執行 `supabase/migrations/030_district_view_tier.sql`~~ **已完成**（`district_role` 欄位確認存在、`district_access` 已移除）
