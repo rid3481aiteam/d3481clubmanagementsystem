@@ -140,18 +140,27 @@ async function changeDistrictRole(id: string, value: string) {
   if (error) alert(error.message)
 }
 
-// 社員預設「檢視」，選「可編輯」就直接升級成執秘（套用既有的權限矩陣，
-// 不用另外做一套細部欄位、也不需要讓使用者選職稱）；升級後帳號會
-// 從這張「社員帳號」表格移到上面的「社長／執秘帳號」表格。
-async function changeMemberPermission(id: string, name: string, value: string) {
-  if (value !== 'edit') return
-  if (!confirm(`確定要把「${name}」的權限從「檢視」改成「可編輯」嗎？`)) return
-  const { error } = await accounts.approveRole(id, 'club_secretary')
-  if (error) {
-    alert(error.message)
-  } else {
-    await accounts.fetchMembers()
-  }
+// 帳號總覽：社長/執秘/社員合併成一張表，用同一個開關雙向切換
+// 檢視（club_member）／可編輯（club_secretary）。approveRole() 本來
+// 就是通用的雙向 role 更新，RLS（028_club_tier_role_management.sql）
+// 也已經放行 club_admin/club_secretary/club_member 三者互轉，之前
+// 只是 UI 沒做關閉編輯權限的路徑。
+// 社長（club_admin）關閉編輯權限後會變成社員，之後若重新打開，固定
+// 變成執秘（不會恢復社長身分）——社長身分本來就該透過「帳號邀請」
+// 重新指派，不透過這個開關復原。
+const allAccounts = computed(() =>
+  [...accounts.managed, ...accounts.members].sort((a, b) => a.name.localeCompare(b.name))
+)
+
+async function togglePermission(a: UserProfile) {
+  const turningOn = a.role === 'club_member'
+  const nextRole: UserRole = turningOn ? 'club_secretary' : 'club_member'
+  const msg = turningOn
+    ? `確定要把「${a.name}」的權限從「檢視」改成「可編輯」嗎？`
+    : `確定要把「${a.name}」的權限從「可編輯」改回「檢視」嗎？`
+  if (!confirm(msg)) return
+  const { error } = await accounts.approveRole(a.id, nextRole)
+  if (error) alert(error.message)
 }
 
 async function removeAccount(id: string, name: string) {
@@ -172,11 +181,13 @@ onMounted(async () => {
 <template>
   <div class="page">
     <div class="ph">
-      <h1>帳號邀請 / 管理</h1>
+      <h1>帳號管理</h1>
     </div>
 
-    <div class="tw" style="padding:20px; margin-bottom:24px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:14px;">邀請帳號</h2>
+    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號邀請</h2>
+
+    <div class="tw" style="padding:20px; margin-bottom:14px;">
+      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:14px;">邀請社長／執秘（Email）</h3>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>
           <label class="fl">Email</label>
@@ -208,8 +219,81 @@ onMounted(async () => {
       <p v-if="inviteSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">邀請已寄出。</p>
     </div>
 
+    <div class="tw" style="padding:20px; margin-bottom:14px;">
+      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:6px;">新增社員帳號（手機號碼）</h3>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+        社員用手機號碼登入，不需要 Email，初始密碼為完整手機號碼（跟帳號一樣）。忘記密碼可由社長／執秘在「帳號總覽」一鍵重設。
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+        <div>
+          <label class="fl">姓名</label>
+          <input v-model="memberName" type="text" class="fi" placeholder="社員姓名" style="min-width:160px;" />
+        </div>
+        <div>
+          <label class="fl">手機號碼</label>
+          <input v-model="memberPhone" type="tel" class="fi" placeholder="0912345678" style="min-width:160px;" />
+        </div>
+        <template v-if="isDistrictAdminView">
+          <div>
+            <label class="fl">分區</label>
+            <select v-model="memberZone" class="fi" style="min-width:140px;" @change="onMemberZoneChange">
+              <option value="" disabled>請選擇</option>
+              <option v-for="z in memberZones" :key="z" :value="z">{{ z }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="fl">所屬社團</label>
+            <select v-model="memberClubId" class="fi" style="min-width:200px;" :disabled="!memberZone">
+              <option :value="null" disabled>{{ memberZone ? '請選擇' : '請先選擇分區' }}</option>
+              <option v-for="c in memberClubsInZone" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+        </template>
+        <button class="btn btn-gold" :disabled="creatingMember" @click="submitCreateMember">
+          {{ creatingMember ? '建立中…' : '建立帳號' }}
+        </button>
+      </div>
+      <p v-if="memberError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ memberError }}</p>
+      <p v-if="memberSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">{{ memberSuccess }}</p>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <h3 style="font-size:13px; font-weight:700; color:var(--navy);">邀請紀錄</h3>
+      <button class="btn btn-g btn-sm" @click="showInviteLog = !showInviteLog">
+        {{ showInviteLog ? '收起邀請紀錄' : '查看邀請紀錄' }}
+      </button>
+    </div>
+    <div v-if="showInviteLog" class="tw" style="margin-bottom:24px;">
+      <table>
+        <thead class="th">
+          <tr>
+            <th>Email</th>
+            <th>角色</th>
+            <th>社團</th>
+            <th>邀請時間</th>
+            <th>接受時間</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="i in invites.log" :key="i.id">
+            <td>{{ i.invited_email }}</td>
+            <td>{{ roleLabel(i.role) }}</td>
+            <td>{{ clubName(i.club_id) }}</td>
+            <td>{{ new Date(i.invited_at).toLocaleString() }}</td>
+            <td>
+              <span v-if="i.accepted_at" class="bdg b-gr">已接受</span>
+              <span v-else class="bdg b-y">待接受</span>
+            </td>
+          </tr>
+          <tr v-if="!invites.log.length">
+            <td colspan="5" style="text-align:center; color:var(--muted);">尚無邀請紀錄</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <template v-if="canManagePending">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">自助註冊待審核</h2>
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號審核</h2>
       <div class="tw" style="margin-bottom:24px;">
         <table>
           <thead class="th">
@@ -247,59 +331,27 @@ onMounted(async () => {
       </div>
     </template>
 
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy);">邀請紀錄</h2>
-      <button class="btn btn-g btn-sm" @click="showInviteLog = !showInviteLog">
-        {{ showInviteLog ? '收起邀請紀錄' : '查看邀請紀錄' }}
-      </button>
-    </div>
-    <div v-if="showInviteLog" class="tw" style="margin-bottom:24px;">
-      <table>
-        <thead class="th">
-          <tr>
-            <th>Email</th>
-            <th>角色</th>
-            <th>社團</th>
-            <th>邀請時間</th>
-            <th>接受時間</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="i in invites.log" :key="i.id">
-            <td>{{ i.invited_email }}</td>
-            <td>{{ roleLabel(i.role) }}</td>
-            <td>{{ clubName(i.club_id) }}</td>
-            <td>{{ new Date(i.invited_at).toLocaleString() }}</td>
-            <td>
-              <span v-if="i.accepted_at" class="bdg b-gr">已接受</span>
-              <span v-else class="bdg b-y">待接受</span>
-            </td>
-          </tr>
-          <tr v-if="!invites.log.length">
-            <td colspan="5" style="text-align:center; color:var(--muted);">尚無邀請紀錄</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社長／執秘帳號</h2>
+    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號總覽</h2>
     <div class="tw">
       <table>
         <thead class="th">
           <tr>
             <th>姓名</th>
             <th>角色</th>
-            <th>社團</th>
+            <th v-if="isDistrictAdminView">社團</th>
+            <th>手機號碼</th>
             <th v-if="isDistrictAdminView">可見範圍</th>
+            <th>權限</th>
             <th>狀態</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="a in accounts.managed" :key="a.id">
+          <tr v-for="a in allAccounts" :key="a.id">
             <td>{{ a.name }}</td>
             <td>{{ roleLabel(a.role) }}</td>
-            <td>{{ clubName(a.club_id) }}</td>
+            <td v-if="isDistrictAdminView">{{ clubName(a.club_id) }}</td>
+            <td>{{ a.phone ?? '-' }}</td>
             <td v-if="isDistrictAdminView">
               <div class="segmented" role="group" aria-label="可見範圍">
                 <button
@@ -322,8 +374,24 @@ onMounted(async () => {
                 >地區管理員</button>
               </div>
             </td>
+            <td>
+              <button
+                type="button"
+                class="toggle-switch"
+                role="switch"
+                :aria-checked="a.role !== 'club_member'"
+                aria-label="權限：檢視／可編輯"
+                @click="togglePermission(a)"
+              >
+                <span class="track"><span class="knob"></span></span>
+                <span class="label">{{ a.role === 'club_member' ? '檢視' : '可編輯' }}</span>
+              </button>
+            </td>
             <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
-            <td style="display:flex; gap:6px;">
+            <td style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button v-if="a.role === 'club_member' && a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a.id, a.name)">
+                重設密碼
+              </button>
               <button class="btn btn-g btn-sm" @click="toggleActive(a.id, a.is_active)">
                 {{ a.is_active ? '停用' : '啟用' }}
               </button>
@@ -332,97 +400,8 @@ onMounted(async () => {
               </button>
             </td>
           </tr>
-          <tr v-if="!accounts.managed.length">
-            <td :colspan="isDistrictAdminView ? 6 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="tw" style="padding:20px; margin:24px 0;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:6px;">新增社員帳號</h2>
-      <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-        社員用手機號碼登入，不需要 Email，初始密碼為完整手機號碼（跟帳號一樣）。忘記密碼可由社長／執秘在下方一鍵重設。
-      </p>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-        <div>
-          <label class="fl">姓名</label>
-          <input v-model="memberName" type="text" class="fi" placeholder="社員姓名" style="min-width:160px;" />
-        </div>
-        <div>
-          <label class="fl">手機號碼</label>
-          <input v-model="memberPhone" type="tel" class="fi" placeholder="0912345678" style="min-width:160px;" />
-        </div>
-        <template v-if="isDistrictAdminView">
-          <div>
-            <label class="fl">分區</label>
-            <select v-model="memberZone" class="fi" style="min-width:140px;" @change="onMemberZoneChange">
-              <option value="" disabled>請選擇</option>
-              <option v-for="z in memberZones" :key="z" :value="z">{{ z }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="fl">所屬社團</label>
-            <select v-model="memberClubId" class="fi" style="min-width:200px;" :disabled="!memberZone">
-              <option :value="null" disabled>{{ memberZone ? '請選擇' : '請先選擇分區' }}</option>
-              <option v-for="c in memberClubsInZone" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-          </div>
-        </template>
-        <button class="btn btn-gold" :disabled="creatingMember" @click="submitCreateMember">
-          {{ creatingMember ? '建立中…' : '建立帳號' }}
-        </button>
-      </div>
-      <p v-if="memberError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ memberError }}</p>
-      <p v-if="memberSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">{{ memberSuccess }}</p>
-    </div>
-
-    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社員帳號</h2>
-    <div class="tw">
-      <table>
-        <thead class="th">
-          <tr>
-            <th>姓名</th>
-            <th>手機號碼</th>
-            <th v-if="isDistrictAdminView">社團</th>
-            <th>權限</th>
-            <th>狀態</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in accounts.members" :key="m.id">
-            <td>{{ m.name }}</td>
-            <td>{{ m.phone ?? '-' }}</td>
-            <td v-if="isDistrictAdminView">{{ clubName(m.club_id) }}</td>
-            <td>
-              <button
-                type="button"
-                class="toggle-switch"
-                role="switch"
-                aria-checked="false"
-                aria-label="權限：檢視／可編輯"
-                @click="changeMemberPermission(m.id, m.name, 'edit')"
-              >
-                <span class="track"><span class="knob"></span></span>
-                <span class="label">檢視</span>
-              </button>
-            </td>
-            <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '啟用中' : '已停用' }}</span></td>
-            <td style="display:flex; gap:6px;">
-              <button class="btn btn-g btn-sm" @click="resetMemberPassword(m.id, m.name)">
-                重設密碼
-              </button>
-              <button class="btn btn-g btn-sm" @click="toggleActive(m.id, m.is_active)">
-                {{ m.is_active ? '停用' : '啟用' }}
-              </button>
-              <button class="btn btn-red btn-sm" @click="removeAccount(m.id, m.name)">
-                永久刪除
-              </button>
-            </td>
-          </tr>
-          <tr v-if="!accounts.members.length">
-            <td :colspan="isDistrictAdminView ? 6 : 5" style="text-align:center; color:var(--muted);">尚無社員帳號</td>
+          <tr v-if="!allAccounts.length">
+            <td :colspan="isDistrictAdminView ? 8 : 6" style="text-align:center; color:var(--muted);">尚無帳號</td>
           </tr>
         </tbody>
       </table>
