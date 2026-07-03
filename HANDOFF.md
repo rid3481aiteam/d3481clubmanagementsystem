@@ -1,12 +1,12 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-03（第三十一輪，**修掉「升級成執秘後沒有救援管道」的缺口，但 Edge Function 需要使用者手動部署**——第三十輪重構帳號總覽時發現：手機號碼建立的帳號一旦被開關升級成「可編輯」，`reset-member-password` 就會拒絕重設密碼（寫死只能重設 `club_member`），而這類帳號的登入信箱是系統合成的、沒有真實收件匣，等於完全沒有救援管道。這輪把 Edge Function 的角色限制拿掉、改成只看有沒有手機號碼，前端「重設密碼」按鈕也同步從 `role==='club_member'` 改成只看 `a.phone`。**這台環境的 Supabase CLI 目前壞掉**（`ENOTDIR: not a directory, access '/private/tmp/supabase/config.json'`，是這個沙盒環境暫存檔案的路徑衝突，不是登入問題），沒辦法像前幾輪一樣直接部署，前端已經推上 Cloudflare 自動部署，但 Edge Function 需要使用者自己執行 `supabase functions deploy reset-member-password`）
+> 最後更新：2026-07-03（第三十一輪，**修掉「升級成執秘後沒有救援管道」的缺口，`reset-member-password` 已由使用者手動部署完成**——第三十輪重構帳號總覽時發現：手機號碼建立的帳號一旦被開關升級成「可編輯」，`reset-member-password` 就會拒絕重設密碼（寫死只能重設 `club_member`），而這類帳號的登入信箱是系統合成的、沒有真實收件匣，等於完全沒有救援管道。這輪把 Edge Function 的角色限制拿掉、改成只看有沒有手機號碼，前端「重設密碼」按鈕也同步從 `role==='club_member'` 改成只看 `a.phone`。這台環境的 Supabase CLI 壞掉（`ENOTDIR` 沙盒路徑衝突）沒辦法直接部署，**使用者已在自己的機器上手動部署完成，這條路徑已經全部生效**）
 
 ---
 
 ## ⚠️ 待辦
 
-**【第三十一輪，優先】`reset-member-password` Edge Function 程式碼已改好並推上 GitHub，但尚未部署**：這台環境的 Supabase CLI 執行 `supabase functions deploy` 直接噴 `ENOTDIR` 錯誤（沙盒暫存路徑衝突，不是帳號登入問題，換一台乾淨的機器/環境應該就正常）。麻煩使用者在自己的機器上 `git pull` 之後執行 `supabase functions deploy reset-member-password --project-ref xdwqrgthsxyzclnjlmvy`，或直接到 Supabase Dashboard → Edge Functions 貼上 `supabase/functions/reset-member-password/index.ts` 的最新內容部署。部署前這顆「重設密碼」按鈕對已升級成執秘的手機帳號還是會噴後端錯誤「只能重設社員帳號的密碼」。
+**【第三十一輪】`reset-member-password` Edge Function** ~~程式碼已改好並推上 GitHub，但尚未部署~~ **使用者已手動部署完成 ✅**：手機號碼帳號升級成執秘後仍能用「重設密碼」還原回手機號碼，救援管道缺口已修好。
 
 **【第三十輪，待實測】帳號管理頁重構已推上正式站，麻煩使用者實際測試 bug 修正**：進「帳號管理」頁確認新版三段式版面（帳號邀請／帳號審核／帳號總覽），找一個測試帳號實測開關：檢視→可編輯（帳號應該還留在同一張表，不會消失到別的地方）、再點一次可編輯→檢視（**這是這次要修的核心 bug，之前完全沒有路徑做到這一步**），重新整理頁面確認狀態有持久化。另外確認「可見範圍」分段控制在合併表格內對所有角色都正常顯示。這台環境沒有真實帳號密碼，只做到型別/build 驗證，沒有用真帳號登入正式站實測互動流程；點開關會跳出瀏覽器原生 `confirm()` 對話框，Claude 的瀏覽器自動化工具目前沒辦法點過這種原生對話框（會卡住），所以最後這步也需要使用者親自點一次。
 
