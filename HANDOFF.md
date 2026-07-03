@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十三輪，**解除了社員手機號碼帳號的密碼長度死結**：使用者實測發現 Supabase Dashboard 的「Minimum password length」UI 本身就鎖死不給調到 6 以下（`Must be greater or equal to 6`），代表「密碼＝手機末四碼」這個設計從一開始就不可能過關，不是忘了調設定、是設計本身行不通。跟使用者確認後改成「密碼＝完整手機號碼」（帳號密碼都是同一組手機號碼，10 碼原生就滿足 6 碼下限，**不需要改任何 Supabase Dashboard 設定**），`create-member-account`／`reset-member-password` 兩支 Edge Function 已修正並重新部署，前端提示文字也同步改掉。第二十二輪 migration `028`、`029` 已在 Supabase 執行完成 ✅；Redirect URLs 也已確認正確 ✅；Email 樣板中文化使用者正在 Dashboard 貼上套用中，這步不影響 repo 程式碼）
+> 最後更新：2026-07-02（第二十四輪，修正「帳號管理」頁一個視角判斷 bug：同時有地區權限＋本社身分的雙重視角帳號，切到「各社視角」後，「新增社員帳號」還是會顯示分區/社團選單，理論上各社視角一定是建自己社的帳號、不該出現選單。根因是整支 `AccountManagementView.vue` 都用 `auth.isDistrictAdmin`（帳號本身有沒有地區權限，不會因為切視角而改變）判斷要不要顯示地區限定欄位，應該跟 Dashboard/Sidebar/通訊錄頁一樣用 `auth.isDistrictView`（現在切到哪個視角）才對。已把整支檔案的判斷來源換成 `isDistrictView`，影響範圍是這支檔案裡所有地區限定 UI（新增社員的分區/社團選單、邀請帳號的社團選單、自助註冊待審核的社團欄、社長/執秘表格的可見範圍欄、社員表格的社團欄），純本地端 UI 判斷修正、沒有動資料庫。第二十三輪解除了社員手機號碼帳號的密碼長度死結（密碼改用完整手機號碼，不用調 Supabase 設定）；第二十二輪 migration `028`、`029` 已執行完成 ✅；Redirect URLs 已確認正確 ✅；Email 樣板中文化使用者正在 Dashboard 貼上套用中）
 
 ---
 

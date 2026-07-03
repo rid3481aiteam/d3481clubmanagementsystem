@@ -11,9 +11,9 @@ const invites = useInvitesStore()
 const accounts = useAccountsStore()
 const club = useClubStore()
 
-const isDistrictAdmin = computed(() => auth.isDistrictAdmin)
+const isDistrictView = computed(() => auth.isDistrictView)
 const isClubTier = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
-const canManagePending = computed(() => isDistrictAdmin.value || isClubTier.value)
+const canManagePending = computed(() => isDistrictView.value || isClubTier.value)
 
 // 跟 ClubListView／RegisterView 的分區排序共用同一份順序
 const ZONE_ORDER = [
@@ -29,7 +29,7 @@ function zoneRank(zone: string) {
 const email = ref('')
 const inviteName = ref('')
 const role = ref<'club_secretary' | 'club_admin'>('club_secretary')
-const clubId = ref<string | null>(isDistrictAdmin.value ? null : auth.clubId)
+const clubId = ref<string | null>(isDistrictView.value ? null : auth.clubId)
 const inviting = ref(false)
 const inviteError = ref<string | null>(null)
 const inviteSuccess = ref(false)
@@ -90,7 +90,7 @@ async function toggleActive(id: string, current: boolean) {
 const memberName = ref('')
 const memberPhone = ref('')
 const memberZone = ref('')
-const memberClubId = ref<string | null>(isDistrictAdmin.value ? null : auth.clubId)
+const memberClubId = ref<string | null>(isDistrictView.value ? null : auth.clubId)
 const creatingMember = ref(false)
 const memberError = ref<string | null>(null)
 const memberSuccess = ref<string | null>(null)
@@ -178,7 +178,7 @@ onMounted(async () => {
             <option value="club_admin">社長</option>
           </select>
         </div>
-        <div v-if="isDistrictAdmin">
+        <div v-if="isDistrictView">
           <label class="fl">所屬社團</label>
           <select v-model="clubId" class="fi" style="min-width:200px;">
             <option :value="null" disabled>請選擇</option>
@@ -275,7 +275,7 @@ onMounted(async () => {
             <th>姓名</th>
             <th>角色</th>
             <th>社團</th>
-            <th v-if="isDistrictAdmin">可見範圍</th>
+            <th v-if="isDistrictView">可見範圍</th>
             <th>狀態</th>
             <th></th>
           </tr>
@@ -285,7 +285,7 @@ onMounted(async () => {
             <td>{{ a.name }}</td>
             <td>{{ roleLabel(a.role) }}</td>
             <td>{{ clubName(a.club_id) }}</td>
-            <td v-if="isDistrictAdmin">
+            <td v-if="isDistrictView">
               <select
                 class="fi"
                 :value="a.district_access ? 'district' : 'club'"
@@ -307,7 +307,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="!accounts.managed.length">
-            <td :colspan="isDistrictAdmin ? 6 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
+            <td :colspan="isDistrictView ? 6 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
           </tr>
         </tbody>
       </table>
@@ -327,7 +327,7 @@ onMounted(async () => {
           <label class="fl">手機號碼</label>
           <input v-model="memberPhone" type="tel" class="fi" placeholder="0912345678" style="min-width:160px;" />
         </div>
-        <template v-if="isDistrictAdmin">
+        <template v-if="isDistrictView">
           <div>
             <label class="fl">分區</label>
             <select v-model="memberZone" class="fi" style="min-width:140px;" @change="onMemberZoneChange">
@@ -358,7 +358,7 @@ onMounted(async () => {
           <tr>
             <th>姓名</th>
             <th>手機號碼</th>
-            <th v-if="isDistrictAdmin">社團</th>
+            <th v-if="isDistrictView">社團</th>
             <th>狀態</th>
             <th></th>
           </tr>
@@ -367,7 +367,7 @@ onMounted(async () => {
           <tr v-for="m in accounts.members" :key="m.id">
             <td>{{ m.name }}</td>
             <td>{{ m.phone ?? '-' }}</td>
-            <td v-if="isDistrictAdmin">{{ clubName(m.club_id) }}</td>
+            <td v-if="isDistrictView">{{ clubName(m.club_id) }}</td>
             <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '啟用中' : '已停用' }}</span></td>
             <td style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="resetMemberPassword(m.id, m.name)">
@@ -382,7 +382,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="!accounts.members.length">
-            <td :colspan="isDistrictAdmin ? 5 : 4" style="text-align:center; color:var(--muted);">尚無社員帳號</td>
+            <td :colspan="isDistrictView ? 5 : 4" style="text-align:center; color:var(--muted);">尚無社員帳號</td>
           </tr>
         </tbody>
       </table>
