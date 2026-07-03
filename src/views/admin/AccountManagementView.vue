@@ -139,6 +139,20 @@ async function changeDistrictAccess(id: string, value: boolean) {
   if (error) alert(error.message)
 }
 
+// 社員預設「僅檢視」，這裡直接升級成執秘/社長就等於給了編輯權限
+// （套用既有的權限矩陣，不用另外做一套細部欄位）；升級後帳號會
+// 從這張「社員帳號」表格移到上面的「社長／執秘帳號」表格。
+async function changeMemberPermission(id: string, name: string, newRole: UserRole) {
+  if (newRole === 'club_member') return
+  if (!confirm(`確定要把「${name}」的權限從「僅檢視」改成「${roleLabel(newRole)}（有編輯權限）」嗎？`)) return
+  const { error } = await accounts.approveRole(id, newRole)
+  if (error) {
+    alert(error.message)
+  } else {
+    await accounts.fetchMembers()
+  }
+}
+
 async function removeAccount(id: string, name: string) {
   if (!confirm(`確定要永久刪除「${name}」的帳號嗎？此動作無法復原，該 Email 之後可以重新邀請。`)) return
   const { error } = await accounts.deleteAccount(id)
@@ -359,6 +373,7 @@ onMounted(async () => {
             <th>姓名</th>
             <th>手機號碼</th>
             <th v-if="isDistrictView">社團</th>
+            <th>權限</th>
             <th>狀態</th>
             <th></th>
           </tr>
@@ -368,6 +383,18 @@ onMounted(async () => {
             <td>{{ m.name }}</td>
             <td>{{ m.phone ?? '-' }}</td>
             <td v-if="isDistrictView">{{ clubName(m.club_id) }}</td>
+            <td>
+              <select
+                class="fi"
+                :value="m.role"
+                style="min-width:170px; padding:6px 8px;"
+                @change="changeMemberPermission(m.id, m.name, ($event.target as HTMLSelectElement).value as UserRole)"
+              >
+                <option value="club_member">僅檢視（社員）</option>
+                <option value="club_secretary">編輯權限（執秘）</option>
+                <option value="club_admin">編輯權限（社長）</option>
+              </select>
+            </td>
             <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '啟用中' : '已停用' }}</span></td>
             <td style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="resetMemberPassword(m.id, m.name)">
@@ -382,7 +409,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="!accounts.members.length">
-            <td :colspan="isDistrictView ? 5 : 4" style="text-align:center; color:var(--muted);">尚無社員帳號</td>
+            <td :colspan="isDistrictView ? 6 : 5" style="text-align:center; color:var(--muted);">尚無社員帳號</td>
           </tr>
         </tbody>
       </table>
