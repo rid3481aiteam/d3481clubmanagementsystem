@@ -1,16 +1,16 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十六輪，**權限模型重新整理成 4 級，新增第 3 級「地區（唯讀）」**：1. 一般社友（唯讀）2. 各社管理員（社長/執秘，可編輯本社）3. 地區（唯讀，可看地區儀表板/社團總覽含名冊幹部/地區公告/總監獎彙總/EDM，不能編輯）4. 地區管理員（原本的地區權限，可編輯社團/開關功能/發公告/管理帳號/調權限矩陣）。**程式碼已寫完並推上 GitHub，但 `030_district_view_tier.sql` 還沒套用、5 支 Edge Function 還沒重新部署，這兩件事都要等使用者確認 migration 030 執行成功後才能做，順序不能反**，詳見下方待辦第 0 項。第二十五輪「社員帳號」表格新增「權限」欄（升級成執秘/社長）；第二十四輪修正帳號管理頁視角判斷 bug；第二十三輪解除密碼長度死結；第二十二輪 migration `028`、`029` 已執行完成 ✅）
+> 最後更新：2026-07-02（第二十六輪，權限模型重新整理成 4 級，新增第 3 級「地區（唯讀）」：1. 一般社友（唯讀）2. 各社管理員（社長/執秘，可編輯本社）3. 地區（唯讀，可看地區儀表板/社團總覽含名冊幹部/地區公告/總監獎彙總/EDM，不能編輯）4. 地區管理員（原本的地區權限）。**`030_district_view_tier.sql` 使用者已在 SQL Editor 執行成功 ✅（用 CLI 確認 `district_role` 欄位已存在、`district_access` 已消失）；Claude 接著直接用本機已登入的 Supabase CLI 重新部署了 5 支 Edge Function（`invite-user`/`delete-account`/`create-member-account`/`reset-member-password`/`generate-edm`），curl 打過都回傳正常的 401（非崩潰），確認上線成功**。**剩下只差 Cloudflare Pages 部署前端**，之後請實測一次地區唯讀帳號的畫面。第二十五輪「社員帳號」表格新增「權限」欄；第二十四輪修正帳號管理頁視角判斷 bug；第二十三輪解除密碼長度死結）
 
 ---
 
 ## ⚠️ 待辦
 
-**【第二十六輪，優先處理，有明確順序，不能反】權限模型改成 4 級，新增地區唯讀角色**：
-1. 使用者到 Supabase SQL Editor 執行 `supabase/migrations/030_district_view_tier.sql`（`user_profiles.district_access boolean` 換成 `district_role text`('view'/'admin'/NULL)，`is_district_admin()` 改吃 `district_role='admin'`，新增 `is_district_viewer()`，並放寬 `roster`/`prospective_members`/`meetings`/`attendance_sessions`/`club_officers`/`district_announcements`/`governor_award_applications` 的 SELECT policy 讓 `is_district_viewer()` 也能讀）
-2. **等第 1 步跑完確認成功後**，才能部署以下 5 支 Edge Function（因為程式碼已經改成查詢 `district_role` 這個新欄位，migration 沒套用之前部署會直接打壞現有功能）：`invite-user`、`delete-account`、`create-member-account`、`reset-member-password`、`generate-edm`
-3. 部署完成後到「帳號管理」／「社團詳情」頁測試：把某個帳號的「可見範圍」設成「地區（唯讀）」，登入該帳號確認：能看地區儀表板/社團總覽(含名冊幹部)/地區公告/總監獎彙總/EDM 產生器，但看不到功能開關/權限矩陣/帳號管理，社團總覽/地區公告頁面沒有新增/編輯/刪除按鈕
-4. 前端也要記得部署到 Cloudflare Pages（Sidebar/TopNav/router 都有改）
+**【第二十六輪，權限模型改成 4 級，新增地區唯讀角色】migration + Edge Function 都已完成 ✅，剩下部署前端 + 實測**：
+1. ~~使用者到 Supabase SQL Editor 執行 `supabase/migrations/030_district_view_tier.sql`~~ **已完成**（`district_role` 欄位確認存在、`district_access` 已移除）
+2. ~~部署 5 支 Edge Function：`invite-user`、`delete-account`、`create-member-account`、`reset-member-password`、`generate-edm`~~ **已完成**（2026-07-02，Claude 用 CLI 直接部署，curl 驗證都回傳正常 401）
+3. **待辦**：部署新版前端到 Cloudflare Pages（Sidebar/TopNav/router 都有改）
+4. **待實測**：到「帳號管理」／「社團詳情」頁把某個帳號的「可見範圍」設成「地區（唯讀）」，登入該帳號確認：能看地區儀表板/社團總覽(含名冊幹部)/地區公告/總監獎彙總/EDM 產生器，但看不到功能開關/權限矩陣/帳號管理，社團總覽/地區公告頁面沒有新增/編輯/刪除按鈕
 
 0. ~~在 Supabase SQL Editor 執行 `supabase/migrations/029_registration_title.sql`~~ **已完成**（第二十二輪的「3481地區辦公室」選項＋扶輪社職稱代碼已生效）
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`~~ **已完成**（第二十一輪的社長/執秘角色編輯權限已生效）
