@@ -337,7 +337,6 @@ onMounted(async () => {
         <thead class="th">
           <tr>
             <th>姓名</th>
-            <th>角色</th>
             <th v-if="isDistrictAdminView">社團</th>
             <th>手機號碼</th>
             <th v-if="isDistrictAdminView">可見範圍</th>
@@ -349,7 +348,6 @@ onMounted(async () => {
         <tbody>
           <tr v-for="a in allAccounts" :key="a.id">
             <td>{{ a.name }}</td>
-            <td>{{ roleLabel(a.role) }}</td>
             <td v-if="isDistrictAdminView">{{ clubName(a.club_id) }}</td>
             <td>{{ a.phone ?? '-' }}</td>
             <td v-if="isDistrictAdminView">
@@ -401,7 +399,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="!allAccounts.length">
-            <td :colspan="isDistrictAdminView ? 8 : 6" style="text-align:center; color:var(--muted);">尚無帳號</td>
+            <td :colspan="isDistrictAdminView ? 7 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
           </tr>
         </tbody>
       </table>
