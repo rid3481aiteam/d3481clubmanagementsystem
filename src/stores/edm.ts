@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
 export type EdmScope = 'district' | 'club'
@@ -19,7 +20,19 @@ export const useEdmStore = defineStore('edm', () => {
     loading.value = false
 
     if (fnError) {
-      error.value = fnError.message
+      // fnError.message 只會是 Supabase client 包出來的通用文字
+      // （例如「Edge Function returned a non-2xx status code」），
+      // 真正的錯誤原因在 response body 裡，要另外解析出來。
+      let message = fnError.message
+      if (fnError instanceof FunctionsHttpError) {
+        try {
+          const responseBody = await fnError.context.json()
+          if (responseBody?.error) message = responseBody.error
+        } catch {
+          // 回應不是 JSON，維持預設訊息
+        }
+      }
+      error.value = message
       return
     }
     if (data?.error) {
