@@ -213,6 +213,7 @@ async function editName() {
 
 /* Override btn-g for dark bg */
 .topnav-right .btn-g {
+  background: transparent;
   border-color: rgba(255,255,255,.3);
   color: #fff;
 }
