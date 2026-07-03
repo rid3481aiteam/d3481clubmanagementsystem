@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十七輪，**EDM 產生器「AI 生成文案」失敗的真正原因找到了：不是程式碼問題，是 Anthropic 帳號額度用完**——`generate-edm` 呼叫 Anthropic API 收到 `400 invalid_request_error: Your credit balance is too low`。這條路徑本身沒有 bug，程式碼、部署、權限判斷都正常；純粹是這個 Supabase 專案設定的 `ANTHROPIC_API_KEY` 所屬 Anthropic 帳號要去 [console.anthropic.com](https://console.anthropic.com) → Plans & Billing 加值/升級方案，Claude 這邊沒有帳務存取權限、無法代為處理。第二十六輪權限模型重新整理成 4 級，新增第 3 級「地區（唯讀）」，migration 030 已執行、5 支 Edge Function 已重新部署，只差 Cloudflare Pages 部署前端）
+> 最後更新：2026-07-03（第二十八輪，**確認「地區（唯讀）」前端其實已經部署上線**——上一輪 HANDOFF 誤記為「待辦：部署前端」，實際上 Cloudflare Pages 有接 GitHub 自動部署，push 進 main 後就自動建置上線了，只是沒回來更新記錄。這輪用瀏覽器直接連正式站 `d3481clubmanagementsystem.pages.dev` 比對 JS bundle 內容（`district_role`／`isDistrictViewer`／「地區（唯讀）」文字都在，`district_access` 完全消失），確認是最新版無誤）
 
 ---
 
@@ -8,11 +8,11 @@
 
 **【第二十七輪，優先】EDM 產生器：Anthropic 帳號額度用完，需要使用者到 [console.anthropic.com](https://console.anthropic.com) → Plans & Billing 加值或升級方案**——程式碼跟部署都沒問題，純粹帳務問題，Claude 這邊無法代為處理。加值完成後直接重試「AI 生成文案」即可，不用重新部署。
 
-**【第二十六輪，權限模型改成 4 級，新增地區唯讀角色】migration + Edge Function 都已完成 ✅，剩下部署前端 + 實測**：
+**【第二十六輪，權限模型改成 4 級，新增地區唯讀角色】migration + Edge Function + 前端部署都已完成 ✅，只剩最後一步登入實測**：
 1. ~~使用者到 Supabase SQL Editor 執行 `supabase/migrations/030_district_view_tier.sql`~~ **已完成**（`district_role` 欄位確認存在、`district_access` 已移除）
 2. ~~部署 5 支 Edge Function：`invite-user`、`delete-account`、`create-member-account`、`reset-member-password`、`generate-edm`~~ **已完成**（2026-07-02，Claude 用 CLI 直接部署，curl 驗證都回傳正常 401）
-3. **待辦**：部署新版前端到 Cloudflare Pages（Sidebar/TopNav/router 都有改）
-4. **待實測**：到「帳號管理」／「社團詳情」頁把某個帳號的「可見範圍」設成「地區（唯讀）」，登入該帳號確認：能看地區儀表板/社團總覽(含名冊幹部)/地區公告/總監獎彙總/EDM 產生器，但看不到功能開關/權限矩陣/帳號管理，社團總覽/地區公告頁面沒有新增/編輯/刪除按鈕
+3. ~~部署新版前端到 Cloudflare Pages~~ **已確認完成**（第二十八輪發現其實早就部署了，Cloudflare Pages 接 GitHub 自動部署，見上方最新更新）
+4. **【第二十八輪，只差這一步】待使用者登入實測**：Claude 這輪已經把測試帳號「Eric測試」（執秘，台北市和平扶輪社）的「可見範圍」改成「地區（唯讀）」並確認寫入 DB 成功（重新整理頁面後 dropdown 仍顯示「地區（唯讀）」）。**Claude 沒有這個帳號的密碼，無法代為登入測試**（涉及輸入密碼，屬於 Claude 不能代勞的動作）。麻煩使用者用「Eric測試」帳號登入 `https://d3481clubmanagementsystem.pages.dev/login`，確認：能看地區儀表板/社團總覽(含名冊幹部)/地區公告/總監獎彙總/EDM 產生器，但看不到功能開關/權限矩陣/帳號管理，社團總覽/地區公告頁面沒有新增/編輯/刪除按鈕。測試完如果要把「Eric測試」改回原本的「只能看到各社」，回「帳號邀請 / 管理」頁面改回來即可
 
 0. ~~在 Supabase SQL Editor 執行 `supabase/migrations/029_registration_title.sql`~~ **已完成**（第二十二輪的「3481地區辦公室」選項＋扶輪社職稱代碼已生效）
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`~~ **已完成**（第二十一輪的社長/執秘角色編輯權限已生效）
