@@ -58,10 +58,14 @@ function toggleZone(zone: string) {
     </div>
 
     <template v-if="auth.isDistrictView">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px;">
-        <div class="tw" style="padding:18px;">
-          <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">當月例會舉行數量</div>
-          <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.meetingCount }}</div>
+      <div class="stat-grid" style="margin-bottom:24px;">
+        <div class="stat-card">
+          <div class="stat-label">當月例會舉行數量</div>
+          <div class="stat-value">{{ dashboard.meetingCount }}</div>
+        </div>
+        <div class="stat-card c-gold">
+          <div class="stat-label">全區社團數</div>
+          <div class="stat-value">{{ dashboard.districtClubStats.length }}</div>
         </div>
       </div>
 
@@ -89,9 +93,14 @@ function toggleZone(zone: string) {
                 <tr v-for="row in g.clubs" :key="row.clubId">
                   <td>{{ row.clubName }}</td>
                   <td>
-                    <span class="bdg" :class="row.rate !== null && row.rate < 75 ? 'b-r' : 'b-gr'">
-                      {{ row.rate !== null ? row.rate + '%' : '-' }}
-                    </span>
+                    <div style="display:flex; align-items:center; gap:8px; min-width:120px;">
+                      <span class="bdg" :class="row.rate !== null && row.rate < 75 ? 'b-r' : 'b-gr'">
+                        {{ row.rate !== null ? row.rate + '%' : '-' }}
+                      </span>
+                      <div v-if="row.rate !== null" class="bar-track" style="flex:1;">
+                        <div class="bar-fill" :style="{ width: row.rate + '%' }"></div>
+                      </div>
+                    </div>
                   </td>
                   <td>{{ row.joinedCount }}</td>
                   <td>{{ row.resignedCount }}</td>
@@ -109,20 +118,21 @@ function toggleZone(zone: string) {
     </template>
 
     <template v-else>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin-bottom:24px;">
-      <div class="tw" style="padding:18px;">
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">本月例會數</div>
-        <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.meetingCount }}</div>
+      <div class="stat-grid" style="margin-bottom:24px;">
+      <div class="stat-card">
+        <div class="stat-label">本月例會數</div>
+        <div class="stat-value">{{ dashboard.meetingCount }}</div>
       </div>
-      <div class="tw" style="padding:18px;">
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">平均出席率</div>
-        <div style="font-size:26px; font-weight:700; color:var(--navy);">
-          {{ dashboard.avgRate !== null ? dashboard.avgRate + '%' : '-' }}
+      <div class="stat-card c-sky">
+        <div class="stat-label">平均出席率</div>
+        <div class="stat-value">{{ dashboard.avgRate !== null ? dashboard.avgRate + '%' : '-' }}</div>
+        <div v-if="dashboard.avgRate !== null" class="bar-track" style="margin-top:10px;">
+          <div class="bar-fill" :style="{ width: dashboard.avgRate + '%' }"></div>
         </div>
       </div>
-      <div class="tw" style="padding:18px;">
-        <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">社友人數</div>
-        <div style="font-size:26px; font-weight:700; color:var(--navy);">{{ dashboard.memberCount }}</div>
+      <div class="stat-card c-gold">
+        <div class="stat-label">社友人數</div>
+        <div class="stat-value">{{ dashboard.memberCount }}</div>
       </div>
       </div>
 

@@ -209,16 +209,26 @@ watch(() => route.params.id, load)
               <td>{{ a.name }}</td>
               <td>{{ accountRoleLabel(a.role) }}</td>
               <td>
-                <select
-                  class="fi"
-                  :value="a.district_role ?? 'club'"
-                  style="min-width:170px; padding:6px 8px;"
-                  @change="changeDistrictRole(a.id, ($event.target as HTMLSelectElement).value)"
-                >
-                  <option value="club">只能看到各社</option>
-                  <option value="view">地區（唯讀）</option>
-                  <option value="admin">地區管理員</option>
-                </select>
+                <div class="segmented" role="group" aria-label="可見範圍">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: (a.district_role ?? 'club') === 'club' }"
+                    @click="changeDistrictRole(a.id, 'club')"
+                  >只能看到各社</button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: a.district_role === 'view' }"
+                    @click="changeDistrictRole(a.id, 'view')"
+                  >地區（唯讀）</button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: a.district_role === 'admin' }"
+                    @click="changeDistrictRole(a.id, 'admin')"
+                  >地區管理員</button>
+                </div>
               </td>
               <td>
                 <span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">

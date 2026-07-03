@@ -301,16 +301,26 @@ onMounted(async () => {
             <td>{{ roleLabel(a.role) }}</td>
             <td>{{ clubName(a.club_id) }}</td>
             <td v-if="isDistrictAdminView">
-              <select
-                class="fi"
-                :value="a.district_role ?? 'club'"
-                style="min-width:170px; padding:6px 8px;"
-                @change="changeDistrictRole(a.id, ($event.target as HTMLSelectElement).value)"
-              >
-                <option value="club">只能看到各社</option>
-                <option value="view">地區（唯讀）</option>
-                <option value="admin">地區管理員</option>
-              </select>
+              <div class="segmented" role="group" aria-label="可見範圍">
+                <button
+                  type="button"
+                  class="seg-btn"
+                  :class="{ active: (a.district_role ?? 'club') === 'club' }"
+                  @click="changeDistrictRole(a.id, 'club')"
+                >只能看到各社</button>
+                <button
+                  type="button"
+                  class="seg-btn"
+                  :class="{ active: a.district_role === 'view' }"
+                  @click="changeDistrictRole(a.id, 'view')"
+                >地區（唯讀）</button>
+                <button
+                  type="button"
+                  class="seg-btn"
+                  :class="{ active: a.district_role === 'admin' }"
+                  @click="changeDistrictRole(a.id, 'admin')"
+                >地區管理員</button>
+              </div>
             </td>
             <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
             <td style="display:flex; gap:6px;">
@@ -386,15 +396,17 @@ onMounted(async () => {
             <td>{{ m.phone ?? '-' }}</td>
             <td v-if="isDistrictAdminView">{{ clubName(m.club_id) }}</td>
             <td>
-              <select
-                class="fi"
-                :value="'view'"
-                style="min-width:120px; padding:6px 8px;"
-                @change="changeMemberPermission(m.id, m.name, ($event.target as HTMLSelectElement).value)"
+              <button
+                type="button"
+                class="toggle-switch"
+                role="switch"
+                aria-checked="false"
+                aria-label="權限：檢視／可編輯"
+                @click="changeMemberPermission(m.id, m.name, 'edit')"
               >
-                <option value="view">檢視</option>
-                <option value="edit">可編輯</option>
-              </select>
+                <span class="track"><span class="knob"></span></span>
+                <span class="label">檢視</span>
+              </button>
             </td>
             <td><span class="bdg" :class="m.is_active ? 'b-gr' : 'b-g'">{{ m.is_active ? '啟用中' : '已停用' }}</span></td>
             <td style="display:flex; gap:6px;">

@@ -1,10 +1,12 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-03（第二十八輪，**確認「地區（唯讀）」前端其實已經部署上線**——上一輪 HANDOFF 誤記為「待辦：部署前端」，實際上 Cloudflare Pages 有接 GitHub 自動部署，push 進 main 後就自動建置上線了，只是沒回來更新記錄。這輪用瀏覽器直接連正式站 `d3481clubmanagementsystem.pages.dev` 比對 JS bundle 內容（`district_role`／`isDistrictViewer`／「地區（唯讀）」文字都在，`district_access` 完全消失），確認是最新版無誤）
+> 最後更新：2026-07-03（第二十九輪，**視覺改版：整體配置更活潑、易讀，按鈕/開關更直白**——使用者要求維持「純內部社務管理工具」定位，改視覺風格而非功能。全站樣式集中在 `App.vue` 一個檔案，一次改動即全站生效：基礎字級 14→16px、按鈕加陰影/hover 位移分出主次、帳號管理頁的「可見範圍」「權限」從原生 `<select>` 換成分段控制／開關樣式、儀表板從單一數字改成彩色統計卡片＋出席率進度條。`vue-tsc`/`build` 皆過，本機用假 Supabase 金鑰起 dev server 驗證過元件樣式渲染正確）
 
 ---
 
 ## ⚠️ 待辦
+
+**【第二十九輪，待實測】視覺改版已推上正式站（Cloudflare Pages 自動部署），麻煩使用者實際點過一次**：儀表板（新統計卡片/進度條有沒有跑版）、社團總覽（查看/編輯按鈕顏色分得出來）、帳號管理頁（「可見範圍」現在是三顆藥丸按鈕、「權限」現在是開關樣式，點擊後狀態是否正確切換、重新整理後有沒有正確保留）。這台環境沒有真實帳號密碼，只做到本機元件渲染 + 型別/build 驗證，沒有用真帳號登入正式站點過。
 
 **【第二十七輪，優先】EDM 產生器：Anthropic 帳號額度用完，需要使用者到 [console.anthropic.com](https://console.anthropic.com) → Plans & Billing 加值或升級方案**——程式碼跟部署都沒問題，純粹帳務問題，Claude 這邊無法代為處理。加值完成後直接重試「AI 生成文案」即可，不用重新部署。
 
@@ -12,7 +14,7 @@
 1. ~~使用者到 Supabase SQL Editor 執行 `supabase/migrations/030_district_view_tier.sql`~~ **已完成**（`district_role` 欄位確認存在、`district_access` 已移除）
 2. ~~部署 5 支 Edge Function：`invite-user`、`delete-account`、`create-member-account`、`reset-member-password`、`generate-edm`~~ **已完成**（2026-07-02，Claude 用 CLI 直接部署，curl 驗證都回傳正常 401）
 3. ~~部署新版前端到 Cloudflare Pages~~ **已確認完成**（第二十八輪發現其實早就部署了，Cloudflare Pages 接 GitHub 自動部署，見上方最新更新）
-4. **【第二十八輪，只差這一步】待使用者登入實測**：Claude 這輪已經把測試帳號「Eric測試」（執秘，台北市和平扶輪社）的「可見範圍」改成「地區（唯讀）」並確認寫入 DB 成功（重新整理頁面後 dropdown 仍顯示「地區（唯讀）」）。**Claude 沒有這個帳號的密碼，無法代為登入測試**（涉及輸入密碼，屬於 Claude 不能代勞的動作）。麻煩使用者用「Eric測試」帳號登入 `https://d3481clubmanagementsystem.pages.dev/login`，確認：能看地區儀表板/社團總覽(含名冊幹部)/地區公告/總監獎彙總/EDM 產生器，但看不到功能開關/權限矩陣/帳號管理，社團總覽/地區公告頁面沒有新增/編輯/刪除按鈕。測試完如果要把「Eric測試」改回原本的「只能看到各社」，回「帳號邀請 / 管理」頁面改回來即可
+4. **【第二十八輪，只差這一步】待使用者登入實測**：Claude 這輪已經把測試帳號「Eric測試」（執秘，台北市和平扶輪社）的「可見範圍」改成「地區（唯讀）」並確認寫入 DB 成功（重新整理頁面後仍顯示「地區（唯讀）」）。**Claude 沒有這個帳號的密碼，無法代為登入測試**（涉及輸入密碼，屬於 Claude 不能代勞的動作）。麻煩使用者用「Eric測試」帳號登入 `https://d3481clubmanagementsystem.pages.dev/login`，確認：能看地區儀表板/社團總覽(含名冊幹部)/地區公告/總監獎彙總/EDM 產生器，但看不到功能開關/權限矩陣/帳號管理，社團總覽/地區公告頁面沒有新增/編輯/刪除按鈕。測試完如果要把「Eric測試」改回原本的「只能看到各社」，回「帳號邀請 / 管理」頁面改回來即可（第二十九輪後這個控制項的樣式從下拉選單換成了三顆藥丸按鈕，但底層邏輯沒變）
 
 0. ~~在 Supabase SQL Editor 執行 `supabase/migrations/029_registration_title.sql`~~ **已完成**（第二十二輪的「3481地區辦公室」選項＋扶輪社職稱代碼已生效）
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`~~ **已完成**（第二十一輪的社長/執秘角色編輯權限已生效）
@@ -40,6 +42,22 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第二十九輪）：視覺改版——整體配置更活潑、易讀，按鈕/開關更直白
+
+使用者要求「改整個配置風格」，先確認定位：純內部社務管理工具（維持現狀，不做對外公開層），改的是視覺／品牌風格，不是功能或架構。用瀏覽器看過正式站現況後發現：儀表板幾乎空白、社團總覽的「查看/編輯」按鈕長得一樣分不出主次、帳號管理頁的「可見範圍」「權限」用原生 `<select>` 狀態不夠一目了然。
+
+調查確認全站樣式集中在 `src/App.vue` 一個 `<style>` 區塊的全域 class（`.btn`/`.bdg`/`.fi`/`.tw` 等），24 個 view 檔案都直接吃這套 class、沒有各自重複定義，所以只改一個檔案就能讓全站視覺同步更新。本次刻意不做資訊架構重組（例如帳號管理頁拆分頁 tab），也不引入任何新套件（無 icon/chart/元件庫），維持這個 repo 手刻 CSS 的慣例。
+
+| 檔案 | 說明 |
+|------|------|
+| `src/App.vue` | `:root` 新增 `--sky`（次要動作色）、間距 scale（`--sp-1~6`）、圓角 scale（`--r-sm/--r/--r-lg`，`--r` 從 8px 提升到 10px）、陰影 token（`--shadow-sm/md/lg`，原本完全沒有）；基礎字級 `body` 從 14px 提升到 16px（對長輩可讀性影響最大的單一改動），表格/表單字級同步從 13px 提升到 15px；`.btn` 家族每個變體各自的 hover/active 規則（背景加深＋陰影＋位移，取代原本統一的 `opacity:.88`），新增 `.btn-sky`；badge 底色 alpha 調高、文字加深以維持對比度；新增兩個全域 class：`.toggle-switch`（膠囊型二元開關，取代原生 `<select>` 二選一）、`.segmented`（三顆藥丸按鈕的分段控制，取代原生 `<select>` 三選一）；新增 `.stat-grid`/`.stat-card`（含 4 種色條變化）、`.bar-track`/`.bar-fill`（純 CSS 進度條，出席率視覺化用） |
+| `src/views/admin/AccountManagementView.vue` | 「可見範圍」（`district_role`）從 `<select>` 換成 `.segmented` 三顆藥丸按鈕；「權限」（社員檢視／可編輯）從 `<select>` 換成 `.toggle-switch`，底層呼叫的 function（`changeDistrictRole`/`changeMemberPermission`）完全沒動，純樣式替換 |
+| `src/views/admin/ClubDetailView.vue` | 同上，「可見範圍」換成 `.segmented` |
+| `src/views/admin/ClubListView.vue` | 「編輯」按鈕從 `.btn-g`（跟「查看社團資訊」長得一樣）改成 `.btn-sky`，兩個按鈕視覺上能分出主次 |
+| `src/views/DashboardView.vue` | 地區視角／各社視角的統計數字從純文字改成 `.stat-card` 彩色卡片；出席率（地區視角的各社列表、各社視角的平均出席率）加上 `.bar-track`/`.bar-fill` 進度條 |
+
+**驗證方式**：`npx vue-tsc --noEmit`、`npm run build` 皆通過。這台環境沒有 `.env`（只有 `.env.example`），先建立臨時 `.env.local`（假的 Supabase URL，僅避免 `createClient()` 因空字串丟例外）起本機 dev server，確認登入頁在新字級/圓角下沒有跑版；接著用 `preview_eval` 把 `.stat-card`/`.segmented`/`.toggle-switch`/`.btn` 家族直接注入頁面截圖比對，確認色彩、圓角、陰影、開關的開/關狀態視覺區分都符合預期。驗證用的臨時 `.env.local` 已刪除，`git status` 乾淨。**沒有**用真帳號登入正式站確認這些控制項在實際資料下的互動流程（可見範圍/權限按下去後狀態是否正確持久化），麻煩使用者實測，見上方待辦第一項。
 
 ## 本次完成（第二十六輪）：權限模型重新整理成 4 級，新增「地區（唯讀）」
 
