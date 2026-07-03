@@ -111,7 +111,15 @@ ${keyPointsText}
   if (!anthropicResponse.ok) {
     const errText = await anthropicResponse.text()
     console.error('Anthropic API error', anthropicResponse.status, errText)
-    return errorResponse('AI 服務暫時無法使用，請稍後再試', 502)
+    // 把 Anthropic 回傳的實際錯誤類型/訊息帶回前端，方便診斷（api key 本身不會出現在錯誤內容裡）
+    let detail = errText
+    try {
+      const parsedErr = JSON.parse(errText)
+      if (parsedErr?.error?.message) detail = `${parsedErr.error.type ?? ''} ${parsedErr.error.message}`.trim()
+    } catch {
+      // 不是 JSON，維持原始文字
+    }
+    return errorResponse(`AI 服務暫時無法使用（HTTP ${anthropicResponse.status}：${detail}）`, 502)
   }
 
   const result = await anthropicResponse.json()
