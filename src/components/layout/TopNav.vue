@@ -12,7 +12,7 @@
           class="view-switch-btn"
           :class="{ active: auth.isDistrictView }"
           @click="auth.setViewScope('district')"
-        >地區管理介面</button>
+        >地區介面</button>
         <button
           type="button"
           class="view-switch-btn"
@@ -44,9 +44,9 @@ const router = useRouter()
 const ui = useUiStore()
 
 const roleLabel = computed(() => {
-  if (auth.role !== 'district_admin' && auth.isDistrictAdmin) {
-    return `${baseRoleLabel.value}＋地區`
-  }
+  if (auth.role === 'district_admin') return baseRoleLabel.value
+  if (auth.isDistrictAdmin) return `${baseRoleLabel.value}＋地區`
+  if (auth.isDistrictViewer) return `${baseRoleLabel.value}＋地區（唯讀）`
   return baseRoleLabel.value
 })
 
@@ -61,7 +61,7 @@ const baseRoleLabel = computed(() => {
 })
 
 const roleBadgeClass = computed(() => {
-  if (auth.isDistrictAdmin) return 'b-y'
+  if (auth.isDistrictViewer) return 'b-y'
   switch (auth.role) {
     case 'club_secretary': return 'b-n'
     case 'club_admin':     return 'b-gr'
@@ -70,7 +70,7 @@ const roleBadgeClass = computed(() => {
 })
 
 const interfaceLabel = computed(() => {
-  if (auth.isDistrictView) return '地區管理介面'
+  if (auth.isDistrictView) return '地區介面'
   return auth.clubName || '各社介面'
 })
 

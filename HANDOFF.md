@@ -1,10 +1,16 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-02（第二十五輪，「社員帳號」表格新增「權限」欄：使用者確認「有編輯權限」就是直接升級成執秘或社長角色，套用既有權限矩陣，不用另外做一套細部欄位。新增的下拉選單選了「執秘」或「社長」會呼叫既有的 `accounts.approveRole()`（跟自助註冊審核共用同一支），成功後帳號會從「社員帳號」表格移到上面的「社長／執秘帳號」表格，純前端功能、沒有新增 migration。第二十四輪修正「帳號管理」頁的視角判斷 bug（改用 `auth.isDistrictView` 而非 `auth.isDistrictAdmin`）；第二十三輪解除了社員手機號碼帳號的密碼長度死結；第二十二輪 migration `028`、`029` 已執行完成 ✅；Redirect URLs 已確認正確 ✅；Email 樣板中文化使用者正在 Dashboard 貼上套用中）
+> 最後更新：2026-07-02（第二十六輪，**權限模型重新整理成 4 級，新增第 3 級「地區（唯讀）」**：1. 一般社友（唯讀）2. 各社管理員（社長/執秘，可編輯本社）3. 地區（唯讀，可看地區儀表板/社團總覽含名冊幹部/地區公告/總監獎彙總/EDM，不能編輯）4. 地區管理員（原本的地區權限，可編輯社團/開關功能/發公告/管理帳號/調權限矩陣）。**程式碼已寫完並推上 GitHub，但 `030_district_view_tier.sql` 還沒套用、5 支 Edge Function 還沒重新部署，這兩件事都要等使用者確認 migration 030 執行成功後才能做，順序不能反**，詳見下方待辦第 0 項。第二十五輪「社員帳號」表格新增「權限」欄（升級成執秘/社長）；第二十四輪修正帳號管理頁視角判斷 bug；第二十三輪解除密碼長度死結；第二十二輪 migration `028`、`029` 已執行完成 ✅）
 
 ---
 
 ## ⚠️ 待辦
+
+**【第二十六輪，優先處理，有明確順序，不能反】權限模型改成 4 級，新增地區唯讀角色**：
+1. 使用者到 Supabase SQL Editor 執行 `supabase/migrations/030_district_view_tier.sql`（`user_profiles.district_access boolean` 換成 `district_role text`('view'/'admin'/NULL)，`is_district_admin()` 改吃 `district_role='admin'`，新增 `is_district_viewer()`，並放寬 `roster`/`prospective_members`/`meetings`/`attendance_sessions`/`club_officers`/`district_announcements`/`governor_award_applications` 的 SELECT policy 讓 `is_district_viewer()` 也能讀）
+2. **等第 1 步跑完確認成功後**，才能部署以下 5 支 Edge Function（因為程式碼已經改成查詢 `district_role` 這個新欄位，migration 沒套用之前部署會直接打壞現有功能）：`invite-user`、`delete-account`、`create-member-account`、`reset-member-password`、`generate-edm`
+3. 部署完成後到「帳號管理」／「社團詳情」頁測試：把某個帳號的「可見範圍」設成「地區（唯讀）」，登入該帳號確認：能看地區儀表板/社團總覽(含名冊幹部)/地區公告/總監獎彙總/EDM 產生器，但看不到功能開關/權限矩陣/帳號管理，社團總覽/地區公告頁面沒有新增/編輯/刪除按鈕
+4. 前端也要記得部署到 Cloudflare Pages（Sidebar/TopNav/router 都有改）
 
 0. ~~在 Supabase SQL Editor 執行 `supabase/migrations/029_registration_title.sql`~~ **已完成**（第二十二輪的「3481地區辦公室」選項＋扶輪社職稱代碼已生效）
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/028_club_tier_role_management.sql`~~ **已完成**（第二十一輪的社長/執秘角色編輯權限已生效）
@@ -32,6 +38,31 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第二十六輪）：權限模型重新整理成 4 級，新增「地區（唯讀）」
+
+使用者提出要把權限模型講清楚，總共分 4 級：1. 一般社友（唯讀）2. 各社管理員（社長/執秘對等，可編輯本社）3. 地區（唯讀，可進地區後台看彙總分析/社團總覽/公告/總監獎/EDM，不能編輯）4. 地區管理員（原本的地區權限）。第 1、2、4 級系統本來就是這樣運作，真正要新做的是第 3 級——現有的 `district_access` 只有布林值，一旦是 true 就等同第 4 級，沒有唯讀這個中間層。
+
+跟使用者確認過範圍：第 3 級可以看地區儀表板（後台分析）、社團總覽（含點進去看完整名冊/幹部）、地區公告、總監獎彙總、EDM 產生器；不能碰功能開關、權限矩陣、帳號管理，也不能編輯/刪除/新增任何東西。
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/030_district_view_tier.sql`（**尚未套用**） | `user_profiles.district_access boolean` 換成 `district_role text CHECK (district_role IN ('view','admin'))`（既有 `district_access=true` 一律轉成 `'admin'`，不會有人被降級）；`is_district_admin()` 改吃 `district_role='admin'`；新增 `is_district_viewer()`（`district_role IN ('view','admin')` 或 `role='district_admin'`）；`protect_user_profile_privileged_fields()` 的 `district_access` 檢查換成 `district_role`；放寬 `roster_select`/`prospects_select`/`meetings_select`/`attendance_sessions_select`/`club_officers_select`/`district_announcements_select`/`governor_award_applications_select` 這幾個 SELECT policy，加上 `is_district_viewer()` 的 OR 條件（`attendance_details`、`member_care`、`invite_log`、`role_permissions`、`feature_flags` 的寫入 policy 都刻意沒動，維持地區管理員專屬） |
+| `src/stores/auth.ts` | `isDistrictAdmin` 現在精確對應「第 4 級」；新增 `isDistrictViewer`（第 3 或第 4 級都算）；`canSwitchView` 改吃 `isDistrictViewer`（唯讀角色的雙重身分帳號也會有切換按鈕）；`isDistrictView` 語意變成「目前切到地區視角」（第 3、4 級都可能是 true）；新增 `isDistrictAdminView`（`isDistrictView && isDistrictAdmin`，専門給「地區視角 + 有編輯權限」的畫面判斷用，寫死不動的地方全部改用這個，不能只看 `isDistrictView`） |
+| `src/router/index.ts` | 新增 `districtViewer: true` 這個 route meta，`/admin/clubs`、`/admin/clubs/:id`、`/admin/announcements`、`/admin/governor-awards`、`/admin/edm` 改用這個（唯讀+管理員都能進）；`/admin/features`、`/admin/clubs/:id/edit`、`/admin/permissions`、`/club/invite` 維持 `role: 'district_admin'`（唯獨管理員能進） |
+| `src/components/layout/Sidebar.vue` | 「地區管理」選單改名「地區」；社團總覽/地區公告/總監獎/EDM 產生器對 `isDistrictView` 顯示（唯讀也看得到選單），功能開關/權限矩陣/帳號管理另外包一層 `isDistrictAdminView` |
+| `src/components/layout/TopNav.vue` | 角色徽章：第 3 級顯示「＋地區（唯讀）」、第 4 級顯示「＋地區」；視角切換按鈕文字從「地區管理介面」改成「地區介面」（唯讀角色看了才不會誤解） |
+| `src/views/admin/AccountManagementView.vue`、`ClubDetailView.vue` | 「可見範圍」下拉從 2 個選項（只能看到各社／同步看到地區）改成 3 個（只能看到各社／地區（唯讀）／地區管理員） |
+| `src/views/admin/ClubListView.vue` | 「+ 新增社團」按鈕、排序上下箭頭、「編輯」連結都包 `auth.isDistrictAdminView`；「查看社團資訊」連結維持所有能進這頁的人都看得到 |
+| `src/views/admin/DistrictAnnouncementsView.vue` | 「+ 新增公告」按鈕、每列的「編輯」「刪除」都包 `auth.isDistrictAdminView` |
+| `src/stores/accounts.ts` | `setDistrictAccess(id, boolean)` 改成 `setDistrictRole(id, 'view'\|'admin'\|null)` |
+| `src/types/index.ts` | `UserProfile.district_access: boolean` 換成 `district_role: 'view' \| 'admin' \| null` |
+| `supabase/functions/invite-user`、`delete-account`、`create-member-account`、`reset-member-password`（**尚未重新部署**） | `.select()` 的 `district_access` 欄位改成 `district_role`，判斷式改吃 `district_role === 'admin'`（這 4 支都是純地區管理員專屬動作，邏輯不變只是換欄位） |
+| `supabase/functions/generate-edm`（**尚未重新部署**） | `scope==='district'` 的授權從「只有 `isDistrictAdmin`」放寬成「`isDistrictAdmin` 或 `isDistrictViewer`」，讓地區唯讀角色也能用 |
+
+**重要：migration 030 跟這 5 支 Edge Function 重新部署有嚴格的先後順序**——Edge Function 的程式碼已經改成查詢 `district_role` 這個新欄位，如果在 migration 030 套用之前就先部署，會直接把現有正常運作的邀請帳號/刪除帳號/EDM 產生器功能打壞（查詢一個還不存在的欄位）。這次沒有像前幾輪一樣直接用 CLI 部署，就是因為要等使用者先確認 migration 030 在 SQL Editor 跑成功。
+
+**驗證**：`npx vue-tsc --noEmit`、`npm run build` 皆通過。這輪牽涉到 RLS policy 大量調整（7 張表的 SELECT policy），沒有真實資料庫連線沒辦法端對端驗證「地區唯讀角色實際登入後看到的畫面/擋掉的頁面」是否完全正確，麻煩使用者照上面待辦第二十六輪的第 3 步實測一次。
 
 ## 本次完成（第二十二輪）：註冊頁新增「3481地區辦公室」選項、職稱換成扶輪社真實職稱代碼
 

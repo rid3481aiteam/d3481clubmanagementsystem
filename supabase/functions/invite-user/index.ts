@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile } = await callerClient
     .from('user_profiles')
-    .select('role, club_id, district_access')
+    .select('role, club_id, district_role')
     .eq('id', user.id)
     .single()
 
@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
   if (!['club_secretary', 'club_admin', 'club_member'].includes(role))
     return errorResponse('角色不正確', 400)
 
-  const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_access === true
+  const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'
   const isClubTier = CLUB_TIER_ROLES.includes(callerProfile.role)
 
   // 地區：可為任何社邀請任何角色（新社團建立第一組帳號用）

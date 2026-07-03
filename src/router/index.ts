@@ -98,35 +98,42 @@ const router = createRouter({
       component: () => import('@/views/directory/DirectoryView.vue'),
       meta: { feature: 'H1_directory' as FeatureKey },
     },
-    // Admin（地區管理員）
+    // Admin（地區：第 3 級唯讀 + 第 4 級地區管理員共用進得去，畫面內再依 isDistrictAdminView 決定能不能編輯）
     {
       path: '/admin/clubs',
       name: 'admin-clubs',
       component: () => import('@/views/admin/ClubListView.vue'),
-      meta: { role: 'district_admin' },
-    },
-    {
-      path: '/admin/features',
-      name: 'admin-features',
-      component: () => import('@/views/admin/FeatureFlagsView.vue'),
-      meta: { role: 'district_admin' },
+      meta: { districtViewer: true },
     },
     {
       path: '/admin/announcements',
       name: 'admin-announcements',
       component: () => import('@/views/admin/DistrictAnnouncementsView.vue'),
-      meta: { role: 'district_admin' },
+      meta: { districtViewer: true },
     },
     {
       path: '/admin/governor-awards',
       name: 'admin-governor-awards',
       component: () => import('@/views/admin/GovernorAwardSummaryView.vue'),
-      meta: { role: 'district_admin' },
+      meta: { districtViewer: true },
     },
     {
       path: '/admin/clubs/:id',
       name: 'admin-club-detail',
       component: () => import('@/views/admin/ClubDetailView.vue'),
+      meta: { districtViewer: true },
+    },
+    {
+      path: '/admin/edm',
+      name: 'admin-edm',
+      component: () => import('@/views/edm/EdmGeneratorView.vue'),
+      meta: { districtViewer: true, feature: 'B5_edm' as FeatureKey },
+    },
+    // Admin（僅第 4 級地區管理員，唯讀角色進不去）
+    {
+      path: '/admin/features',
+      name: 'admin-features',
+      component: () => import('@/views/admin/FeatureFlagsView.vue'),
       meta: { role: 'district_admin' },
     },
     {
@@ -140,12 +147,6 @@ const router = createRouter({
       name: 'admin-permissions',
       component: () => import('@/views/admin/PermissionMatrixView.vue'),
       meta: { role: 'district_admin' },
-    },
-    {
-      path: '/admin/edm',
-      name: 'admin-edm',
-      component: () => import('@/views/edm/EdmGeneratorView.vue'),
-      meta: { role: 'district_admin', feature: 'B5_edm' as FeatureKey },
     },
     {
       path: '/club/edm',
@@ -175,6 +176,9 @@ router.beforeEach(async (to) => {
   if (auth.loading) await auth.init()
 
   if (!to.meta.public && !auth.isLoggedIn) return { name: 'login' }
+
+  // 地區（唯讀）或地區管理員都能進的路由
+  if (to.meta.districtViewer && !auth.isDistrictViewer) return { name: 'dashboard' }
 
   // 角色限定路由：非該角色導回首頁
   if (to.meta.role) {

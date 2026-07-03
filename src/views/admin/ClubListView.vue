@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { useClubStore } from '@/stores/club'
 import type { Club } from '@/types'
 
+const auth = useAuthStore()
 const club = useClubStore()
 
 const ZONE_ORDER = [
@@ -77,7 +79,7 @@ onMounted(() => {
   <div class="page">
     <div class="ph">
       <h1>社團總覽</h1>
-      <button class="btn btn-gold" @click="openAdd">+ 新增社團</button>
+      <button v-if="auth.isDistrictAdminView" class="btn btn-gold" @click="openAdd">+ 新增社團</button>
     </div>
 
     <div class="tw">
@@ -104,7 +106,7 @@ onMounted(() => {
           <template v-if="!collapsedZones.has(g.zone)">
             <tr v-for="(c, i) in g.clubs" :key="c.id">
               <td>
-                <span class="order-btns">
+                <span v-if="auth.isDistrictAdminView" class="order-btns">
                   <button class="order-btn" :disabled="i === 0" @click="moveClub(g.clubs, i, -1)">▲</button>
                   <button class="order-btn" :disabled="i === g.clubs.length - 1" @click="moveClub(g.clubs, i, 1)">▼</button>
                 </span>
@@ -117,7 +119,7 @@ onMounted(() => {
               <td>{{ c.phone || '-' }}</td>
               <td style="display:flex; gap:6px;">
                 <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社團資訊</RouterLink>
-                <RouterLink :to="`/admin/clubs/${c.id}/edit`" class="btn btn-g btn-sm">編輯</RouterLink>
+                <RouterLink v-if="auth.isDistrictAdminView" :to="`/admin/clubs/${c.id}/edit`" class="btn btn-g btn-sm">編輯</RouterLink>
               </td>
             </tr>
           </template>

@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile } = await callerClient
     .from('user_profiles')
-    .select('role, club_id, district_access')
+    .select('role, club_id, district_role')
     .eq('id', user.id)
     .single()
 
@@ -49,10 +49,11 @@ Deno.serve(async (req) => {
   if (scope !== 'district' && scope !== 'club') return errorResponse('scope 參數不正確', 400)
   if (!topic || typeof topic !== 'string' || !topic.trim()) return errorResponse('請輸入主題', 400)
 
-  const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_access === true
+  // 地區唯讀（第3級）跟地區管理員（第4級）都能用 EDM 產生器
+  const isDistrictViewer = callerProfile.role === 'district_admin' || ['view', 'admin'].includes(callerProfile.district_role)
   const isClubTier = CLUB_TIER_ROLES.includes(callerProfile.role)
 
-  if (scope === 'district' && !isDistrictAdmin) return errorResponse('沒有權限產生地區 EDM', 403)
+  if (scope === 'district' && !isDistrictViewer) return errorResponse('沒有權限產生地區 EDM', 403)
   if (scope === 'club' && !isClubTier) return errorResponse('沒有權限產生社內 EDM', 403)
 
   let clubName: string | null = null

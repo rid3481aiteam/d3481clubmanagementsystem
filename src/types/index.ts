@@ -17,7 +17,7 @@ export interface UserProfile {
   role: UserRole
   requested_role: UserRole | null
   requested_title: string | null
-  district_access: boolean
+  district_role: 'view' | 'admin' | null
   is_active: boolean
   phone: string | null
   created_at: string

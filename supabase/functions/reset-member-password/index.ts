@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile } = await callerClient
     .from('user_profiles')
-    .select('role, club_id, district_access')
+    .select('role, club_id, district_role')
     .eq('id', user.id)
     .single()
 
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
   if (targetProfile.role !== 'club_member') return errorResponse('只能重設社員帳號的密碼', 400)
   if (!targetProfile.phone) return errorResponse('該帳號沒有手機號碼，無法重設為預設密碼', 400)
 
-  const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_access === true
+  const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'
   const isClubTier = CLUB_TIER_ROLES.includes(callerProfile.role)
 
   if (!isDistrictAdmin) {

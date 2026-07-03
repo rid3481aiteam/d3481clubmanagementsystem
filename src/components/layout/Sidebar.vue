@@ -7,14 +7,11 @@
         <span class="nav-icon">📊</span>儀表板
       </RouterLink>
 
-      <!-- 地區管理員 -->
+      <!-- 地區（唯讀）+ 地區管理員共用 -->
       <template v-if="auth.isDistrictView">
-        <div class="nav-section">地區管理</div>
+        <div class="nav-section">地區</div>
         <RouterLink to="/admin/clubs" class="nav-item">
           <span class="nav-icon">🏢</span>社團總覽
-        </RouterLink>
-        <RouterLink to="/admin/features" class="nav-item">
-          <span class="nav-icon">⚙️</span>功能開關
         </RouterLink>
         <RouterLink to="/admin/announcements" class="nav-item">
           <span class="nav-icon">📣</span>地區公告
@@ -22,15 +19,21 @@
         <RouterLink to="/admin/governor-awards" class="nav-item">
           <span class="nav-icon">🏅</span>總監獎項統整
         </RouterLink>
-        <RouterLink to="/admin/permissions" class="nav-item">
-          <span class="nav-icon">🔐</span>權限矩陣
-        </RouterLink>
-        <RouterLink to="/club/invite" class="nav-item">
-          <span class="nav-icon">👤</span>帳號邀請 / 管理
-        </RouterLink>
         <RouterLink v-if="features.isEnabled('B5_edm')" to="/admin/edm" class="nav-item">
           <span class="nav-icon">📧</span>EDM 產生器
         </RouterLink>
+        <!-- 以下僅地區管理員（唯讀角色看不到、也進不去） -->
+        <template v-if="auth.isDistrictAdminView">
+          <RouterLink to="/admin/features" class="nav-item">
+            <span class="nav-icon">⚙️</span>功能開關
+          </RouterLink>
+          <RouterLink to="/admin/permissions" class="nav-item">
+            <span class="nav-icon">🔐</span>權限矩陣
+          </RouterLink>
+          <RouterLink to="/club/invite" class="nav-item">
+            <span class="nav-icon">👤</span>帳號邀請 / 管理
+          </RouterLink>
+        </template>
       </template>
 
       <!-- 執秘 + 社長 + 一般社員共用（社員唯讀） -->

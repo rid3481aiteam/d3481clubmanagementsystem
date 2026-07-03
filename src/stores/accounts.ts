@@ -98,14 +98,14 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
-  async function setDistrictAccess(id: string, districtAccess: boolean) {
+  async function setDistrictRole(id: string, districtRole: 'view' | 'admin' | null) {
     const { error } = await supabase
       .from('user_profiles')
-      .update({ district_access: districtAccess })
+      .update({ district_role: districtRole })
       .eq('id', id)
     if (!error) {
       managed.value = managed.value.map(u => (
-        u.id === id ? { ...u, district_access: districtAccess } : u
+        u.id === id ? { ...u, district_role: districtRole } : u
       ))
     }
     return { error }
@@ -127,6 +127,6 @@ export const useAccountsStore = defineStore('accounts', () => {
     managed, pending, members, loading,
     fetchManaged, fetchPending, approveRole, dismissPending,
     fetchMembers, createMember, resetMemberPassword,
-    setActive, setDistrictAccess, deleteAccount,
+    setActive, setDistrictRole, deleteAccount,
   }
 })

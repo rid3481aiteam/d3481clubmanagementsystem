@@ -2,11 +2,13 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus, UserProfile, UserRole } from '@/types'
 
 const route = useRoute()
+const auth = useAuthStore()
 const roster = useRosterStore()
 const officers = useOfficersStore()
 const club = ref<Club | null>(null)
@@ -57,10 +59,11 @@ function accountRoleLabel(role: UserRole) {
   return role
 }
 
-async function changeDistrictAccess(accountId: string, districtAccess: boolean) {
+async function changeDistrictRole(accountId: string, value: string) {
+  const districtRole = value === 'view' || value === 'admin' ? value : null
   const { error } = await supabase
     .from('user_profiles')
-    .update({ district_access: districtAccess })
+    .update({ district_role: districtRole })
     .eq('id', accountId)
 
   if (error) {
@@ -69,7 +72,7 @@ async function changeDistrictAccess(accountId: string, districtAccess: boolean) 
   }
 
   registeredAccounts.value = registeredAccounts.value.map(a => (
-    a.id === accountId ? { ...a, district_access: districtAccess } : a
+    a.id === accountId ? { ...a, district_role: districtRole } : a
   ))
 }
 
@@ -189,44 +192,47 @@ watch(() => route.params.id, load)
       <p v-else style="color:var(--muted); font-size:13px;">尚無委員會成員資料</p>
     </div>
 
-    <h2 class="section-h">已註冊帳號</h2>
-    <div class="tw" style="margin-bottom:24px;">
-      <table>
-        <thead class="th">
-          <tr>
-            <th>姓名</th>
-            <th>角色</th>
-            <th>可見範圍</th>
-            <th>狀態</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="a in registeredAccounts" :key="a.id">
-            <td>{{ a.name }}</td>
-            <td>{{ accountRoleLabel(a.role) }}</td>
-            <td>
-              <select
-                class="fi"
-                :value="a.district_access ? 'district' : 'club'"
-                style="min-width:150px; padding:6px 8px;"
-                @change="changeDistrictAccess(a.id, ($event.target as HTMLSelectElement).value === 'district')"
-              >
-                <option value="club">只能看到各社</option>
-                <option value="district">同步看到地區</option>
-              </select>
-            </td>
-            <td>
-              <span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">
-                {{ a.is_active ? '啟用中' : '已停用' }}
-              </span>
-            </td>
-          </tr>
-          <tr v-if="!registeredAccounts.length">
-            <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無已註冊帳號</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-if="auth.isDistrictAdminView">
+      <h2 class="section-h">已註冊帳號</h2>
+      <div class="tw" style="margin-bottom:24px;">
+        <table>
+          <thead class="th">
+            <tr>
+              <th>姓名</th>
+              <th>角色</th>
+              <th>可見範圍</th>
+              <th>狀態</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="a in registeredAccounts" :key="a.id">
+              <td>{{ a.name }}</td>
+              <td>{{ accountRoleLabel(a.role) }}</td>
+              <td>
+                <select
+                  class="fi"
+                  :value="a.district_role ?? 'club'"
+                  style="min-width:170px; padding:6px 8px;"
+                  @change="changeDistrictRole(a.id, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="club">只能看到各社</option>
+                  <option value="view">地區（唯讀）</option>
+                  <option value="admin">地區管理員</option>
+                </select>
+              </td>
+              <td>
+                <span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">
+                  {{ a.is_active ? '啟用中' : '已停用' }}
+                </span>
+              </td>
+            </tr>
+            <tr v-if="!registeredAccounts.length">
+              <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無已註冊帳號</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
 
     <h2 class="section-h">社員名單</h2>
     <div class="tw">

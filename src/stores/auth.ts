@@ -13,13 +13,19 @@ export const useAuthStore = defineStore('auth', () => {
   const viewScope = ref<'district' | 'club'>('district')
 
   const isLoggedIn = computed(() => !!user.value)
-  const isDistrictAdmin = computed(() => profile.value?.role === 'district_admin' || profile.value?.district_access === true)
+  // 地區管理員（第 4 級）：可編輯社團/公告/帳號/權限矩陣等
+  const isDistrictAdmin = computed(() => profile.value?.role === 'district_admin' || profile.value?.district_role === 'admin')
+  // 地區唯讀（第 3 級）或地區管理員都算「有地區權限」：可進地區後台看彙總分析/社團總覽/公告/總監獎/EDM，但不能編輯
+  const isDistrictViewer = computed(() => isDistrictAdmin.value || profile.value?.district_role === 'view')
   const clubId = computed(() => profile.value?.club_id ?? null)
   const role = computed<UserRole | null>(() => profile.value?.role ?? null)
 
-  // 同時擁有地區權限與本社身分的人（社長/執秘/社員 + district_access）才需要視角切換
-  const canSwitchView = computed(() => isDistrictAdmin.value && !!clubId.value)
-  const isDistrictView = computed(() => canSwitchView.value ? viewScope.value === 'district' : isDistrictAdmin.value)
+  // 同時擁有地區權限（不論唯讀還是管理員）與本社身分的人才需要視角切換
+  const canSwitchView = computed(() => isDistrictViewer.value && !!clubId.value)
+  // 目前實際檢視的視角是不是地區（唯讀＋管理員都算，用來決定畫面顯示地區儀表板還是各社儀表板）
+  const isDistrictView = computed(() => canSwitchView.value ? viewScope.value === 'district' : isDistrictViewer.value)
+  // 目前是不是「地區視角 + 有編輯權限」，畫面上的編輯/新增/刪除按鈕要用這個判斷，不能只看 isDistrictView
+  const isDistrictAdminView = computed(() => isDistrictView.value && isDistrictAdmin.value)
 
   function setViewScope(scope: 'district' | 'club') {
     if (scope === 'club' && !clubId.value) return
@@ -104,8 +110,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, profile, clubName, loading, isLoggedIn, isDistrictAdmin, clubId, role,
-    viewScope, canSwitchView, isDistrictView, setViewScope,
+    user, profile, clubName, loading, isLoggedIn, isDistrictAdmin, isDistrictViewer, clubId, role,
+    viewScope, canSwitchView, isDistrictView, isDistrictAdminView, setViewScope,
     init, signIn, signOut, updateName,
   }
 })

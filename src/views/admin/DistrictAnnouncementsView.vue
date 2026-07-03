@@ -104,7 +104,7 @@ onMounted(() => {
   <div class="page">
     <div class="ph">
       <h1>地區公告</h1>
-      <button class="btn btn-gold" @click="openAdd">+ 新增公告</button>
+      <button v-if="auth.isDistrictAdminView" class="btn btn-gold" @click="openAdd">+ 新增公告</button>
     </div>
 
     <div class="tw">
@@ -115,7 +115,7 @@ onMounted(() => {
             <th>狀態</th>
             <th>發布時間</th>
             <th>到期時間</th>
-            <th></th>
+            <th v-if="auth.isDistrictAdminView"></th>
           </tr>
         </thead>
         <tbody>
@@ -131,13 +131,13 @@ onMounted(() => {
             </td>
             <td>{{ formatDateTime(item.published_at) }}</td>
             <td>{{ formatDateTime(item.expires_at) }}</td>
-            <td style="display:flex; gap:6px;">
+            <td v-if="auth.isDistrictAdminView" style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
               <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
             </td>
           </tr>
           <tr v-if="!announcements.adminDistrictAnnouncements.length">
-            <td colspan="5" style="text-align:center; color:var(--muted);">尚無地區公告</td>
+            <td :colspan="auth.isDistrictAdminView ? 5 : 4" style="text-align:center; color:var(--muted);">尚無地區公告</td>
           </tr>
         </tbody>
       </table>

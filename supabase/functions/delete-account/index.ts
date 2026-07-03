@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile } = await callerClient
     .from('user_profiles')
-    .select('role, club_id, district_access')
+    .select('role, club_id, district_role')
     .eq('id', user.id)
     .single()
 
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
   if (!DELETABLE_ROLES.includes(targetProfile.role))
     return errorResponse('只能刪除社長／執秘／社員帳號', 400)
 
-  const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_access === true
+  const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'
   const isClubTier = CLUB_TIER_ROLES.includes(callerProfile.role)
 
   // 地區：可刪除任何社的帳號；各社（社長／執秘對等）：只能刪除本社帳號
