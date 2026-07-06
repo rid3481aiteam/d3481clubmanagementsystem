@@ -118,6 +118,9 @@ async function editName() {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 @media (max-width: 900px) {
@@ -140,6 +143,11 @@ async function editName() {
   font-size: 15px;
   color: #fff;
   letter-spacing: .3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .topnav-context {
@@ -208,6 +216,7 @@ async function editName() {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .topnav-user {
