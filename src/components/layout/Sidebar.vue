@@ -22,28 +22,30 @@
         <RouterLink v-if="features.isEnabled('B5_edm')" to="/admin/edm" class="nav-item">
           <span class="nav-icon">📧</span>EDM 產生器
         </RouterLink>
+
         <!-- 以下僅地區管理員（唯讀角色看不到、也進不去） -->
         <template v-if="auth.isDistrictAdminView">
+          <div class="nav-section">進階設定</div>
+          <RouterLink to="/club/invite" class="nav-item">
+            <span class="nav-icon">👤</span>邀請 / 管理地區帳號
+          </RouterLink>
           <RouterLink to="/admin/features" class="nav-item">
             <span class="nav-icon">⚙️</span>功能開關
           </RouterLink>
           <RouterLink to="/admin/permissions" class="nav-item">
             <span class="nav-icon">🔐</span>權限矩陣
           </RouterLink>
-          <RouterLink to="/club/invite" class="nav-item">
-            <span class="nav-icon">👤</span>帳號邀請 / 管理
-          </RouterLink>
         </template>
       </template>
 
-      <!-- 各社管理員（club_secretary/club_admin）+ 一般社友共用（社友唯讀） -->
-      <template v-if="auth.role === 'club_secretary' || auth.role === 'club_admin' || auth.role === 'club_member'">
+      <!-- 各社管理員（club_secretary/club_admin）+ 一般社友共用（社友唯讀），地區視角下不顯示 -->
+      <template v-if="!auth.isDistrictView && (auth.role === 'club_secretary' || auth.role === 'club_admin' || auth.role === 'club_member')">
         <div class="nav-section">社務管理</div>
-        <RouterLink v-if="features.isEnabled('D1_roster')" to="/roster" class="nav-item">
-          <span class="nav-icon">📋</span>社友名冊
+        <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/announcements" class="nav-item">
+          <span class="nav-icon">📣</span>社內公告
         </RouterLink>
-        <RouterLink v-if="features.isEnabled('D3_prospective') && auth.role !== 'club_member'" to="/roster/prospective" class="nav-item">
-          <span class="nav-icon">🔍</span>潛在社友
+        <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/governor-award" class="nav-item">
+          <span class="nav-icon">🏅</span>總監獎項申請
         </RouterLink>
         <RouterLink v-if="features.isEnabled('B1_meeting_info')" to="/meetings" class="nav-item">
           <span class="nav-icon">📅</span>例會管理
@@ -51,30 +53,27 @@
         <RouterLink to="/club/officers" class="nav-item">
           <span class="nav-icon">🎖️</span>社的年度成員
         </RouterLink>
-        <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/announcements" class="nav-item">
-          <span class="nav-icon">📣</span>社內公告
+        <RouterLink v-if="features.isEnabled('D1_roster')" to="/roster" class="nav-item">
+          <span class="nav-icon">📋</span>社友名冊
         </RouterLink>
-        <RouterLink v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'" to="/club/governor-award" class="nav-item">
-          <span class="nav-icon">🏅</span>總監獎項申請
+        <RouterLink v-if="features.isEnabled('D3_prospective') && auth.role !== 'club_member'" to="/roster/prospective" class="nav-item">
+          <span class="nav-icon">🔍</span>潛在社友
         </RouterLink>
         <RouterLink v-if="(auth.role === 'club_secretary' || auth.role === 'club_admin') && features.isEnabled('B5_edm')" to="/club/edm" class="nav-item">
           <span class="nav-icon">📧</span>EDM 產生器
         </RouterLink>
+        <RouterLink v-if="features.isEnabled('H1_directory')" to="/directory" class="nav-item">
+          <span class="nav-icon">📖</span>地區通訊錄
+        </RouterLink>
       </template>
 
-      <!-- 各社管理員（club_secretary/club_admin）：本社帳號自行管理 -->
-      <template v-if="auth.role === 'club_secretary' || auth.role === 'club_admin'">
-        <div class="nav-section">帳號</div>
+      <!-- 各社管理員（club_secretary/club_admin）：本社帳號自行管理，地區視角下不顯示 -->
+      <template v-if="!auth.isDistrictView && (auth.role === 'club_secretary' || auth.role === 'club_admin')">
+        <div class="nav-section">進階設定</div>
         <RouterLink to="/club/invite" class="nav-item">
           <span class="nav-icon">👤</span>邀請 / 管理本社帳號
         </RouterLink>
       </template>
-
-      <!-- 全角色共用 -->
-      <div class="nav-section">通訊錄</div>
-      <RouterLink v-if="features.isEnabled('H1_directory')" to="/directory" class="nav-item">
-        <span class="nav-icon">📖</span>地區通訊錄
-      </RouterLink>
     </nav>
 
     <div class="sidebar-footer">
