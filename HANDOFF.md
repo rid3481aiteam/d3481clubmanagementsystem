@@ -6,11 +6,9 @@
 
 ## ⚠️ 待辦
 
-**【第三十七輪，優先】補 034 migration，讓跨社協作帳號的姓名顯示出來**：
-1. 在 Supabase SQL Editor 執行 `supabase/migrations/034_collaborator_profile_visibility.sql`（新增 `user_profiles` 的 SELECT policy：社長/執秘可以讀到「有授權到本社」的人的姓名/啟用狀態）——**待使用者執行**
-2. 前端修好的部分（`fetchClubCollaborators` 改成分兩次查）已經 push 完成，Cloudflare Pages 應該會自動部署——**待確認**
-3. **待複查**：034 執行完後，重新整理「帳號管理」頁，「跨社協作帳號」區塊應該要能看到 `bton0505`／`Vivian` 兩筆，姓名正確顯示（不是空白或 `-`）
-4. 確認完 034 之後，才接續第三十六輪原本待實測的項目：用 `bton0505`／`vivianrotary` 這兩個帳號實際登入，確認 TopNav 有切換社團的下拉選單、切過去能編輯和平社資料、切回去不影響原本社的權限；再測一次「跨社協作帳號」區塊的權限開關（改成檢視）跟「撤銷協作」
+**【第三十七輪】補 034 migration，讓跨社協作帳號的姓名顯示出來** ~~待使用者執行~~ **使用者已執行完成 ✅**（Claude 用 CLI 查 `pg_policy` 確認 `profiles_select_collaborator` 這條 policy 確實已建立在 `user_profiles` 上）：
+1. **待複查**：重新整理「帳號管理」頁，「跨社協作帳號」區塊應該要能看到 `bton0505`／`Vivian` 兩筆，姓名正確顯示（不是空白或 `-`）
+2. 確認完姓名有顯示之後，接續第三十六輪原本待實測的項目：用 `bton0505`／`vivianrotary` 這兩個帳號實際登入，確認 TopNav 有切換社團的下拉選單、切過去能編輯和平社資料、切回去不影響原本社的權限；再測一次「跨社協作帳號」區塊的權限開關（改成檢視）跟「撤銷協作」
 
 **【第三十六輪】單一帳號跨社管理** **migration 已由使用者手動貼到 Supabase SQL Editor 執行完成 ✅，4 支 Edge Function 已由 Claude 用 CLI 部署完成 ✅**：
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/033_multi_club_access.sql`~~ **使用者已執行完成 ✅**（Claude 用本機 CLI 查 `pg_proc`/`information_schema` 確認 `current_club_id`/`current_user_role`/`is_club_tier`/`is_club_secretary`/`find_user_id_by_email` 五個 function、`user_club_roles` 表、`user_profiles.active_club_id` 欄位都已存在）
