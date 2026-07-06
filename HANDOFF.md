@@ -1,10 +1,16 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-06（第三十七輪，**修「跨社協作帳號」看不到人的 bug**——使用者實測第三十六輪功能，邀請 `bton0505@gmail.com`／`vivianrotary@gmail.com` 都正確觸發跨社授權（`invite_log`／`user_club_roles` 都有正確寫入），但「帳號管理」頁的「跨社協作帳號」區塊卻顯示「尚無跨社協作帳號」。查出兩個疊加的 bug：① `fetchClubCollaborators()` 用 PostgREST 內嵌語法 `select('*, user_profiles(...))'`，但 `user_club_roles.user_id` 只有 FK 指到 `auth.users`、沒有直接指到 `user_profiles`，內嵌查詢整個失敗，且原本沒檢查 error，悄悄變空陣列；② 就算查詢語法對了，`user_profiles` 也沒有任何 RLS policy放行「讀取別社但有授權到本社的人的 profile」。已修好①（分兩次查再手動合併，見 [`src/stores/accounts.ts`](src/stores/accounts.ts)）並推上 GitHub，②寫成新 migration `034_collaborator_profile_visibility.sql`，待使用者貼到 SQL Editor 執行）
+> 最後更新：2026-07-06（第三十八輪，**選單從左側 Sidebar 改成頂部橫向選單，配色改用地區原始規劃的深藍/古銅金**——使用者提供另一個 repo `vivianrotary-cloud/3481rotarymember`（`rotary3481_platform_12.html`，7388 行單檔靜態原型）作為「原始規劃」參考，裡面已經定義好配色（`--navy:#1C2B4A`／`--gold:#B8892A`，比現有配色更深沉，不是原本的寶藍/亮金）跟頂部選單的版面（跑馬燈公告列 + 橫向選單，選單背景整條深藍、超出項目用「橫向捲動＋左右箭頭」而不是下拉收合）。這輪把這套版面套進實際的 Vue app：新增 [`src/components/layout/TopMenu.vue`](src/components/layout/TopMenu.vue) 取代原本的 [`src/components/layout/Sidebar.vue`](src/components/layout/Sidebar.vue)（已刪除），選單項目、角色/feature-flag 判斷邏輯原封不動照抄 Sidebar 的規則，只是排列方式從直向清單改成橫向可捲動列；原本地區/各社共用的「進階設定」摺疊區塊改成橫向的下拉選單（用 `Teleport` 掛到 `body`，位置用 `getBoundingClientRect()` 動態算，避免被 `.tnav-scroll` 的 `overflow-x:auto` 連帶裁切掉——這是本輪唯一抓到的真實 bug，第一版直接把下拉選單放在 scroll 容器裡面會被裁掉看不到，改用 Teleport 才修好）。`App.vue` 的 CSS 變數（`--navy`/`--gold`等）整組換成原始規劃的配色，`TopNav.vue` 拿掉手機版漢堡選單按鈕（改成橫向捲動後手機不需要漢堡選單，跟原始規劃行為一致），連帶刪除只有這兩個檔案在用的 [`src/stores/ui.ts`](src/stores/ui.ts)（已無其他呼叫端）。使用者這輪明確要求「先搬選單＋配色，功能之後再陸續加」，所以 IOU／GG案／月報／出席管理／目標社友／地區行事曆這些原始規劃裡已經做出來的新功能**這輪沒有動**，Vue app 裡目前還沒有對應頁面）
 
 ---
 
 ## ⚠️ 待辦
+
+**【第三十八輪】頂部選單改版，待使用者上正式站複查** ~~本機驗證~~ **Claude 本機用假 Pinia state（`club_secretary`／`district_admin` 兩種角色）+ `npx vue-tsc --noEmit` + `npm run build` 驗證通過 ✅，但本機沒有真實 `.env`，沒有真的登入過正式帳號**：
+1. **待複查**：正式站登入後確認頂部橫向選單跟配色（深藍底+古銅金 active 底線）跟預期一致，選單項目、順序、圖示都跟原本 Sidebar 一致（只是變橫的）
+2. **待複查**：手機／窄螢幕下橫向選單可以左右滑動看到全部項目（原本手機版漢堡選單已拿掉，改成跟桌面版一樣的橫向捲動+箭頭）
+3. **待複查**：各社管理員角色點右側「進階設定」下拉，能看到「邀請/管理本社帳號」；地區管理員點「進階設定」能看到三個項目（邀請/管理地區帳號、功能開關、權限矩陣）；下拉選單位置要跟著觸發按鈕、不會被裁切或超出螢幕
+4. 下一步（使用者這輪明確表示「之後再陸續增加功能」）：`vivianrotary-cloud/3481rotarymember` 原始規劃裡的 IOU／GG案／月報／出席管理／目標社友／地區行事曆，這些都還只是靜態原型，Vue app 裡完全沒有對應頁面/資料表，之後每加一個功能都要重新評估對應的 Supabase schema
 
 **【第三十七輪】補 034 migration，讓跨社協作帳號的姓名顯示出來** ~~待使用者執行~~ **使用者已執行完成 ✅**（Claude 用 CLI 查 `pg_policy` 確認 `profiles_select_collaborator` 這條 policy 確實已建立在 `user_profiles` 上）：
 1. **待複查**：重新整理「帳號管理」頁，「跨社協作帳號」區塊應該要能看到 `bton0505`／`Vivian` 兩筆，姓名正確顯示（不是空白或 `-`）

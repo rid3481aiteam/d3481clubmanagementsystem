@@ -3,12 +3,10 @@
     <template v-if="!auth.loading">
       <template v-if="auth.isLoggedIn && !route.meta.bare">
         <TopNav />
-        <div class="layout">
-          <Sidebar />
-          <main class="main">
-            <RouterView />
-          </main>
-        </div>
+        <TopMenu />
+        <main class="main">
+          <RouterView />
+        </main>
       </template>
       <template v-else>
         <RouterView />
@@ -25,7 +23,7 @@ import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import TopNav from '@/components/layout/TopNav.vue'
-import Sidebar from '@/components/layout/Sidebar.vue'
+import TopMenu from '@/components/layout/TopMenu.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -33,13 +31,13 @@ onMounted(() => auth.init())
 </script>
 
 <style>
-/* ── CSS Variables（扶輪官方色） ── */
+/* ── CSS Variables（比照地區原始規劃 rotary3481_platform_12.html 配色） ── */
 :root {
-  --navy:   #17458F;
-  --navy2:  #1e56b0;
-  --gold:   #F7A81B;
-  --gold-l: #F9C046;
-  --gold-p: #FEF9EE;
+  --navy:   #1C2B4A;
+  --navy2:  #2C3F6B;
+  --gold:   #B8892A;
+  --gold-l: #D4A84B;
+  --gold-p: #FDF8EE;
   --green:  #2A6B48;
   --red:    #B03030;
   --sky:    #2F8FCE;
@@ -47,7 +45,7 @@ onMounted(() => auth.init())
   --card:   #fff;
   --text:   #1A1A2A;
   --muted:  #6B7280;
-  --border: rgba(23,69,143,.12);
+  --border: rgba(28,43,74,.1);
   --r-sm:   6px;
   --r:      10px;
   --r-lg:   16px;
@@ -55,8 +53,8 @@ onMounted(() => auth.init())
   --shadow-sm: 0 1px 3px rgba(23,69,143,.08);
   --shadow-md: 0 4px 12px rgba(23,69,143,.10);
   --shadow-lg: 0 12px 32px rgba(23,69,143,.14);
-  --sidebar-w: 220px;
   --topnav-h:  56px;
+  --topmenu-h: 50px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -65,17 +63,11 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg)
 
 #app-root { height: 100vh; display: flex; flex-direction: column; }
 
-.layout {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  padding-top: var(--topnav-h);
-}
-
 .main {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  padding-top: calc(var(--topnav-h) + var(--topmenu-h) + 24px);
 }
 
 @media (max-width: 900px) {
@@ -295,8 +287,7 @@ tr:hover td { background: rgba(23,69,143,.04); }
 
 /* Print (used by EDM 產生器「下載 PDF」) */
 @media print {
-  .topnav, .sidebar, .sidebar-backdrop { display: none !important; }
-  .layout { padding-top: 0 !important; }
+  .topnav, .topmenu { display: none !important; }
   .main { overflow: visible !important; padding: 0 !important; }
 }
 </style>
