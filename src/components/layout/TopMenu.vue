@@ -96,9 +96,16 @@ const navItems = computed<NavItem[]>(() => {
       items.push({ type: 'link', to: '/meetings', icon: '📅', label: '例會管理' })
     }
     items.push({ type: 'link', to: '/club/officers', icon: '🎖️', label: '社的年度成員' })
-    items.push({ type: 'link', to: '/club/sister-clubs', icon: '🤝', label: '友好社' })
-    items.push({ type: 'link', to: '/club/history', icon: '📜', label: '歷屆社長' })
-    items.push({ type: 'link', to: '/club/service-plans', icon: '🌱', label: '服務計劃總覽' })
+    items.push({
+      type: 'dropdown',
+      icon: '📜',
+      label: '本社歷程',
+      items: [
+        { to: '/club/history', icon: '📜', label: '歷屆社長' },
+        { to: '/club/service-plans', icon: '🌱', label: '服務計劃總覽' },
+        { to: '/club/sister-clubs', icon: '🤝', label: '友好社' },
+      ],
+    })
     if (features.isEnabled('D1_roster')) {
       items.push({ type: 'link', to: '/roster', icon: '📋', label: '社友名冊' })
     }
