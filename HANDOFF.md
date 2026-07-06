@@ -6,12 +6,12 @@
 
 ## ⚠️ 待辦
 
-**【第三十五輪，優先】歷屆社長／服務計劃總覽上線前還要做**：
-1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/032_club_history.sql`~~ **使用者已執行完成 ✅**（Claude 用本機已連結的 Supabase CLI `supabase db query --linked` 查詢 `information_schema.tables` 確認 `club_history` 表確實已建立）
-2. **使用者第一次點「儲存」時表還沒建好，那筆「25-26年／Eric／Ken／文豪基金會花蓮偏鄉服務物資發放…」沒有真的寫入**（Claude 查詢 `club_history` 表當下是空的），已請使用者重新填一次
+**【第三十五輪】歷屆社長／服務計劃總覽** ~~上線前還要做~~ **migration + 首筆真實寫入都已確認 ✅，仍有幾項待複查**：
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/032_club_history.sql`~~ **使用者已執行完成 ✅**（Claude 用本機已連結的 Supabase CLI 查詢 `information_schema.tables` 確認 `club_history` 表確實已建立）
+2. ~~使用者第一次點「儲存」時表還沒建好，那筆沒有真的寫入~~ **使用者重新儲存後已確認 ✅**（Claude 用 CLI 查詢 `club_history` 表，實際看到 2 筆真實資料：2025-2026／Eric／Ken／文豪基金會偏鄉物資發放…、2024-2025／Jerome／Eason／花蓮小太陽、嘉義腦麻協會，`created_at` 是同一天兩次儲存，時間點吻合）
 3. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
-4. **待實測**：確認重新儲存那筆 25-26 年度紀錄成功後，繼續測試編輯/刪除、確認清單依年份新到舊排序；有填服務計劃的年度會出現在「服務計劃總覽」，沒填的不會出現；一般社友帳號確認兩頁都看得到、但「歷屆社長」沒有新增/編輯/刪除按鈕
-5. 本機沒有真實登入密碼，上一輪的驗證是用暫時假 Pinia state + 直接塞假資料進 store 模擬畫面，沒有測到「真的寫入資料庫」這一段，這輪則是用 Supabase CLI 直接查表確認 migration 有沒有成功、資料有沒有寫入，仍不是透過真實登入介面操作
+4. **待複查**：兩筆都有填服務計劃，理論上都該出現在「服務計劃總覽」，麻煩使用者點進去確認畫面上兩筆都有列出、且依年份新到舊排序（2025-2026 在上）；也麻煩測一次編輯/刪除，以及一般社友帳號進「歷屆社長」確認看得到清單但沒有新增/編輯/刪除按鈕
+5. 這輪驗證資料真的有沒有寫入資料庫，是 Claude 用本機 Supabase CLI 直接查表確認，不是透過瀏覽器操作看到的，畫面呈現（排序、服務計劃總覽篩選、社友唯讀）還是要麻煩使用者實際點一次頁面複查
 
 **【第三十四輪】友好社功能** ~~上線前還要做~~ **已由使用者執行 migration 完成，仍待實測**：
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/031_sister_clubs.sql`~~ **使用者已執行完成 ✅**
