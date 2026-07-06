@@ -13,6 +13,7 @@ export type UserRole =
 export interface UserProfile {
   id: string
   club_id: string | null
+  active_club_id: string | null
   name: string
   role: UserRole
   requested_role: UserRole | null
@@ -22,6 +23,18 @@ export interface UserProfile {
   phone: string | null
   created_at: string
   updated_at: string
+}
+
+// 跨社協作授權：某人 home club 之外，被額外授權管理的社
+export interface UserClubRole {
+  user_id: string
+  club_id: string
+  role: UserRole
+  is_active: boolean
+  granted_by: string | null
+  created_at: string
+  updated_at: string
+  user_profiles?: { name: string; is_active: boolean } | null
 }
 
 // ── 社別 / 通訊錄 ────────────────────────────────────

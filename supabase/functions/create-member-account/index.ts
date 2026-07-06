@@ -68,12 +68,17 @@ Deno.serve(async (req) => {
   if (!club_id) return errorResponse('缺少社團', 400)
 
   const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'
-  const isClubTier = CLUB_TIER_ROLES.includes(callerProfile.role)
 
-  // 地區：可為任何社建立社員帳號；各社（社長／執秘對等）：只能建立本社社員帳號
+  // 用 current_club_id()/current_user_role() 而不是 callerProfile 的 home
+  // club_id/role，跨社協作的執秘切到被授權的社之後，也要能建立那個社的帳號。
+  const { data: currentClubId } = await callerClient.rpc('current_club_id')
+  const { data: currentRole } = await callerClient.rpc('current_user_role')
+  const isClubTier = CLUB_TIER_ROLES.includes(currentRole)
+
+  // 地區：可為任何社建立社員帳號；各社（社長／執秘對等）：只能建立目前檢視中的社的社員帳號
   if (!isDistrictAdmin) {
     if (!isClubTier) return errorResponse('沒有權限執行此操作', 403)
-    if (callerProfile.club_id !== club_id)
+    if (currentClubId !== club_id)
       return errorResponse('只能建立本社的帳號', 403)
   }
 

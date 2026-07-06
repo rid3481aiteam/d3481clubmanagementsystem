@@ -71,11 +71,16 @@ Deno.serve(async (req) => {
   if (!targetProfile.phone) return errorResponse('該帳號沒有手機號碼，無法重設為預設密碼', 400)
 
   const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'
-  const isClubTier = CLUB_TIER_ROLES.includes(callerProfile.role)
+
+  // 用 current_club_id()/current_user_role() 而不是 callerProfile 的 home
+  // club_id/role，跨社協作的執秘切到被授權的社之後，也要能管理那個社的帳號。
+  const { data: currentClubId } = await callerClient.rpc('current_club_id')
+  const { data: currentRole } = await callerClient.rpc('current_user_role')
+  const isClubTier = CLUB_TIER_ROLES.includes(currentRole)
 
   if (!isDistrictAdmin) {
     if (!isClubTier) return errorResponse('沒有權限執行此操作', 403)
-    if (callerProfile.club_id !== targetProfile.club_id)
+    if (currentClubId !== targetProfile.club_id)
       return errorResponse('只能重設本社社員的密碼', 403)
   }
 

@@ -32,21 +32,24 @@ const role = ref<'club_member' | 'club_secretary'>('club_secretary')
 const clubId = ref<string | null>(isDistrictAdminView.value ? null : auth.clubId)
 const inviting = ref(false)
 const inviteError = ref<string | null>(null)
-const inviteSuccess = ref(false)
+const inviteSuccessMessage = ref<string | null>(null)
 const showInviteLog = ref(false)
 
 async function submitInvite() {
   if (!email.value.trim() || !clubId.value) return
   inviting.value = true
   inviteError.value = null
-  inviteSuccess.value = false
-  const { error } = await invites.inviteUser(email.value.trim(), role.value, clubId.value, inviteName.value.trim() || undefined)
+  inviteSuccessMessage.value = null
+  const { data, error } = await invites.inviteUser(email.value.trim(), role.value, clubId.value, inviteName.value.trim() || undefined)
   if (error) {
     inviteError.value = error.message
   } else {
     email.value = ''
     inviteName.value = ''
-    inviteSuccess.value = true
+    inviteSuccessMessage.value = data?.cross_club_grant
+      ? '此帳號已存在，已直接授予本社管理權限，請自行通知對方登入後切換社團。'
+      : '邀請已寄出。'
+    await accounts.fetchClubCollaborators()
   }
   inviting.value = false
 }
@@ -179,12 +182,31 @@ async function removeAccount(id: string, name: string) {
   if (error) alert(error.message)
 }
 
+// 跨社協作帳號：home club 在別的社，只是被本社額外授權管理，
+// 不能用「永久刪除」（那會刪掉對方在自己 home club 的整個帳號），
+// 只能調整授權角色或撤銷協作。
+async function toggleCollaboratorPermission(c: { user_id: string; club_id: string; role: UserRole }) {
+  const turningOn = c.role === 'club_member'
+  const nextRole: UserRole = turningOn ? 'club_secretary' : 'club_member'
+  const msg = turningOn ? '確定要把這個協作帳號的權限改成「編輯」嗎？' : '確定要把這個協作帳號的權限改回「檢視」嗎？'
+  if (!confirm(msg)) return
+  const { error } = await accounts.updateCollaboratorRole(c.user_id, c.club_id, nextRole)
+  if (error) alert(error.message)
+}
+
+async function removeCollaborator(c: { user_id: string; club_id: string }, name: string) {
+  if (!confirm(`確定要撤銷「${name}」對本社的協作權限嗎？對方在自己所屬社的帳號不受影響。`)) return
+  const { error } = await accounts.revokeCollaborator(c.user_id, c.club_id)
+  if (error) alert(error.message)
+}
+
 onMounted(async () => {
   await club.fetchAll()
   await invites.fetchLog()
   await accounts.fetchManaged()
   if (canManagePending.value) await accounts.fetchPending()
   await accounts.fetchMembers()
+  if (!isDistrictAdminView.value) await accounts.fetchClubCollaborators()
 })
 </script>
 
@@ -233,7 +255,7 @@ onMounted(async () => {
         </button>
       </div>
       <p v-if="inviteError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ inviteError }}</p>
-      <p v-if="inviteSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">邀請已寄出。</p>
+      <p v-if="inviteSuccessMessage" style="margin-top:10px; font-size:12px; color:var(--green);">{{ inviteSuccessMessage }}</p>
     </div>
 
     <div class="tw" style="padding:20px; margin-bottom:14px;">
@@ -410,5 +432,49 @@ onMounted(async () => {
         </tbody>
       </table>
     </div>
+
+    <template v-if="!isDistrictAdminView">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin:24px 0 8px;">跨社協作帳號</h2>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">
+        這些人原本是別的社的帳號，被本社額外授權管理，不佔本社的帳號名額。撤銷協作不影響對方原本所屬社的帳號。
+      </p>
+      <div class="tw">
+        <table>
+          <thead class="th">
+            <tr>
+              <th>姓名</th>
+              <th>權限</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in accounts.collaborators" :key="`${c.user_id}-${c.club_id}`">
+              <td>{{ c.user_profiles?.name ?? '-' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="toggle-switch"
+                  role="switch"
+                  :aria-checked="c.role !== 'club_member'"
+                  aria-label="權限：檢視／編輯"
+                  @click="toggleCollaboratorPermission(c)"
+                >
+                  <span class="track"><span class="knob"></span></span>
+                  <span class="label">{{ c.role === 'club_member' ? '檢視' : '編輯' }}</span>
+                </button>
+              </td>
+              <td>
+                <button class="btn btn-red btn-sm" @click="removeCollaborator(c, c.user_profiles?.name ?? '')">
+                  撤銷協作
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!accounts.collaborators.length">
+              <td colspan="3" style="text-align:center; color:var(--muted);">尚無跨社協作帳號</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
   </div>
 </template>

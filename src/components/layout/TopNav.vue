@@ -21,6 +21,15 @@
         >{{ auth.clubName || '本社介面' }}</button>
       </div>
       <span v-else class="topnav-context">{{ interfaceLabel }}</span>
+      <select
+        v-if="auth.canSwitchClub"
+        class="club-switch-select"
+        title="切換檢視中的社"
+        :value="auth.clubId"
+        @change="onSwitchClub"
+      >
+        <option v-for="c in auth.accessibleClubs" :key="c.club_id" :value="c.club_id">{{ c.name }}</option>
+      </select>
     </div>
     <div class="topnav-right">
       <span class="topnav-user" style="cursor:pointer;" title="點擊修改顯示名稱" @click="editName">
@@ -77,6 +86,12 @@ const interfaceLabel = computed(() => {
 async function handleSignOut() {
   await auth.signOut()
   router.push('/login')
+}
+
+async function onSwitchClub(e: Event) {
+  const targetClubId = (e.target as HTMLSelectElement).value
+  const { error } = await auth.switchActiveClub(targetClubId)
+  if (error) alert(error.message)
 }
 
 async function editName() {
@@ -138,6 +153,7 @@ async function editName() {
   .topnav-context { font-size: 12px; max-width: 120px; }
   .topnav-user { display: none; }
   .view-switch-btn { font-size: 11px; padding: 4px 8px; max-width: 90px; }
+  .club-switch-select { font-size: 11px; padding: 4px 8px; max-width: 100px; }
 }
 
 .topnav-wheel {
@@ -198,6 +214,22 @@ async function editName() {
   background: var(--gold);
   color: var(--navy);
   font-weight: 700;
+}
+
+.club-switch-select {
+  margin-left: 4px;
+  max-width: 160px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.club-switch-select option {
+  color: var(--navy);
 }
 
 .topnav-right {

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import type { UserProfile, UserRole } from '@/types'
+import type { UserProfile, UserRole, UserClubRole } from '@/types'
 
 function unwrapFunctionError(error: unknown) {
   if (error instanceof FunctionsHttpError) {
@@ -17,6 +17,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const managed = ref<UserProfile[]>([])
   const pending = ref<UserProfile[]>([])
   const members = ref<UserProfile[]>([])
+  const collaborators = ref<UserClubRole[]>([])
   const loading = ref(false)
 
   async function fetchManaged() {
@@ -111,6 +112,39 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
+  // 跨社協作帳號：home club 在別的社，但被目前這個社（current_club_id()）
+  // 額外授權管理的人。跟 fetchManaged/fetchMembers 分開查，因為 user_profiles
+  // 的 RLS 只回傳 home club 是目前社的人，查不到這種人。
+  async function fetchClubCollaborators() {
+    const { data } = await supabase
+      .from('user_club_roles')
+      .select('*, user_profiles(name, is_active)')
+      .order('created_at', { ascending: false })
+    collaborators.value = data ?? []
+  }
+
+  async function updateCollaboratorRole(userId: string, clubId: string, role: UserRole) {
+    const { error } = await supabase
+      .from('user_club_roles')
+      .update({ role })
+      .eq('user_id', userId)
+      .eq('club_id', clubId)
+    if (!error) await fetchClubCollaborators()
+    return { error }
+  }
+
+  async function revokeCollaborator(userId: string, clubId: string) {
+    const { error } = await supabase
+      .from('user_club_roles')
+      .delete()
+      .eq('user_id', userId)
+      .eq('club_id', clubId)
+    if (!error) collaborators.value = collaborators.value.filter(
+      c => !(c.user_id === userId && c.club_id === clubId)
+    )
+    return { error }
+  }
+
   async function deleteAccount(id: string) {
     const { error } = await supabase.functions.invoke('delete-account', {
       body: { user_id: id },
@@ -124,9 +158,10 @@ export const useAccountsStore = defineStore('accounts', () => {
   }
 
   return {
-    managed, pending, members, loading,
+    managed, pending, members, collaborators, loading,
     fetchManaged, fetchPending, approveRole, dismissPending,
     fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictRole, deleteAccount,
+    fetchClubCollaborators, updateCollaboratorRole, revokeCollaborator,
   }
 })
