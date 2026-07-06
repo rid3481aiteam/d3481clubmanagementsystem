@@ -25,16 +25,21 @@
 
         <!-- 以下僅地區管理員（唯讀角色看不到、也進不去） -->
         <template v-if="auth.isDistrictAdminView">
-          <div class="nav-section">進階設定</div>
-          <RouterLink to="/club/invite" class="nav-item">
-            <span class="nav-icon">👤</span>邀請 / 管理地區帳號
-          </RouterLink>
-          <RouterLink to="/admin/features" class="nav-item">
-            <span class="nav-icon">⚙️</span>功能開關
-          </RouterLink>
-          <RouterLink to="/admin/permissions" class="nav-item">
-            <span class="nav-icon">🔐</span>權限矩陣
-          </RouterLink>
+          <button type="button" class="nav-section nav-section-toggle" @click.stop="advancedOpen = !advancedOpen">
+            進階設定
+            <span class="nav-section-chevron">{{ advancedOpen ? '▾' : '▸' }}</span>
+          </button>
+          <template v-if="advancedOpen">
+            <RouterLink to="/club/invite" class="nav-item">
+              <span class="nav-icon">👤</span>邀請 / 管理地區帳號
+            </RouterLink>
+            <RouterLink to="/admin/features" class="nav-item">
+              <span class="nav-icon">⚙️</span>功能開關
+            </RouterLink>
+            <RouterLink to="/admin/permissions" class="nav-item">
+              <span class="nav-icon">🔐</span>權限矩陣
+            </RouterLink>
+          </template>
         </template>
       </template>
 
@@ -69,8 +74,11 @@
 
       <!-- 各社管理員（club_secretary/club_admin）：本社帳號自行管理，地區視角下不顯示 -->
       <template v-if="!auth.isDistrictView && (auth.role === 'club_secretary' || auth.role === 'club_admin')">
-        <div class="nav-section">進階設定</div>
-        <RouterLink to="/club/invite" class="nav-item">
+        <button type="button" class="nav-section nav-section-toggle" @click.stop="advancedOpen = !advancedOpen">
+          進階設定
+          <span class="nav-section-chevron">{{ advancedOpen ? '▾' : '▸' }}</span>
+        </button>
+        <RouterLink v-if="advancedOpen" to="/club/invite" class="nav-item">
           <span class="nav-icon">👤</span>邀請 / 管理本社帳號
         </RouterLink>
       </template>
@@ -85,6 +93,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useFeaturesStore } from '@/stores/features'
 import { useUiStore } from '@/stores/ui'
@@ -92,6 +101,9 @@ import { useUiStore } from '@/stores/ui'
 const auth = useAuthStore()
 const features = useFeaturesStore()
 const ui = useUiStore()
+
+const advancedOpen = ref(false)
+watch(() => auth.isDistrictView, () => { advancedOpen.value = false })
 </script>
 
 <style scoped>
@@ -143,6 +155,27 @@ const ui = useUiStore()
   background: var(--navy);
   color: #fff;
   font-weight: 600;
+}
+
+.nav-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.nav-section-toggle:hover {
+  color: var(--navy);
+}
+
+.nav-section-chevron {
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .nav-icon { font-size: 15px; width: 20px; text-align: center; }
