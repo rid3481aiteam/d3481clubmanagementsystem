@@ -1,10 +1,17 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-06（第三十八輪，**選單從左側 Sidebar 改成頂部橫向選單，配色改用地區原始規劃的深藍/古銅金**——使用者提供另一個 repo `vivianrotary-cloud/3481rotarymember`（`rotary3481_platform_12.html`，7388 行單檔靜態原型）作為「原始規劃」參考，裡面已經定義好配色（`--navy:#1C2B4A`／`--gold:#B8892A`，比現有配色更深沉，不是原本的寶藍/亮金）跟頂部選單的版面（跑馬燈公告列 + 橫向選單，選單背景整條深藍、超出項目用「橫向捲動＋左右箭頭」而不是下拉收合）。這輪把這套版面套進實際的 Vue app：新增 [`src/components/layout/TopMenu.vue`](src/components/layout/TopMenu.vue) 取代原本的 [`src/components/layout/Sidebar.vue`](src/components/layout/Sidebar.vue)（已刪除），選單項目、角色/feature-flag 判斷邏輯原封不動照抄 Sidebar 的規則，只是排列方式從直向清單改成橫向可捲動列；原本地區/各社共用的「進階設定」摺疊區塊改成橫向的下拉選單（用 `Teleport` 掛到 `body`，位置用 `getBoundingClientRect()` 動態算，避免被 `.tnav-scroll` 的 `overflow-x:auto` 連帶裁切掉——這是本輪唯一抓到的真實 bug，第一版直接把下拉選單放在 scroll 容器裡面會被裁掉看不到，改用 Teleport 才修好）。`App.vue` 的 CSS 變數（`--navy`/`--gold`等）整組換成原始規劃的配色，`TopNav.vue` 拿掉手機版漢堡選單按鈕（改成橫向捲動後手機不需要漢堡選單，跟原始規劃行為一致），連帶刪除只有這兩個檔案在用的 [`src/stores/ui.ts`](src/stores/ui.ts)（已無其他呼叫端）。使用者這輪明確要求「先搬選單＋配色，功能之後再陸續加」，所以 IOU／GG案／月報／出席管理／目標社友／地區行事曆這些原始規劃裡已經做出來的新功能**這輪沒有動**，Vue app 裡目前還沒有對應頁面）
+> 最後更新：2026-07-06（第三十九輪，**修手機版 TopNav 換行破版 bug + 選單合併「本社歷程」**——延續第三十八輪的頂部選單改版：① 手機窄螢幕（375px）下標題文字沒設 `white-space:nowrap`，會換成兩行撐高 TopNav，導致下面用 `position:fixed` 靠 `--topnav-h` 定位的 TopMenu 疊到標題上面，已修好（[`TopNav.vue`](src/components/layout/TopNav.vue) 加上 ellipsis 截斷 + flex 縮放規則）；② 使用者要求把「友好社／歷屆社長／服務計劃總覽」三個原本各自獨立的選單項目，順序改成「歷屆社長、服務計劃總覽、友好社」並合併成一個下拉群組「本社歷程」，減少選單一次要塞的項目數，已在 [`TopMenu.vue`](src/components/layout/TopMenu.vue) 改好並用假 Pinia state 驗證下拉順序正確）
+
+> 最後更新（上一輪）：2026-07-06（第三十八輪，**選單從左側 Sidebar 改成頂部橫向選單，配色改用地區原始規劃的深藍/古銅金**——使用者提供另一個 repo `vivianrotary-cloud/3481rotarymember`（`rotary3481_platform_12.html`，7388 行單檔靜態原型）作為「原始規劃」參考，裡面已經定義好配色（`--navy:#1C2B4A`／`--gold:#B8892A`，比現有配色更深沉，不是原本的寶藍/亮金）跟頂部選單的版面（跑馬燈公告列 + 橫向選單，選單背景整條深藍、超出項目用「橫向捲動＋左右箭頭」而不是下拉收合）。這輪把這套版面套進實際的 Vue app：新增 [`src/components/layout/TopMenu.vue`](src/components/layout/TopMenu.vue) 取代原本的 [`src/components/layout/Sidebar.vue`](src/components/layout/Sidebar.vue)（已刪除），選單項目、角色/feature-flag 判斷邏輯原封不動照抄 Sidebar 的規則，只是排列方式從直向清單改成橫向可捲動列；原本地區/各社共用的「進階設定」摺疊區塊改成橫向的下拉選單（用 `Teleport` 掛到 `body`，位置用 `getBoundingClientRect()` 動態算，避免被 `.tnav-scroll` 的 `overflow-x:auto` 連帶裁切掉——這是本輪唯一抓到的真實 bug，第一版直接把下拉選單放在 scroll 容器裡面會被裁掉看不到，改用 Teleport 才修好）。`App.vue` 的 CSS 變數（`--navy`/`--gold`等）整組換成原始規劃的配色，`TopNav.vue` 拿掉手機版漢堡選單按鈕（改成橫向捲動後手機不需要漢堡選單，跟原始規劃行為一致），連帶刪除只有這兩個檔案在用的 [`src/stores/ui.ts`](src/stores/ui.ts)（已無其他呼叫端）。使用者這輪明確要求「先搬選單＋配色，功能之後再陸續加」，所以 IOU／GG案／月報／出席管理／目標社友／地區行事曆這些原始規劃裡已經做出來的新功能**這輪沒有動**，Vue app 裡目前還沒有對應頁面）
 
 ---
 
 ## ⚠️ 待辦
+
+**【第三十九輪】待使用者上正式站複查手機版 + 選單合併結果** ~~本機驗證~~ **Claude 本機用假 Pinia state（`club_member` 角色）+ `npx vue-tsc --noEmit` 驗證通過 ✅，本機仍沒有真實 `.env`**：
+1. **待複查**：手機瀏覽器（或縮小視窗到 375px 左右）確認標題不會再換行、TopMenu 不會疊到 TopNav 上
+2. **待複查**：「本社歷程」下拉裡的順序應該是歷屆社長→服務計劃總覽→友好社，點進去三個連結都要能正常導頁
+3. RWD 后續還可以優化的方向（尚未動）：手機版橫向選單項目一多還是要滑很多次，之後可以考慮手機版拿掉圖示只留文字、塞進更多項目
 
 **【第三十八輪】頂部選單改版，待使用者上正式站複查** ~~本機驗證~~ **Claude 本機用假 Pinia state（`club_secretary`／`district_admin` 兩種角色）+ `npx vue-tsc --noEmit` + `npm run build` 驗證通過 ✅，但本機沒有真實 `.env`，沒有真的登入過正式帳號**：
 1. **待複查**：正式站登入後確認頂部橫向選單跟配色（深藍底+古銅金 active 底線）跟預期一致，選單項目、順序、圖示都跟原本 Sidebar 一致（只是變橫的）
