@@ -1,18 +1,23 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-06（第三十六輪，**新增「單一帳號跨社管理」功能**——起因是使用者發現：某人已經是別的社（例如 A 社）的註冊帳號，和平社想邀請他當管理員/執秘時，因為 Supabase Auth 的 email 全域唯一，`invite-user` 一律回「此 Email 已經註冊過帳號」而失敗。新增 `user_club_roles` 表記錄「home club 之外的額外授權」+ `user_profiles.active_club_id` 記錄「目前切換檢視中的社」，`current_club_id()`/`current_user_role()` 這兩個被 20+ 個既有 RLS policy 呼叫的 helper function 改成依 `active_club_id` 動態解析，其餘 policy 完全不用改就自動生效。migration + 4 支 Edge Function 都已部署完成，只差前端 push 到 Cloudflare Pages + 使用者用真帳號實測）
+> 最後更新：2026-07-06（第三十七輪，**修「跨社協作帳號」看不到人的 bug**——使用者實測第三十六輪功能，邀請 `bton0505@gmail.com`／`vivianrotary@gmail.com` 都正確觸發跨社授權（`invite_log`／`user_club_roles` 都有正確寫入），但「帳號管理」頁的「跨社協作帳號」區塊卻顯示「尚無跨社協作帳號」。查出兩個疊加的 bug：① `fetchClubCollaborators()` 用 PostgREST 內嵌語法 `select('*, user_profiles(...))'`，但 `user_club_roles.user_id` 只有 FK 指到 `auth.users`、沒有直接指到 `user_profiles`，內嵌查詢整個失敗，且原本沒檢查 error，悄悄變空陣列；② 就算查詢語法對了，`user_profiles` 也沒有任何 RLS policy放行「讀取別社但有授權到本社的人的 profile」。已修好①（分兩次查再手動合併，見 [`src/stores/accounts.ts`](src/stores/accounts.ts)）並推上 GitHub，②寫成新 migration `034_collaborator_profile_visibility.sql`，待使用者貼到 SQL Editor 執行）
 
 ---
 
 ## ⚠️ 待辦
 
-**【第三十六輪，優先】單一帳號跨社管理** **migration 已由使用者手動貼到 Supabase SQL Editor 執行完成 ✅，4 支 Edge Function 已由 Claude 用 CLI 部署完成 ✅，仍待實測**：
+**【第三十七輪，優先】補 034 migration，讓跨社協作帳號的姓名顯示出來**：
+1. 在 Supabase SQL Editor 執行 `supabase/migrations/034_collaborator_profile_visibility.sql`（新增 `user_profiles` 的 SELECT policy：社長/執秘可以讀到「有授權到本社」的人的姓名/啟用狀態）——**待使用者執行**
+2. 前端修好的部分（`fetchClubCollaborators` 改成分兩次查）已經 push 完成，Cloudflare Pages 應該會自動部署——**待確認**
+3. **待複查**：034 執行完後，重新整理「帳號管理」頁，「跨社協作帳號」區塊應該要能看到 `bton0505`／`Vivian` 兩筆，姓名正確顯示（不是空白或 `-`）
+4. 確認完 034 之後，才接續第三十六輪原本待實測的項目：用 `bton0505`／`vivianrotary` 這兩個帳號實際登入，確認 TopNav 有切換社團的下拉選單、切過去能編輯和平社資料、切回去不影響原本社的權限；再測一次「跨社協作帳號」區塊的權限開關（改成檢視）跟「撤銷協作」
+
+**【第三十六輪】單一帳號跨社管理** **migration 已由使用者手動貼到 Supabase SQL Editor 執行完成 ✅，4 支 Edge Function 已由 Claude 用 CLI 部署完成 ✅**：
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/033_multi_club_access.sql`~~ **使用者已執行完成 ✅**（Claude 用本機 CLI 查 `pg_proc`/`information_schema` 確認 `current_club_id`/`current_user_role`/`is_club_tier`/`is_club_secretary`/`find_user_id_by_email` 五個 function、`user_club_roles` 表、`user_profiles.active_club_id` 欄位都已存在）
 2. ~~部署 `invite-user`/`delete-account`/`reset-member-password`/`create-member-account` 四支 Edge Function~~ **已完成**（Claude 用 CLI 部署，curl 空 body 測試 `invite-user` 確認回傳正常 401，不是 500 崩潰）
-3. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
-4. **待實測（需要真實帳號，Claude 不能代勞登入）**：找一個已經在別的社（非和平社）註冊過的真實帳號 email，用和平社的社長/執秘帳號登入「帳號管理」頁邀請這個 email 進和平社 → 應該顯示「此帳號已存在，已直接授予本社管理權限…」而不是「已經註冊過帳號」的錯誤 → 「跨社協作帳號」區塊應該多一筆 → 用那個帳號登入 → TopNav 右上角應該出現一個下拉選單可以切換到「和平社」→ 切過去之後應該能編輯和平社的名冊/例會/出席等資料，切回原本的社則恢復只能管原本社的資料
-5. 補測：在「跨社協作帳號」區塊把剛才那筆的權限從「編輯」切回「檢視」、再測「撤銷協作」，確認撤銷後對方原本所屬社的帳號不受影響（可以正常登入，只是和平社的協作權限消失）
-6. 這輪唯一的已知取捨：跨社授權**不需要對方按「接受」**，授權當下就生效（跟全新邀請要收信+設密碼不同），如果使用者覺得應該要有確認步驟再回來討論
+3. ~~部署新版前端到 Cloudflare Pages~~ **已推送**
+4. **使用者實測發現**：邀請 `bton0505@gmail.com`／`vivianrotary@gmail.com` 都正確觸發跨社授權邏輯，但畫面上的「跨社協作帳號」區塊顯示空的——**這就是第三十七輪要修的 bug**，邀請本身的邏輯（`invite_log`／`user_club_roles` 正確寫入）沒有問題
+5. 這輪唯一的已知取捨：跨社授權**不需要對方按「接受」**，授權當下就生效（跟全新邀請要收信+設密碼不同），如果使用者覺得應該要有確認步驟再回來討論
 
 **【第三十五輪】歷屆社長／服務計劃總覽** ~~上線前還要做~~ **migration + 首筆真實寫入都已確認 ✅，仍有幾項待複查**：
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/032_club_history.sql`~~ **使用者已執行完成 ✅**（Claude 用本機已連結的 Supabase CLI 查詢 `information_schema.tables` 確認 `club_history` 表確實已建立）
