@@ -115,12 +115,33 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 跨社協作帳號：home club 在別的社，但被目前這個社（current_club_id()）
   // 額外授權管理的人。跟 fetchManaged/fetchMembers 分開查，因為 user_profiles
   // 的 RLS 只回傳 home club 是目前社的人，查不到這種人。
+  //
+  // 分兩次查而不是用 PostgREST 的 user_profiles(...) 內嵌語法：
+  // user_club_roles.user_id 只有 FK 指到 auth.users，沒有直接指到
+  // user_profiles，PostgREST 找不到這個關聯會讓內嵌查詢整個失敗
+  // （之前這裡沒檢查 error，失敗時就悄悄變成空陣列）。
   async function fetchClubCollaborators() {
-    const { data } = await supabase
+    const { data: grants } = await supabase
       .from('user_club_roles')
-      .select('*, user_profiles(name, is_active)')
+      .select('*')
       .order('created_at', { ascending: false })
-    collaborators.value = data ?? []
+
+    const userIds = [...new Set((grants ?? []).map(g => g.user_id))]
+    let profilesById: Record<string, { name: string; is_active: boolean }> = {}
+    if (userIds.length) {
+      const { data: profiles } = await supabase
+        .from('user_profiles')
+        .select('id, name, is_active')
+        .in('id', userIds)
+      profilesById = Object.fromEntries(
+        (profiles ?? []).map(p => [p.id, { name: p.name, is_active: p.is_active }])
+      )
+    }
+
+    collaborators.value = (grants ?? []).map(g => ({
+      ...g,
+      user_profiles: profilesById[g.user_id] ?? null,
+    }))
   }
 
   async function updateCollaboratorRole(userId: string, clubId: string, role: UserRole) {
