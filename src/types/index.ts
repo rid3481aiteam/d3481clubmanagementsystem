@@ -85,6 +85,25 @@ export type ClubAnnouncementUpdate = Partial<
   Omit<ClubAnnouncement, 'id' | 'club_id' | 'created_at' | 'updated_at' | 'created_by'>
 >
 
+// ── 友好社 ───────────────────────────────────────────
+export interface SisterClub {
+  id: string
+  club_id: string
+  partner_name: string
+  established_date: string
+  president_name: string | null
+  relationship_note: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type SisterClubInsert = Omit<SisterClub, 'id' | 'created_at' | 'updated_at'>
+
+export type SisterClubUpdate = Partial<
+  Omit<SisterClub, 'id' | 'club_id' | 'created_at' | 'updated_at' | 'created_by'>
+>
+
 // ── 總監獎項申請 ─────────────────────────────────────
 export type GovernorAwardStatus = 'draft' | 'submitted'
 export type GovernorAwardGroup = 'A' | 'B'

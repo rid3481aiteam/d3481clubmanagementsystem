@@ -58,6 +58,9 @@
         <RouterLink to="/club/officers" class="nav-item">
           <span class="nav-icon">🎖️</span>社的年度成員
         </RouterLink>
+        <RouterLink to="/club/sister-clubs" class="nav-item">
+          <span class="nav-icon">🤝</span>友好社
+        </RouterLink>
         <RouterLink v-if="features.isEnabled('D1_roster')" to="/roster" class="nav-item">
           <span class="nav-icon">📋</span>社友名冊
         </RouterLink>

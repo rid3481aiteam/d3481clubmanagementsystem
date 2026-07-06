@@ -1,10 +1,16 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-06（第三十三輪，**Sidebar 選單重整：地區/社務分流 + 新增「進階設定」分類（預設收合，點擊才展開）**——使用者發現地區視角下有些帳號會同時看到「社務管理」選單（角色是各社管理員、但又有地區唯讀/管理權限時），這是之前 sidebar 只用 `role` 判斷、沒有排除地區視角的既有 bug。這輪把整份 Sidebar 依使用者指定的資訊架構重排，並把「進階設定」做成預設收合、點一下才展開，避免誤觸）
+> 最後更新：2026-07-06（第三十四輪，**新增「友好社」功能**——以和平社為例，使用者想把跟其他社（新竹和平社、花蓮東南社、礁溪社、鹿耳島北社（姐妹社）、八德聯誼會（忠孝/仁愛/信義社）等）的結盟關係記錄在系統上，讓新社友能查到跟誰結盟、什麼時候結盟、當屆社長是誰、兩社情誼細節。新增 `sister_clubs` 資料表 + 「社務管理」選單新項目，社長/執秘可新增編輯，全部社友（含一般社友）都能唯讀查詢，清單依結盟時間自動排序、最新在最上方）
 
 ---
 
 ## ⚠️ 待辦
+
+**【第三十四輪，優先】友好社功能上線前還要做**：
+1. **在 Supabase SQL Editor 執行 `supabase/migrations/031_sister_clubs.sql`**——這步 Claude 沒辦法代勞（這台環境的 Supabase MCP 帳號清單裡沒有 D3481 這個專案，只能寫 migration 檔案交給使用者貼到 SQL Editor 執行）
+2. 部署新版前端到 Cloudflare Pages（Cloudflare Pages 接 GitHub 自動部署，push 上去應該就會觸發，不用額外操作）
+3. Migration 執行 + 部署完成後，建議用和平社的執秘/社長帳號登入正式站，到「社務管理 → 友好社」測試：新增一筆（例如「新竹和平社」，結盟時間隨便填一個日期，當屆社長、兩社情誼說明可選填）、編輯、刪除、確認清單自動依結盟時間新到舊排序；再用一般社友帳號登入確認看得到清單但沒有新增/編輯/刪除按鈕
+4. **本機沒有真實 `.env`／登入密碼，這輪的驗證是靠暫時塞假 Pinia state + 直接把假資料塞進 store 的 `list` 模擬畫面結果，沒有真的寫入資料庫**，上面第 3 點的「真的新增一筆並確認寫進資料庫」這段沒辦法由 Claude 代勞
 
 **【第三十三輪】Sidebar 重整 + 進階設定收合** ~~待實測~~ **Claude 本機用假 Pinia state 模擬三種角色驗證通過 ✅，但仍建議使用者上正式站用真帳號複查一次**：
 1. 地區管理員（`district_role='admin'`）：總覽 → 地區（社團總覽/地區公告/總監獎項統整/EDM產生器）→ 進階設定（邀請/管理地區帳號/功能開關/權限矩陣），沒有社務管理 —— 本機模擬驗證通過
@@ -61,6 +67,23 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第三十四輪）：新增「友好社」功能
+
+使用者以和平社為例，想把跟其他社的友好/姐妹社結盟關係記錄在系統上（新竹和平社、花蓮東南社、礁溪社、鹿耳島北社（姐妹社）、八德聯誼會（忠孝/仁愛/信義社）），欄位定案為「社名、結盟時間、當屆社長、兩社情誼說明」，全部可編輯新增，清單依結盟時間自動排序、最新在最上方。完全比照這個 repo 既有「社內公告」（`club_announcements`）的資料表/RLS/CRUD store/畫面模式做，沒有發明新架構。
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/031_sister_clubs.sql`（**已寫好，尚未執行**） | 新表 `sister_clubs`：`club_id`、`partner_name`、`established_date`、`president_name`、`relationship_note`。RLS 完全比照 `022_district_announcements.sql` 裡 `club_announcements` 那份寫法：`SELECT` 只要 `club_id = current_club_id()`（同社任何角色都能看，含一般社友）；`INSERT`/`UPDATE`/`DELETE` 多加 `is_club_tier()`（僅社長/執秘）。沒有加地區管理員的例外——跟 `club_announcements` 一致，地區視角看不到各社的友好社資料，符合這個專案「地區只管地區、各社管各社」的一貫原則 |
+| `src/types/index.ts` | 新增 `SisterClub`/`SisterClubInsert`/`SisterClubUpdate` 型別，跟著 `ClubAnnouncement` 那組的命名習慣 |
+| `src/stores/sisterClubs.ts`（新檔） | `fetchAll(clubId)`／`create`／`update`／`remove`，寫法完全複製 `announcements.ts` 的 `fetchClubForAdmin`/`createClubAnnouncement` 那組 CRUD pattern |
+| `src/views/club/SisterClubsView.vue`（新檔） | 複製 `ClubAnnouncementsView.vue` 的「表格 + 新增/編輯彈窗」骨架換成友好社的四個欄位；`canManage`（`club_admin`/`club_secretary`）才看得到「+ 新增友好社」按鈕跟每列的「編輯/刪除」，`club_member` 唯讀；清單排序由 store 的 `fetchAll` 查詢 `order('established_date', { ascending: false })` 做到，不需要額外的手動排序欄位 |
+| `src/router/index.ts` | 新增 `/club/sister-clubs` 路由，`meta.roles` 跟 `/club/officers` 一樣開放給 `club_admin`/`club_secretary`/`club_member` 三種角色（社友唯讀進得去） |
+| `src/components/layout/Sidebar.vue` | 「社務管理」區塊在「社的年度成員」後面加一項「🤝 友好社」連結 |
+
+**沒有加**：功能開關（`features` 表）沒有幫這個功能加新的 flag key——參考 `/club/officers`（社的年度成員）同樣沒有 feature flag，直接常駐顯示，這次跟進同樣的模式，不需要地區管理員額外去「功能開關」頁面開啟。也沒有讓地區視角能瀏覽別社的友好社資料（沒被要求，且跟現有 `club_announcements` 的隔離原則一致）。
+
+**驗證**：`npx vue-tsc --noEmit`、`npm run build` 皆通過。本機沒有真實 Supabase 連線，一樣用暫時 `.env`（假金鑰，驗證後已還原不進 commit）+ 暫時在 `main.ts` 掛 `window.__pinia`/`window.__router`（驗證後已還原）搭配模擬 Pinia state：用 `club_secretary` 身分開啟「+ 新增友好社」彈窗確認四個欄位（社名/結盟時間/當屆社長/兩社情誼說明）都在，直接把使用者提供的 5 筆友好社資料塞進 store 的 `list`（跳過真實網路寫入，因為沒有真的 Supabase 連線可以測），確認畫面依結盟時間新到舊排序（2021→2019→2015→2010→2008，最新的八德聯誼會排最上面）；再切成 `club_member` 身分確認同一頁看得到完整清單，但沒有「新增」按鈕、也沒有每列的「編輯/刪除」。**這次的驗證完全沒有測到「真的寫入 Supabase 資料庫」這一段**（migration 還沒執行、也沒有真帳號密碼），麻煩使用者照上面待辦第三十四輪跑一次真實流程確認。
 
 ## 本次完成（第三十三輪）：Sidebar 選單重整——地區/社務分流 + 新增「進階設定」分類（預設收合）
 

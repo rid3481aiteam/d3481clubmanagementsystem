@@ -91,6 +91,12 @@ const router = createRouter({
       component: () => import('@/views/club/GovernorAwardFormView.vue'),
       meta: { roles: ['club_admin', 'club_secretary'] },
     },
+    {
+      path: '/club/sister-clubs',
+      name: 'club-sister-clubs',
+      component: () => import('@/views/club/SisterClubsView.vue'),
+      meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
+    },
     // H 通訊錄
     {
       path: '/directory',
