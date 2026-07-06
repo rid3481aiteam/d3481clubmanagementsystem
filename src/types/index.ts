@@ -104,6 +104,25 @@ export type SisterClubUpdate = Partial<
   Omit<SisterClub, 'id' | 'club_id' | 'created_at' | 'updated_at' | 'created_by'>
 >
 
+// ── 歷屆社長 / 服務計劃 ───────────────────────────────
+export interface ClubHistoryRecord {
+  id: string
+  club_id: string
+  year_term: string
+  president_name: string | null
+  secretary_name: string | null
+  service_plan: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ClubHistoryInsert = Omit<ClubHistoryRecord, 'id' | 'created_at' | 'updated_at'>
+
+export type ClubHistoryUpdate = Partial<
+  Omit<ClubHistoryRecord, 'id' | 'club_id' | 'created_at' | 'updated_at' | 'created_by'>
+>
+
 // ── 總監獎項申請 ─────────────────────────────────────
 export type GovernorAwardStatus = 'draft' | 'submitted'
 export type GovernorAwardGroup = 'A' | 'B'

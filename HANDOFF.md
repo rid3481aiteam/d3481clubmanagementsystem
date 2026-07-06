@@ -1,12 +1,18 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-06（第三十四輪，**新增「友好社」功能**——以和平社為例，使用者想把跟其他社（新竹和平社、花蓮東南社、礁溪社、鹿耳島北社（姐妹社）、八德聯誼會（忠孝/仁愛/信義社）等）的結盟關係記錄在系統上，讓新社友能查到跟誰結盟、什麼時候結盟、當屆社長是誰、兩社情誼細節。新增 `sister_clubs` 資料表 + 「社務管理」選單新項目，社長/執秘可新增編輯，全部社友（含一般社友）都能唯讀查詢，清單依結盟時間自動排序、最新在最上方）
+> 最後更新：2026-07-06（第三十五輪，**新增「歷屆社長」+「服務計劃總覽」兩個功能**——使用者想把社的文化資料（每屆社長、當年秘書、當年度社區服務計劃）留在系統上，跟第三十四輪的「友好社」是同一批需求的延續。新增 `club_history` 資料表，兩個畫面共用同一份資料：「歷屆社長」是完整編輯頁（年份/社長/秘書/服務計劃），「服務計劃總覽」是唯讀彙整頁，只挑有填服務計劃的年度列出來，兩邊資料自動同步，不用重複維護）
 
 ---
 
 ## ⚠️ 待辦
 
-**【第三十四輪，優先】友好社功能上線前還要做**：
+**【第三十五輪，優先】歷屆社長／服務計劃總覽上線前還要做**：
+1. **在 Supabase SQL Editor 執行 `supabase/migrations/032_club_history.sql`**——Claude 沒辦法代勞，寫法完全比照上一輪的 `031_sister_clubs.sql`
+2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）
+3. **待實測**：和平社執秘/社長帳號登入，到「社務管理 → 歷屆社長」新增幾筆不同年份的紀錄（年份可以隨意填，例如 2023-2024、2024-2025，社長/秘書/服務計劃可選填），確認清單依年份新到舊排序；有填服務計劃的年度會出現在「服務計劃總覽」，沒填的不會出現；一般社友帳號確認兩頁都看得到、但「歷屆社長」沒有新增/編輯/刪除按鈕
+4. 本機沒有真實登入密碼，這輪一樣是用暫時假 Pinia state + 直接塞假資料進 store 模擬畫面（含驗證「服務計劃總覽」正確濾掉沒填服務計劃的年度），沒有測到「真的寫入資料庫」這一段，麻煩使用者接續第 3 點做真實驗證
+
+**【第三十四輪】友好社功能** ~~上線前還要做~~ **已由使用者執行 migration 完成，仍待實測**：
 1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/031_sister_clubs.sql`~~ **使用者已執行完成 ✅**
 2. 部署新版前端到 Cloudflare Pages（Cloudflare Pages 接 GitHub 自動部署，push 上去應該就會觸發，不用額外操作）——**待確認**
 3. **待實測**：建議用和平社的執秘/社長帳號登入正式站，到「社務管理 → 友好社」測試：新增一筆（例如「新竹和平社」，結盟時間隨便填一個日期，當屆社長、兩社情誼說明可選填）、編輯、刪除、確認清單自動依結盟時間新到舊排序；再用一般社友帳號登入確認看得到清單但沒有新增/編輯/刪除按鈕
@@ -67,6 +73,24 @@
 5. 待使用者實測「例會管理」編輯儲存修正（本輪找到真正根因，見下方「第十六輪」）、地區儀表板分區收折後回報結果
 
 其餘項目皆已由使用者在 Supabase Dashboard / SQL Editor 實際確認完成，邀請流程（邀請信 → `/accept-invite` → 設定密碼）三個問題（守衛攔截、版面跑版、`Auth session missing!`）也已全部修正並實測通過，詳見下方「第十一輪」與更早的紀錄。
+
+## 本次完成（第三十五輪）：新增「歷屆社長」+「服務計劃總覽」兩個功能
+
+延續上一輪「友好社」的社史資料需求，這次是「每屆社長、當年秘書、當年度社區服務計劃」。兩個畫面共用同一張新表 `club_history`：「歷屆社長」完整編輯（年份/社長/秘書/服務計劃），「服務計劃總覽」是唯讀彙整頁，只挑「有填服務計劃」的年度顯示（沒填的年度不會出現在總覽，但還是留在歷屆社長清單裡）。寫法完全比照上一輪「友好社」的模式（`sister_clubs` → `club_history`），沒有另外發明架構。
+
+| 檔案 | 說明 |
+|------|------|
+| `supabase/migrations/032_club_history.sql`（**已寫好，尚未執行**） | 新表 `club_history`：`club_id`、`year_term`（沿用 `club_officers` 既有的 '2025-2026' 格式）、`president_name`、`secretary_name`、`service_plan`，`UNIQUE(club_id, year_term)` 避免同一年重複建兩筆。RLS 跟 `sister_clubs` 一模一樣：`SELECT` 只要 `club_id = current_club_id()`（同社任何角色都能看）；寫入需要 `is_club_tier()`。同樣沒有開放地區視角查詢 |
+| `src/types/index.ts` | 新增 `ClubHistoryRecord`/`ClubHistoryInsert`/`ClubHistoryUpdate` |
+| `src/stores/clubHistory.ts`（新檔） | `fetchAll(clubId)`／`create`／`update`／`remove`，複製 `sisterClubs.ts` 的 CRUD pattern，`fetchAll` 用 `order('year_term', { ascending: false })` 排序 |
+| `src/views/club/ClubHistoryView.vue`（新檔，歷屆社長） | 複製 `SisterClubsView.vue` 的「表格 + 新增/編輯彈窗」骨架，四個欄位換成年份/社長/當年秘書/社區服務計劃；`canManage` 才看得到新增/編輯/刪除，`club_member` 唯讀 |
+| `src/views/club/ServicePlanOverviewView.vue`（新檔，服務計劃總覽） | 純唯讀，`computed` 用 `clubHistory.list.filter(item => item.service_plan?.trim())` 只挑有填服務計劃的年度顯示成「年份＋服務計劃」兩欄，沒有任何編輯功能——頁面上方文字明講「要修改請到歷屆社長編輯」，避免使用者以為這裡也能編輯 |
+| `src/router/index.ts` | 新增 `/club/history`、`/club/service-plans` 兩條路由，`meta.roles` 跟 `/club/officers`、`/club/sister-clubs` 一樣開放給三種角色（社友唯讀進得去） |
+| `src/components/layout/Sidebar.vue` | 「社務管理」區塊在「友好社」後面依序加「📜 歷屆社長」「🌱 服務計劃總覽」 |
+
+**沒有加**：跟「友好社」一樣，沒有加 feature flag、沒有開放地區視角查詢別社的歷史資料。
+
+**驗證**：`npx vue-tsc --noEmit`、`npm run build` 皆通過。本機一樣用暫時 `.env`（假金鑰）+ 暫時掛 `window.__pinia`/`window.__router`（皆已還原不進 commit）模擬 Pinia state：塞 3 筆不同年份的假資料進 `clubHistory` store（其中一筆故意不填服務計劃），確認「歷屆社長」依年份新到舊排序（2025-2026→2024-2025→2023-2024），「服務計劃總覽」正確只顯示有填服務計劃的兩筆、跳過沒填的那筆；再切成 `club_member` 身分確認「歷屆社長」看得到清單但沒有新增/編輯/刪除。**同樣沒有測到「真的寫入 Supabase 資料庫」這一段**（migration 還沒執行），麻煩使用者照上面待辦第三十五輪跑一次真實流程確認。
 
 ## 本次完成（第三十四輪）：新增「友好社」功能
 

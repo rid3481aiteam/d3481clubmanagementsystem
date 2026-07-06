@@ -61,6 +61,12 @@
         <RouterLink to="/club/sister-clubs" class="nav-item">
           <span class="nav-icon">🤝</span>友好社
         </RouterLink>
+        <RouterLink to="/club/history" class="nav-item">
+          <span class="nav-icon">📜</span>歷屆社長
+        </RouterLink>
+        <RouterLink to="/club/service-plans" class="nav-item">
+          <span class="nav-icon">🌱</span>服務計劃總覽
+        </RouterLink>
         <RouterLink v-if="features.isEnabled('D1_roster')" to="/roster" class="nav-item">
           <span class="nav-icon">📋</span>社友名冊
         </RouterLink>
