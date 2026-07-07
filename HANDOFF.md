@@ -14,7 +14,7 @@
 
 ## ⚠️ 待辦
 
-**【第四十二輪】活動報名三項修正** ~~待實作~~ **程式碼已完成，待使用者執行 migration + 上正式站實測**：
+**【第四十二輪】活動報名三項修正** ~~待實作~~ ~~待執行 migration~~ **037 migration 使用者已於 2026-07-07 執行完成 ✅，剩下待上正式站實測**：
 
 使用者上正式站測試完第四十一輪的例會同步功能後，回報三個問題：
 
@@ -22,7 +22,7 @@
 2. **手動新增活動要能選「僅本社／全地區」**——新增 `club_only boolean` 欄位（預設 `false` = 維持原本全地區公開行為）。編輯活動 Modal 新增「招募對象」二選一（`ActivityListView.vue`），只有手動活動才看得到這個選項（例會衍生的活動一律限本社，不受這個欄位影響，UI 也不給改）。RLS 一併更新：`club_only=true` 的手動活動比照例會衍生活動，只有主辦社成員看得到/能報名。
 3. **活動要能填地址**——新增 `address text` 欄位，跟原本的「地點」（場地名稱，例如「台北國賓大飯店」）分開，「地址」是給社友導航用的完整地址。新增/編輯 Modal 都有這個欄位（不受 `isMeetingLinked` 鎖定，例會衍生的活動也能自己補地址）；活動詳情頁顯示地址 + 「在地圖上開啟」連結（開 Google Maps 搜尋）。
 
-1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/037_activity_visibility_address_backfill.sql`（**必須在 035、036 都執行過之後**）——新增 `club_only`／`address` 兩個欄位、重寫 `activities_select`／`activity_registrations_insert` 兩條 RLS、一次性補建未到期例會的活動報名紀錄
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/037_activity_visibility_address_backfill.sql`~~ **使用者已執行完成 ✅**——新增 `club_only`／`address` 兩個欄位、重寫 `activities_select`／`activity_registrations_insert` 兩條 RLS、一次性補建未到期例會的活動報名紀錄
 2. 部署新版前端到 Cloudflare Pages——**待確認**
 3. **待實測**（本機沒有真實 `.env`，這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅，沒有真的登入測試過）：
    - migration 跑完後，到「例會管理」確認原本已經存在、還沒到期的例會，現在也都有「預計出席」連結了
