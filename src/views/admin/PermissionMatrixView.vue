@@ -12,6 +12,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   prospective_members: '潛在社友',
   meetings: '例會管理',
   attendance: '出席（彙總 + 明細）',
+  activities: '社友活動報名',
 }
 
 // club_admin／club_secretary 在 RLS、Edge Function、role_permissions

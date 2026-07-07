@@ -66,6 +66,9 @@ const navItems = computed<NavItem[]>(() => {
     items.push({ type: 'link', to: '/admin/clubs', icon: '🏢', label: '社團總覽' })
     items.push({ type: 'link', to: '/admin/announcements', icon: '📣', label: '地區公告' })
     items.push({ type: 'link', to: '/admin/governor-awards', icon: '🏅', label: '總監獎項統整' })
+    if (features.isEnabled('E1_activities')) {
+      items.push({ type: 'link', to: '/activities', icon: '🎉', label: '社友活動' })
+    }
     if (features.isEnabled('B5_edm')) {
       items.push({ type: 'link', to: '/admin/edm', icon: '📧', label: 'EDM 產生器' })
     }
@@ -111,6 +114,9 @@ const navItems = computed<NavItem[]>(() => {
     }
     if (features.isEnabled('D3_prospective') && auth.role !== 'club_member') {
       items.push({ type: 'link', to: '/roster/prospective', icon: '🔍', label: '潛在社友' })
+    }
+    if (features.isEnabled('E1_activities')) {
+      items.push({ type: 'link', to: '/activities', icon: '🎉', label: '社友活動' })
     }
     if (isClubManager && features.isEnabled('B5_edm')) {
       items.push({ type: 'link', to: '/club/edm', icon: '📧', label: 'EDM 產生器' })

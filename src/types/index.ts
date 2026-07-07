@@ -204,6 +204,7 @@ export type FeatureKey =
   | 'B3_attendance_personal' | 'B4_attendance_detail' | 'B5_edm'
   | 'D1_roster' | 'D2_roster_excel' | 'D3_prospective' | 'D4_care'
   | 'H1_directory' | 'H2_directory_search' | 'H3_directory_admin'
+  | 'E1_activities'
 
 export interface FeatureFlag {
   id: string
@@ -364,6 +365,57 @@ export interface MemberCare {
 }
 
 export type MemberCareInsert = Omit<MemberCare, 'id' | 'created_at'>
+
+// ── 社友活動報名 ─────────────────────────────────────
+export type ActivityStatus = 'draft' | 'open' | 'closed' | 'cancelled'
+
+export interface Activity {
+  id: string
+  organizing_club_id: string
+  title: string
+  description: string | null
+  location: string | null
+  start_at: string
+  registration_deadline: string | null
+  capacity: number | null
+  status: ActivityStatus
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ActivityInsert = Omit<Activity, 'id' | 'created_by' | 'created_at' | 'updated_at'>
+export type ActivityUpdate = Partial<ActivityInsert>
+
+// 主辦社名稱（fetchAll 用 clubs(name) embed 帶出）
+export interface ActivityWithClub extends Activity {
+  clubs: { name: string } | null
+}
+
+export type RegistrationStatus = 'registered' | 'cancelled'
+
+export interface ActivityRegistrationFormData {
+  name: string
+  phone: string
+  guest_count: number
+  note: string
+}
+
+export interface ActivityRegistration {
+  id: string
+  activity_id: string
+  club_id: string
+  registrant_id: string
+  form_data: ActivityRegistrationFormData
+  status: RegistrationStatus
+  created_at: string
+  updated_at: string
+}
+
+// 主辦社查看報名清單用，帶出報名者所屬社名稱
+export interface ActivityRegistrationWithClub extends ActivityRegistration {
+  clubs: { name: string } | null
+}
 
 // ── Pinia Store 型別 ──────────────────────────────────
 export interface AuthState {

@@ -109,6 +109,19 @@ const router = createRouter({
       component: () => import('@/views/club/ServicePlanOverviewView.vue'),
       meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
     },
+    // E 活動
+    {
+      path: '/activities',
+      name: 'activities',
+      component: () => import('@/views/activities/ActivityListView.vue'),
+      meta: { feature: 'E1_activities' as FeatureKey },
+    },
+    {
+      path: '/activities/:id',
+      name: 'activity-detail',
+      component: () => import('@/views/activities/ActivityDetailView.vue'),
+      meta: { feature: 'E1_activities' as FeatureKey },
+    },
     // H 通訊錄
     {
       path: '/directory',

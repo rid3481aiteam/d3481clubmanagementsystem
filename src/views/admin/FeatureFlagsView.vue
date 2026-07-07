@@ -23,6 +23,7 @@ const LABELS: Record<FeatureKey, string> = {
   H1_directory: '地區通訊錄',
   H2_directory_search: '通訊錄搜尋',
   H3_directory_admin: '通訊錄管理入口',
+  E1_activities: '社友活動報名',
 }
 
 const LOCKED: FeatureKey[] = ['A1_login', 'A2_roles', 'A3_isolation']
@@ -36,6 +37,7 @@ const groups = [
   { title: '例會', keys: keysByPrefix('B') },
   { title: '名冊', keys: keysByPrefix('D') },
   { title: '通訊錄', keys: keysByPrefix('H') },
+  { title: '活動', keys: keysByPrefix('E') },
 ]
 
 function flagFor(key: FeatureKey) {

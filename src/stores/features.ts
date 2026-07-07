@@ -9,6 +9,7 @@ const DEFAULT_FLAGS: FeatureMap = {
   B3_attendance_personal: true, B4_attendance_detail: true, B5_edm: false,
   D1_roster: true, D2_roster_excel: true, D3_prospective: true, D4_care: false,
   H1_directory: true, H2_directory_search: true, H3_directory_admin: true,
+  E1_activities: true,
 }
 
 export const useFeaturesStore = defineStore('features', () => {
