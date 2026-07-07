@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-07（第四十二輪，**活動報名三項修正：補建舊例會報名/手動活動可選僅本社招募/新增地址欄位**——使用者上正式站測試第四十一輪功能後回報三個問題，這輪一次修完，詳見下方待辦）
+> 最後更新：2026-07-07（第四十三輪，**LINE 官方帳號通知 Demo（給和平社展示用）**——使用者想讓和平社實際看到「LINE 通知」這個構想可行，這輪做了最小可動版本：人工核對手機號碼綁定 + 測試訊息發送，安全性留到正式導入前再加強，詳見下方待辦，**需要使用者到 LINE Developers Console 申請頻道 + 用 Supabase CLI 部署 2 支 Edge Function，Claude 無法代勞**）
+
+> 最後更新（上一輪）：2026-07-07（第四十二輪，**活動報名三項修正：補建舊例會報名/手動活動可選僅本社招募/新增地址欄位**——使用者上正式站測試第四十一輪功能後回報三個問題，這輪一次修完，詳見下方待辦）
 
 > 最後更新（上一輪）：2026-07-07（第四十一輪，**例會自動同步「預計出席」報名統計**——使用者指出例會也需要像活動一樣統計預計出席人數，這輪讓「新增例會」時自動在活動報名系統建立一筆對應紀錄，但範圍限定本社、不比照活動全地區公開，詳見下方待辦）
 
@@ -13,6 +15,38 @@
 ---
 
 ## ⚠️ 待辦
+
+**【第四十三輪】LINE 官方帳號通知 Demo（給和平社展示用）** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 申請 LINE 頻道 + 部署 Edge Function**：
+
+背景：使用者想讓和平社實際看到「活動/例會發布時可以自動用 LINE 通知社友」這件事可行，用來說服他們這個方向值得投入。討論後的關鍵決策（使用者原話：**這輪的重點是證明做得到，安全性之後正式導入前再研究**）：
+
+- **不做 LINE Login OAuth**（那個要另外申請一個 LINE Login 頻道，門檻較高，之後如果要正式上線、需要更嚴謹的身分驗證再考慮）
+- **改用「人工核對版」綁定**：社友加 LINE 官方帳號好友後，直接傳一則訊息（自己的手機號碼），後端 webhook 收到後拿這支手機號碼去比對該社的 `roster`（社友名冊）的 `phone`/`personal_phone`，比對到了就把 LINE 的 `userId` 存起來，回覆「綁定成功」
+- **已知弱點**（使用者知情且接受，之後才處理）：只驗證「手機號碼對不對得上名冊」，沒有驗證「打這串數字的人是不是本人」——如果甲知道乙的手機號碼，甲也可以冒充乙綁定，乙的通知會跑到甲那邊。要更嚴謹就要換成 LINE Login 方案。
+- **廣播 vs 精準推播**：不能用 LINE 的「廣播」功能（會發給所有加好友的人，包含不是社友的人），改用「Multicast」API 只發給資料庫裡「已綁定」的 `line_user_id` 清單，這個清單完全由我們自己的資料庫決定，跟 OA 好友名單無關
+
+實作內容：
+- `038_line_notifications.sql`：新增 `club_notification_channels`（每社的 LINE Channel Secret/Access Token，RLS 限本社管理員/地區管理員）、`line_bindings`（社友 LINE userId ↔ 名冊手機號碼綁定紀錄，RLS 只給本社管理員讀，沒有開放前端寫入——只有 webhook 用 service role 寫）
+- `supabase/functions/line-webhook/index.ts`：LINE 平台直接呼叫的公開 webhook，用 `x-line-signature` 驗證來源（用該社存的 Channel Secret 算 HMAC-SHA256 比對），處理 `follow`（加好友歡迎詞）跟 `message`（文字訊息裡抓數字比對手機號碼）兩種事件，回覆用 LINE Reply API
+- `supabase/functions/line-push/index.ts`：給登入的社管理員用，呼叫 LINE Multicast API 發送訊息給該社已綁定的所有人（demo 版一次最多處理 500 人，沒有分批機制）
+- `src/views/club/LineNotifyView.vue`（路由 `/club/line-notify`，選單在「進階設定」下拉裡）：貼 Channel Secret/Token、顯示 Webhook URL（可複製）、已綁定社友清單、發送測試訊息按鈕
+
+1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/038_line_notifications.sql`
+2. **待使用者執行**（這輪工作環境沒有已登入的 Supabase CLI，Claude 沒辦法代為部署 Edge Function，麻煩使用者在有連結專案的機器上執行）：
+   ```
+   supabase functions deploy line-webhook --no-verify-jwt
+   supabase functions deploy line-push
+   ```
+   `line-webhook` **一定要加 `--no-verify-jwt`**，因為 LINE 平台呼叫這支的時候不會帶 Supabase 的登入 JWT，如果沒加這個旗標，Supabase 會直接擋掉 LINE 打過來的請求（回 401），webhook 永遠收不到事件。`line-push` 維持預設（要驗證 JWT，只有登入的社管理員能呼叫）。
+3. **待使用者執行**：到 [LINE Developers Console](https://developers.line.biz/console/) 幫和平社建立一個 **Messaging API** 頻道（不是 LINE Login），取得 Channel Secret 跟 Channel Access Token（長期權杖，在 Messaging API 頁籤下方 Issue）
+4. **待使用者執行**：用和平社執秘/社長帳號登入正式站，到「進階設定 → LINE 通知設定（測試中）」，把上一步拿到的 Channel Secret/Token 貼上儲存，複製頁面顯示的 Webhook URL
+5. **待使用者執行**：回 LINE Developers Console 該頻道的 Messaging API 頁籤，把 Webhook URL 貼到「Webhook settings」，開啟「Use webhook」，並且**關閉「自動回應訊息」（Auto-reply messages）**（不關的話 LINE 官方預設的自動回覆會跟我們的 webhook 回覆搶著出現，畫面會很奇怪）
+6. **待實測**（本機沒有真實 `.env`、也沒有真實 LINE 頻道，這輪完全沒辦法在本機測試，只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證）：
+   - 用手機加該 LINE 官方帳號好友，應該會收到歡迎訊息，請對方輸入自己在和平社名冊登記的手機號碼
+   - 比對成功應該收到「綁定成功」回覆；到「LINE 通知設定」頁面應該看得到這筆新增到「已綁定社友」清單
+   - 輸入一支查無此人的手機號碼，應該收到「查無這支手機號碼」的提示，不會誤綁
+   - 在「LINE 通知設定」頁面發送一則測試訊息，剛剛綁定的那支手機應該會在 LINE 上收到
+7. 下一步（規劃中，這輪沒做）：把「發送測試訊息」換成真正跟活動/例會報名綁定的自動通知（例如活動前 3 天自動推播提醒已報名的人），以及 Email 管道（見下方「規劃決策存檔」）
 
 **【第四十二輪】活動報名三項修正** ~~待實作~~ ~~待執行 migration~~ **037 migration 使用者已於 2026-07-07 執行完成 ✅，剩下待上正式站實測**：
 

@@ -425,6 +425,29 @@ export interface ActivityRegistrationWithClub extends ActivityRegistration {
   clubs: { name: string } | null
 }
 
+// ── LINE 通知（Demo，見 038_line_notifications.sql）─────
+export type NotificationChannelStatus = 'connected' | 'pending_manual_setup'
+
+export interface ClubNotificationChannel {
+  club_id: string
+  line_channel_secret: string | null
+  line_channel_access_token: string | null
+  status: NotificationChannelStatus
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LineBinding {
+  id: string
+  club_id: string
+  roster_id: string | null
+  member_name: string
+  phone: string
+  line_user_id: string
+  bound_at: string
+}
+
 // ── Pinia Store 型別 ──────────────────────────────────
 export interface AuthState {
   user: import('@supabase/supabase-js').User | null

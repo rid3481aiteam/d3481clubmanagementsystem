@@ -132,7 +132,10 @@ const navItems = computed<NavItem[]>(() => {
       type: 'dropdown',
       icon: '⚙️',
       label: '進階設定',
-      items: [{ to: '/club/invite', icon: '👤', label: '邀請 / 管理本社帳號' }],
+      items: [
+        { to: '/club/invite', icon: '👤', label: '邀請 / 管理本社帳號' },
+        { to: '/club/line-notify', icon: '💬', label: 'LINE 通知設定（測試中）' },
+      ],
     })
   }
 

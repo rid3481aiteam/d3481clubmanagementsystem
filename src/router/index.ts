@@ -191,6 +191,12 @@ const router = createRouter({
       component: () => import('@/views/admin/AccountManagementView.vue'),
       meta: { roles: ['district_admin', 'club_secretary', 'club_admin'] },
     },
+    {
+      path: '/club/line-notify',
+      name: 'club-line-notify',
+      component: () => import('@/views/club/LineNotifyView.vue'),
+      meta: { roles: ['club_secretary', 'club_admin'] },
+    },
     // 404
     {
       path: '/:pathMatch(.*)*',
