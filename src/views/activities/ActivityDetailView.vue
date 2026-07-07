@@ -109,12 +109,17 @@ onMounted(load)
         <span class="bdg" :class="STATUS_BADGE[activity.status]">{{ STATUS_LABELS[activity.status] }}</span>
         <span style="color:var(--muted); font-size:13px;">主辦社：{{ activity.clubs?.name ?? '-' }}</span>
         <span v-if="activity.meeting_id" class="bdg b-n">例會預計出席</span>
+        <span v-else-if="activity.club_only" class="bdg b-n">僅本社招募</span>
         <RouterLink v-if="activity.meeting_id" :to="`/meetings/${activity.meeting_id}/attendance`" style="font-size:12.5px; color:var(--navy);">查看實際出席記錄 →</RouterLink>
       </div>
       <p v-if="activity.description" style="white-space:pre-line; margin-bottom:14px;">{{ activity.description }}</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; font-size:14px;">
         <div><span class="fl">活動時間</span>{{ formatDateTime(activity.start_at) }}</div>
         <div><span class="fl">地點</span>{{ activity.location || '-' }}</div>
+        <div>
+          <span class="fl">詳細地址</span>{{ activity.address || '-' }}
+          <a v-if="activity.address" :href="`https://maps.google.com/?q=${encodeURIComponent(activity.address)}`" target="_blank" rel="noopener" style="margin-left:6px; font-size:12.5px; color:var(--navy);">在地圖上開啟</a>
+        </div>
         <div><span class="fl">報名截止</span>{{ activity.registration_deadline ? formatDateTime(activity.registration_deadline) : '不限' }}</div>
         <div><span class="fl">名額</span>{{ activity.capacity ?? '不限' }}<span v-if="isOrganizer">（已報名 {{ registeredCount }} 人）</span></div>
       </div>

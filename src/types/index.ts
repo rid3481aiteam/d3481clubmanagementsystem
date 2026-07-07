@@ -375,10 +375,14 @@ export interface Activity {
   title: string
   description: string | null
   location: string | null
+  address: string | null
   start_at: string
   registration_deadline: string | null
   capacity: number | null
   status: ActivityStatus
+  // 手動活動的招募範圍：true = 僅本社社友能看到/報名，false = 全地區公開可跨社報名。
+  // 例會衍生的活動（meeting_id 不為 null）不受這個欄位影響，一律限本社。
+  club_only: boolean
   // 非 null = 由例會自動同步產生（見 036_meeting_activity_sync.sql 的 trigger），
   // 只有主辦社看得到，標題/地點/時間由例會端同步、這裡不可手動改
   meeting_id: string | null

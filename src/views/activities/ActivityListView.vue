@@ -39,10 +39,12 @@ function emptyForm(): ActivityInsert {
     title: '',
     description: null,
     location: null,
+    address: null,
     start_at: '',
     registration_deadline: null,
     capacity: null,
     status: 'open',
+    club_only: false,
   }
 }
 
@@ -72,10 +74,12 @@ function openEdit(a: Activity) {
     title: a.title,
     description: a.description,
     location: a.location,
+    address: a.address,
     start_at: a.start_at,
     registration_deadline: a.registration_deadline,
     capacity: a.capacity,
     status: a.status,
+    club_only: a.club_only,
   }
   startLocal.value = toLocalInput(a.start_at)
   deadlineLocal.value = toLocalInput(a.registration_deadline)
@@ -89,6 +93,7 @@ async function save() {
     title: form.value.title.trim(),
     description: form.value.description?.trim() || null,
     location: form.value.location?.trim() || null,
+    address: form.value.address?.trim() || null,
     start_at: fromLocalInput(startLocal.value)!,
     registration_deadline: fromLocalInput(deadlineLocal.value),
   }
@@ -152,6 +157,7 @@ onMounted(() => {
             <td>
               <RouterLink :to="`/activities/${a.id}`" style="color:var(--navy); font-weight:600;">{{ a.title }}</RouterLink>
               <span v-if="a.meeting_id" class="bdg b-n" style="margin-left:6px; font-size:10.5px; padding:2px 8px;">例會</span>
+              <span v-else-if="a.club_only" class="bdg b-n" style="margin-left:6px; font-size:10.5px; padding:2px 8px;">僅本社</span>
             </td>
             <td>{{ a.clubs?.name ?? '-' }}</td>
             <td>{{ a.location || '-' }}</td>
@@ -188,7 +194,11 @@ onMounted(() => {
           </div>
           <div>
             <label class="fl">地點</label>
-            <input v-model="form.location" class="fi" :disabled="isMeetingLinked" />
+            <input v-model="form.location" class="fi" placeholder="場地名稱，例如：台北國賓大飯店" :disabled="isMeetingLinked" />
+          </div>
+          <div>
+            <label class="fl">詳細地址</label>
+            <input v-model="form.address" class="fi" placeholder="完整地址，方便社友導航" />
           </div>
           <div>
             <label class="fl">活動時間 *</label>
@@ -210,6 +220,13 @@ onMounted(() => {
               <option value="closed">已截止</option>
               <option value="cancelled">已取消</option>
             </select>
+          </div>
+          <div v-if="!isMeetingLinked">
+            <label class="fl">招募對象</label>
+            <div class="segmented">
+              <button type="button" class="seg-btn" :class="{ active: !form.club_only }" @click="form.club_only = false">全地區社友（可跨社報名）</button>
+              <button type="button" class="seg-btn" :class="{ active: form.club_only }" @click="form.club_only = true">僅本社社友</button>
+            </div>
           </div>
         </div>
         <div class="mb-foot">
