@@ -12,7 +12,7 @@
 
 ## ⚠️ 待辦
 
-**【第四十一輪】例會自動同步「預計出席」報名統計** ~~待實作~~ **程式碼已完成，待使用者執行 migration + 上正式站實測**：
+**【第四十一輪】例會自動同步「預計出席」報名統計** ~~待實作~~ ~~待執行 migration~~ **035+036 migration 使用者已於 2026-07-07 執行完成 ✅，剩下待上正式站實測**：
 
 使用者提出：例會（每週固定聚會）也需要像活動一樣統計「預計出席人數」，希望新增例會時自動加入活動報名系統。跟使用者確認過範圍後，採用的設計是：
 
@@ -21,8 +21,8 @@
 
 實作方式：`activities` 新增 `meeting_id` 欄位（唯一索引，nullable），DB trigger 在 `meetings` INSERT 時自動建立一筆對應的 `activities`（標題／地點／時間取自例會，狀態預設「招募中」），UPDATE 例會時同步標題/地點/時間回對應的活動（若存在）。**只處理這次 migration 之後新增的例會**，不回頭幫舊例會補建活動，避免大量已經開完的舊例會憑空冒出報名頁面。
 
-1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/036_meeting_activity_sync.sql`（**必須在 035 之後執行**，因為改的是 035 建的 `activities`/`activity_registrations` 表）——新增 `meeting_id` 欄位、重寫 `activities_select`／`activity_registrations_insert` 兩條 RLS（例會衍生的活動限本社，一般活動維持原本全地區可見/可跨社報名不變）、新增 `sync_meeting_activity()` trigger
-2. 部署新版前端到 Cloudflare Pages——**待確認**
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/036_meeting_activity_sync.sql`~~ **使用者已執行完成 ✅**——新增 `meeting_id` 欄位、重寫 `activities_select`／`activity_registrations_insert` 兩條 RLS（例會衍生的活動限本社，一般活動維持原本全地區可見/可跨社報名不變）、新增 `sync_meeting_activity()` trigger
+2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
 3. **待實測**（本機沒有真實 `.env`，這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅，沒有真的登入測試過）：
    - 社長/執秘到「例會管理」新增一場例會，確認該列多出「預計出席」連結，點進去會導到「社友活動」的活動詳情頁，標題/地點/時間跟例會一致
    - 一般社友登入，「社友活動」列表看得到這場例會衍生的活動（標題旁有灰色「例會」小標籤），可以報名/取消報名
@@ -32,11 +32,11 @@
 4. 這輪**沒有**把報名資料自動帶入 `attendance_details`（實際出席登記還是要執秘在例會結束後手動記錄），只是提供「預計 vs 實際」兩組獨立數字，避免混淆規劃跟結果
 5. `meetings` 表沒有時刻欄位，只有日期，trigger 產生的活動時間固定用中午 12:00 佔位，不是真實聚會時間，這是刻意的簡化（如果需要精確時間，之後要幫 `meetings` 加時刻欄位，這輪没有動）
 
-**【第四十輪】社友活動報名 + 查詢功能 Phase 1** ~~待實作~~ **程式碼已完成，待使用者執行 migration + 上正式站實測**：
+**【第四十輪】社友活動報名 + 查詢功能 Phase 1** ~~待實作~~ ~~待執行 migration~~ **035 migration 使用者已於 2026-07-07 執行完成 ✅，剩下待上正式站實測**：
 
 延續第三十九輪的規劃決策（見下方「規劃決策存檔」），這輪把分期第 1 期「活動＋報名＋社友查詢頁」寫成程式碼。Email/LINE 通知（第 2、3 期）還沒開始。
 
-1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/035_activities.sql`——新增 `activities`／`activity_registrations` 兩張表 + RLS、`role_permissions` 種子資料（4 角色 view/edit）、`feature_flags` 種子資料（`E1_activities`，地區預設開啟）
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/035_activities.sql`~~ **使用者已執行完成 ✅**——新增 `activities`／`activity_registrations` 兩張表 + RLS、`role_permissions` 種子資料（4 角色 view/edit）、`feature_flags` 種子資料（`E1_activities`，地區預設開啟）
 2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
 3. **待實測**（本機沒有真實 `.env`，這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅，沒有真的登入測試過）：
    - 社長/執秘登入，到「社友活動」新增一筆活動（狀態設「招募中」），確認出現在列表、標題可點進詳情頁
