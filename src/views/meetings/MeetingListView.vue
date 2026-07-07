@@ -2,14 +2,19 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMeetingsStore } from '@/stores/meetings'
+import { useActivitiesStore } from '@/stores/activities'
 import { usePermissionsStore } from '@/stores/permissions'
 import type { Meeting, MeetingInsert } from '@/types'
 
 const auth = useAuthStore()
 const meetings = useMeetingsStore()
+const activitiesStore = useActivitiesStore()
 const permissions = usePermissionsStore()
 
 const canManage = computed(() => permissions.can('meetings', 'edit'))
+
+// 例會 id -> 對應的預計出席報名活動 id（036 的 trigger 自動建立，這輪之前的舊例會沒有）
+const rsvpActivityByMeeting = ref<Record<string, string>>({})
 
 const showModal = ref(false)
 const editing = ref<Meeting | null>(null)
@@ -63,12 +68,15 @@ async function save() {
     return
   }
   showModal.value = false
-  await meetings.fetchAll(auth.clubId)
+  await loadAll()
 }
 
-onMounted(() => {
-  meetings.fetchAll(auth.clubId)
-})
+async function loadAll() {
+  await meetings.fetchAll(auth.clubId)
+  rsvpActivityByMeeting.value = await activitiesStore.fetchByMeetingIds(meetings.meetings.map(m => m.id))
+}
+
+onMounted(loadAll)
 </script>
 
 <template>
@@ -100,6 +108,7 @@ onMounted(() => {
             <td style="display:flex; gap:6px;">
               <button v-if="canManage" class="btn btn-g btn-sm" @click="openEdit(m)">編輯</button>
               <RouterLink :to="`/meetings/${m.id}/attendance`" class="btn btn-g btn-sm">出席記錄</RouterLink>
+              <RouterLink v-if="rsvpActivityByMeeting[m.id]" :to="`/activities/${rsvpActivityByMeeting[m.id]}`" class="btn btn-g btn-sm">預計出席</RouterLink>
             </td>
           </tr>
           <tr v-if="!meetings.meetings.length">

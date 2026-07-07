@@ -108,6 +108,8 @@ onMounted(load)
       <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px;">
         <span class="bdg" :class="STATUS_BADGE[activity.status]">{{ STATUS_LABELS[activity.status] }}</span>
         <span style="color:var(--muted); font-size:13px;">主辦社：{{ activity.clubs?.name ?? '-' }}</span>
+        <span v-if="activity.meeting_id" class="bdg b-n">例會預計出席</span>
+        <RouterLink v-if="activity.meeting_id" :to="`/meetings/${activity.meeting_id}/attendance`" style="font-size:12.5px; color:var(--navy);">查看實際出席記錄 →</RouterLink>
       </div>
       <p v-if="activity.description" style="white-space:pre-line; margin-bottom:14px;">{{ activity.description }}</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; font-size:14px;">

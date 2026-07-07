@@ -110,6 +110,13 @@ export const useActivitiesStore = defineStore('activities', () => {
     return { error }
   }
 
+  // 例會列表用：查一批例會各自對應的活動 id（由 036 的 trigger 自動建立，舊例會可能沒有）
+  async function fetchByMeetingIds(meetingIds: string[]) {
+    if (!meetingIds.length) return {} as Record<string, string>
+    const { data } = await supabase.from('activities').select('id, meeting_id').in('meeting_id', meetingIds)
+    return Object.fromEntries((data ?? []).map(a => [a.meeting_id as string, a.id as string]))
+  }
+
   return {
     activities,
     current,
@@ -124,5 +131,6 @@ export const useActivitiesStore = defineStore('activities', () => {
     fetchMyRegistration,
     register,
     cancelRegistration,
+    fetchByMeetingIds,
   }
 })

@@ -379,12 +379,16 @@ export interface Activity {
   registration_deadline: string | null
   capacity: number | null
   status: ActivityStatus
+  // 非 null = 由例會自動同步產生（見 036_meeting_activity_sync.sql 的 trigger），
+  // 只有主辦社看得到，標題/地點/時間由例會端同步、這裡不可手動改
+  meeting_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
 }
 
-export type ActivityInsert = Omit<Activity, 'id' | 'created_by' | 'created_at' | 'updated_at'>
+// meeting_id 由 DB trigger 管理，手動新增活動不需要（也不應該）自己傳
+export type ActivityInsert = Omit<Activity, 'id' | 'meeting_id' | 'created_by' | 'created_at' | 'updated_at'>
 export type ActivityUpdate = Partial<ActivityInsert>
 
 // 主辦社名稱（fetchAll 用 clubs(name) embed 帶出）

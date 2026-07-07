@@ -30,6 +30,9 @@ const form = ref<ActivityInsert>(emptyForm())
 const startLocal = ref('')
 const deadlineLocal = ref('')
 
+// 由例會自動同步產生的活動（見 036 migration），標題/地點/時間跟著例會走，這裡不能手動改
+const isMeetingLinked = computed(() => !!editing.value?.meeting_id)
+
 function emptyForm(): ActivityInsert {
   return {
     organizing_club_id: auth.clubId ?? '',
@@ -148,6 +151,7 @@ onMounted(() => {
             <td>{{ formatDateTime(a.start_at) }}</td>
             <td>
               <RouterLink :to="`/activities/${a.id}`" style="color:var(--navy); font-weight:600;">{{ a.title }}</RouterLink>
+              <span v-if="a.meeting_id" class="bdg b-n" style="margin-left:6px; font-size:10.5px; padding:2px 8px;">例會</span>
             </td>
             <td>{{ a.clubs?.name ?? '-' }}</td>
             <td>{{ a.location || '-' }}</td>
@@ -171,9 +175,12 @@ onMounted(() => {
           <button class="mb-close" @click="showModal = false">×</button>
         </div>
         <div class="mb-body">
+          <p v-if="isMeetingLinked" style="font-size:12.5px; color:var(--muted); background:var(--gold-p); padding:8px 10px; border-radius:8px;">
+            此活動同步自例會，標題／地點／時間請到「例會管理」修改，這裡只能調整說明／名額／報名截止／狀態。
+          </p>
           <div>
             <label class="fl">標題 *</label>
-            <input v-model="form.title" class="fi" />
+            <input v-model="form.title" class="fi" :disabled="isMeetingLinked" />
           </div>
           <div>
             <label class="fl">說明</label>
@@ -181,11 +188,11 @@ onMounted(() => {
           </div>
           <div>
             <label class="fl">地點</label>
-            <input v-model="form.location" class="fi" />
+            <input v-model="form.location" class="fi" :disabled="isMeetingLinked" />
           </div>
           <div>
             <label class="fl">活動時間 *</label>
-            <input v-model="startLocal" type="datetime-local" class="fi" />
+            <input v-model="startLocal" type="datetime-local" class="fi" :disabled="isMeetingLinked" />
           </div>
           <div>
             <label class="fl">報名截止時間</label>
