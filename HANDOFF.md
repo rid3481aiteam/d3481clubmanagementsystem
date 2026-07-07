@@ -8,6 +8,28 @@
 
 ## ⚠️ 待辦
 
+**【規劃中，尚未開發】社友活動報名 + 到期前自動通知（Email/LINE）+ 跨社報名同步**——2026-07-07 使用者提出需求，Claude 已評估架構並跟使用者確認關鍵決策，**這輪只記錄規劃，完全沒有動程式碼**：
+
+需求背景：社友報名活動後可自行登入查詢活動資訊；後台依活動日期前 7 天/3 天/1 天自動發 Email 或 LINE 通知；各社官方 LINE 帳號要能自助/協助串接；活動主辦社需要即時看到報名人數與表單內容（尤其活動是別的社辦、報名者可能跨社）。
+
+已確認的關鍵決策：
+- **Email 寄信**：用各社自己的 Gmail，走 **SMTP + App 密碼**（社執秘開兩步驟驗證產生應用程式密碼貼到後台），不做 Google OAuth（OAuth 需送 Google 審核、且 `gmail.send` 屬敏感權限，門檻太高不值得）
+- **LINE 官方帳號串接**：不做全自助流程，後台先放「申請串接」入口，社友提交申請後**由管理員人工協助綁定**
+- **跨社報名同步**：不是另外設計一組「共享清單」，而是活動本身歸屬 `organizing_club_id`（主辦社），RLS 讓「自己主辦的活動」天然可見全部報名紀錄（含表單內容，不只是人數），不管報名者是哪個社的人；社友名冊/出席率等其他資料仍維持既有的「各社互不可見」隔離原則不受影響
+
+資料模型草圖（尚未寫成 migration）：
+- `activities`：`id`/`organizing_club_id`/`title`/`description`/`location`/`start_at`/`registration_deadline`/`capacity`/`status`
+- `activity_registrations`：`id`/`activity_id`/`club_id`（報名者所屬社）/`member_id`/`form_data jsonb`/`status`
+- `club_notification_channels`：`club_id`/`channel_type`(`email`|`line`)/`email_from`/`email_app_password`（加密）/`line_channel_token`/`line_channel_secret`（皆加密）/`status`(`connected`|`pending_manual_setup`)
+- `notification_jobs`：`id`/`activity_id`/`trigger_type`(`7d`|`3d`|`1d`)/`channel`/`sent_at`（避免重複發送）
+
+建議分期（尚未開始任何一期）：
+1. 活動＋報名＋社友查詢頁（含 `organizing_club_id`／跨社可見規則）
+2. Email 排程通知（pg_cron + SMTP，7/3/1 天前）
+3. LINE 申請入口（後台表單 + 人工協助綁定，排程通知加一個 LINE 發送管道）
+
+下一步：使用者尚未下指令開始動工，等使用者確認要從哪一期開始才進入實作。
+
 **【第三十九輪】待使用者上正式站複查手機版 + 選單合併結果** ~~本機驗證~~ **Claude 本機用假 Pinia state（`club_member` 角色）+ `npx vue-tsc --noEmit` 驗證通過 ✅，本機仍沒有真實 `.env`**：
 1. **待複查**：手機瀏覽器（或縮小視窗到 375px 左右）確認標題不會再換行、TopMenu 不會疊到 TopNav 上
 2. **待複查**：「本社歷程」下拉裡的順序應該是歷屆社長→服務計劃總覽→友好社，點進去三個連結都要能正常導頁
