@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { onMounted, watch, ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAnnouncementsStore } from '@/stores/announcements'
 import { useDashboardStore } from '@/stores/dashboard'
+import { useGovernorAwardsStore } from '@/stores/governorAwards'
+import { GOVERNOR_AWARD_YEAR_TERM, getAwardLevel } from '@/data/governorAwardCriteria'
 
+const router = useRouter()
 const auth = useAuthStore()
 const announcements = useAnnouncementsStore()
 const dashboard = useDashboardStore()
+const awards = useGovernorAwardsStore()
 
 function formatDate(value: string | null) {
   if (!value) return ''
@@ -14,12 +19,20 @@ function formatDate(value: string | null) {
 }
 
 function loadForCurrentView() {
-  if (auth.isDistrictView) dashboard.loadDistrict()
-  else dashboard.load(auth.clubId)
+  if (auth.isDistrictView) {
+    dashboard.loadDistrict()
+  } else {
+    dashboard.load(auth.clubId)
+    if (auth.clubId) awards.fetchForClub(auth.clubId)
+  }
 }
 
 onMounted(loadForCurrentView)
 watch(() => auth.isDistrictView, loadForCurrentView)
+
+const clubAwardLevel = computed(() => {
+  return awards.current?.status === 'submitted' ? getAwardLevel(awards.current.total_score) : getAwardLevel(0)
+})
 
 const ZONE_ORDER = [
   '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
@@ -54,7 +67,10 @@ function toggleZone(zone: string) {
 <template>
   <div class="page">
     <div class="ph">
-      <h1>儀表板</h1>
+      <div>
+        <h1>儀表板</h1>
+        <div v-if="!auth.isDistrictView" class="ph-sub">{{ auth.clubName || '本社' }} · {{ GOVERNOR_AWARD_YEAR_TERM }} 年度</div>
+      </div>
     </div>
 
     <template v-if="auth.isDistrictView">
@@ -122,27 +138,31 @@ function toggleZone(zone: string) {
 
     <template v-else>
       <div class="stat-grid" style="margin-bottom:24px;">
-      <div class="stat-card">
+      <div class="stat-card clickable" @click="router.push('/meetings')">
         <div class="stat-label">本月例會數</div>
         <div class="stat-value">{{ dashboard.meetingCount }}</div>
       </div>
-      <div class="stat-card c-sky">
+      <div class="stat-card c-sky clickable" @click="router.push('/attendance/monthly')">
         <div class="stat-label">本月出席率</div>
         <div class="stat-value">{{ dashboard.monthlyRate !== null ? dashboard.monthlyRate + '%' : '-' }}</div>
         <div v-if="dashboard.monthlyRate !== null" class="bar-track" style="margin-top:10px;">
           <div class="bar-fill" :style="{ width: dashboard.monthlyRate + '%' }"></div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card clickable" @click="router.push('/attendance/monthly')">
         <div class="stat-label">本年度平均出席率</div>
         <div class="stat-value">{{ dashboard.avgRate !== null ? dashboard.avgRate + '%' : '-' }}</div>
         <div v-if="dashboard.avgRate !== null" class="bar-track" style="margin-top:10px;">
           <div class="bar-fill" :style="{ width: dashboard.avgRate + '%' }"></div>
         </div>
       </div>
-      <div class="stat-card c-gold">
+      <div class="stat-card c-gold clickable" @click="router.push('/roster')">
         <div class="stat-label">社友人數</div>
         <div class="stat-value">{{ dashboard.memberCount }}</div>
+      </div>
+      <div class="stat-card c-green clickable" @click="router.push('/club/governor-award')">
+        <div class="stat-label">總監獎項等級</div>
+        <div class="stat-value"><span class="bdg" :class="clubAwardLevel.badgeClass">{{ clubAwardLevel.name }}</span></div>
       </div>
       </div>
 
@@ -238,6 +258,22 @@ function toggleZone(zone: string) {
 </template>
 
 <style scoped>
+.ph-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+  transition: transform .1s, box-shadow .15s;
+}
+
+.stat-card.clickable:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
