@@ -247,6 +247,24 @@ export interface DistrictCalendarSyncLog {
   error_message: string | null
 }
 
+// ── 儀表板待辦提醒 ───────────────────────────────────
+export type TodoLevel = 'navy' | 'gold' | 'red'
+
+export interface ClubTodo {
+  id: string
+  club_id: string
+  title: string
+  sub: string | null
+  due_date: string | null
+  level: TodoLevel
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ClubTodoInsert = Omit<ClubTodo, 'id' | 'created_by' | 'created_at' | 'updated_at'>
+export type ClubTodoUpdate = Partial<Pick<ClubTodo, 'title' | 'sub' | 'due_date' | 'level'>>
+
 // ── 例會 ─────────────────────────────────────────────
 export interface Meeting {
   id: string

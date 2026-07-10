@@ -5,13 +5,90 @@ import { useAuthStore } from '@/stores/auth'
 import { useAnnouncementsStore } from '@/stores/announcements'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useGovernorAwardsStore } from '@/stores/governorAwards'
+import { useClubTodosStore } from '@/stores/clubTodos'
 import { GOVERNOR_AWARD_YEAR_TERM, getAwardLevel } from '@/data/governorAwardCriteria'
+import type { ClubTodo, TodoLevel } from '@/types'
 
 const router = useRouter()
 const auth = useAuthStore()
 const announcements = useAnnouncementsStore()
 const dashboard = useDashboardStore()
 const awards = useGovernorAwardsStore()
+const todos = useClubTodosStore()
+
+const canManageTodos = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
+
+const LEVEL_ICON: Record<TodoLevel, string> = { navy: '🔵', gold: '🟡', red: '🔴' }
+const LEVEL_BADGE: Record<TodoLevel, string> = { navy: 'b-n', gold: 'b-y', red: 'b-r' }
+
+// 比照 vivian 檔案：有截止日期時，緊急程度由截止日期動態換算，蓋過手動選的等級
+function todoDisplay(t: ClubTodo) {
+  let level: TodoLevel = t.level
+  let subText = t.sub || ''
+  if (t.due_date) {
+    const days = Math.ceil((new Date(t.due_date).getTime() - Date.now()) / 86400000)
+    const extra = subText ? ` · ${subText}` : ''
+    if (days < 0) { level = 'red'; subText = `⚠️ 已逾期 ${-days} 天${extra}` }
+    else if (days === 0) { level = 'red'; subText = `📅 今天到期${extra}` }
+    else if (days <= 3) { level = 'red'; subText = `📅 剩 ${days} 天${extra}` }
+    else if (days <= 7) { level = 'gold'; subText = `📅 剩 ${days} 天${extra}` }
+    else { subText = `📅 ${t.due_date}${extra}` }
+  }
+  return { level, subText }
+}
+
+const showTodoModal = ref(false)
+const editingTodo = ref<ClubTodo | null>(null)
+const todoForm = ref({ title: '', sub: '', due_date: '', level: 'navy' as TodoLevel })
+const todoError = ref('')
+
+function openAddTodo() {
+  editingTodo.value = null
+  todoForm.value = { title: '', sub: '', due_date: '', level: 'navy' }
+  todoError.value = ''
+  showTodoModal.value = true
+}
+
+function openEditTodo(t: ClubTodo) {
+  editingTodo.value = t
+  todoForm.value = { title: t.title, sub: t.sub || '', due_date: t.due_date || '', level: t.level }
+  todoError.value = ''
+  showTodoModal.value = true
+}
+
+async function saveTodo() {
+  const title = todoForm.value.title.trim()
+  if (!title) {
+    todoError.value = '請填寫任務名稱'
+    return
+  }
+  if (!auth.clubId) return
+  const payload = {
+    title,
+    sub: todoForm.value.sub.trim() || null,
+    due_date: todoForm.value.due_date || null,
+    level: todoForm.value.level,
+  }
+  const { error } = editingTodo.value
+    ? await todos.update(editingTodo.value.id, auth.clubId, payload)
+    : await todos.insert({ ...payload, club_id: auth.clubId }, auth.user?.id ?? null)
+  if (error) {
+    todoError.value = error.message
+    return
+  }
+  showTodoModal.value = false
+}
+
+async function deleteTodo() {
+  if (!editingTodo.value || !auth.clubId) return
+  if (!confirm(`確定刪除任務「${editingTodo.value.title}」？`)) return
+  const { error } = await todos.remove(editingTodo.value.id, auth.clubId)
+  if (error) {
+    todoError.value = error.message
+    return
+  }
+  showTodoModal.value = false
+}
 
 function formatDate(value: string | null) {
   if (!value) return ''
@@ -23,7 +100,10 @@ function loadForCurrentView() {
     dashboard.loadDistrict()
   } else {
     dashboard.load(auth.clubId)
-    if (auth.clubId) awards.fetchForClub(auth.clubId)
+    if (auth.clubId) {
+      awards.fetchForClub(auth.clubId)
+      todos.fetchAll(auth.clubId)
+    }
   }
 }
 
@@ -171,6 +251,35 @@ function toggleZone(zone: string) {
       </div>
 
       <div v-if="auth.clubId" style="margin-bottom:24px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <h2 style="font-size:14px; font-weight:700; color:var(--navy);">⏰ 待辦提醒</h2>
+          <button v-if="canManageTodos" class="btn btn-gold btn-sm" @click="openAddTodo">+ 新增任務</button>
+        </div>
+        <div class="tw">
+          <div v-if="todos.todos.length" class="todo-list">
+            <div
+              v-for="t in todos.todos"
+              :key="t.id"
+              class="todo-item"
+              :class="{ clickable: canManageTodos }"
+              @click="canManageTodos && openEditTodo(t)"
+            >
+              <span class="todo-icon">{{ LEVEL_ICON[todoDisplay(t).level] }}</span>
+              <div class="todo-body">
+                <div class="todo-title">{{ t.title }}</div>
+                <div v-if="todoDisplay(t).subText" class="todo-sub" :class="LEVEL_BADGE[todoDisplay(t).level] === 'b-r' ? 'urgent' : ''">
+                  {{ todoDisplay(t).subText }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else style="padding:18px; text-align:center; color:var(--muted);">
+            目前沒有待辦任務
+          </div>
+        </div>
+      </div>
+
+      <div v-if="auth.clubId" style="margin-bottom:24px;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">地區公告欄</h2>
       <div class="tw">
         <div v-if="announcements.districtAnnouncements.length" class="announcement-list">
@@ -254,6 +363,45 @@ function toggleZone(zone: string) {
       </div>
       </div>
     </template>
+
+    <div v-if="showTodoModal" class="mo" @click.self="showTodoModal = false">
+      <div class="mb">
+        <div class="mb-h">
+          <h3>{{ editingTodo ? '編輯待辦任務' : '+ 新增待辦任務' }}</h3>
+          <button class="mb-close" @click="showTodoModal = false">×</button>
+        </div>
+        <div class="mb-body">
+          <p v-if="todoError" style="color:var(--red); font-size:12px; margin-bottom:10px;">{{ todoError }}</p>
+          <div>
+            <label class="fl">任務名稱 *</label>
+            <input v-model="todoForm.title" class="fi" placeholder="例：聯繫下次例會主講人" />
+          </div>
+          <div>
+            <label class="fl">說明（選填）</label>
+            <input v-model="todoForm.sub" class="fi" placeholder="例：王教授，0912-345-678" />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label class="fl">截止日期</label>
+              <input v-model="todoForm.due_date" type="date" class="fi" />
+            </div>
+            <div>
+              <label class="fl">緊急程度</label>
+              <select v-model="todoForm.level" class="fi">
+                <option value="navy">🔵 一般</option>
+                <option value="gold">🟡 提醒</option>
+                <option value="red">🔴 緊急</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="mb-foot">
+          <button v-if="editingTodo" class="btn btn-red" @click="deleteTodo">🗑 刪除</button>
+          <button class="btn btn-g" @click="showTodoModal = false">取消</button>
+          <button class="btn btn-gold" @click="saveTodo">💾 儲存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -267,6 +415,56 @@ function toggleZone(zone: string) {
 .stat-card.clickable {
   cursor: pointer;
   transition: transform .1s, box-shadow .15s;
+}
+
+.todo-list {
+  display: grid;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.todo-item:last-child {
+  border-bottom: none;
+}
+
+.todo-item.clickable {
+  cursor: pointer;
+}
+
+.todo-item.clickable:hover {
+  background: var(--bg);
+}
+
+.todo-icon {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.todo-body {
+  min-width: 0;
+}
+
+.todo-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.todo-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.todo-sub.urgent {
+  color: var(--red);
+  font-weight: 600;
 }
 
 .stat-card.clickable:hover {
