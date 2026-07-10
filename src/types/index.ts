@@ -130,7 +130,9 @@ export interface ClubHistoryRecord {
   updated_at: string
 }
 
-export type ClubHistoryInsert = Omit<ClubHistoryRecord, 'id' | 'created_at' | 'updated_at'>
+export type ClubHistoryInsert = Omit<ClubHistoryRecord, 'id' | 'created_at' | 'updated_at' | 'secretary_name'> & {
+  secretary_name?: string | null
+}
 
 export type ClubHistoryUpdate = Partial<
   Omit<ClubHistoryRecord, 'id' | 'club_id' | 'created_at' | 'updated_at' | 'created_by'>

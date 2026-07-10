@@ -109,12 +109,6 @@ const router = createRouter({
       component: () => import('@/views/club/ClubHistoryView.vue'),
       meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
     },
-    {
-      path: '/club/service-plans',
-      name: 'club-service-plans',
-      component: () => import('@/views/club/ServicePlanOverviewView.vue'),
-      meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
-    },
     // E 活動
     {
       path: '/activities',

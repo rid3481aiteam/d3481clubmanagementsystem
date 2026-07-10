@@ -18,7 +18,6 @@ function emptyForm() {
   return {
     year_term: '',
     president_name: '',
-    secretary_name: '',
     notable_events: '',
   }
 }
@@ -34,7 +33,6 @@ function openEdit(item: ClubHistoryRecord) {
   form.value = {
     year_term: item.year_term,
     president_name: item.president_name ?? '',
-    secretary_name: item.secretary_name ?? '',
     notable_events: item.notable_events ?? '',
   }
   showModal.value = true
@@ -48,7 +46,6 @@ async function save() {
   const payload = {
     year_term: yearTerm,
     president_name: form.value.president_name.trim() || null,
-    secretary_name: form.value.secretary_name.trim() || null,
     notable_events: form.value.notable_events.trim() || null,
   }
 
@@ -88,7 +85,6 @@ onMounted(() => {
           <tr>
             <th>年份</th>
             <th>社長</th>
-            <th>當年秘書</th>
             <th>重要記事</th>
             <th v-if="canManage"></th>
           </tr>
@@ -97,7 +93,6 @@ onMounted(() => {
           <tr v-for="item in clubHistory.list" :key="item.id">
             <td data-label="年份"><strong>{{ item.year_term }}</strong></td>
             <td data-label="社長">{{ item.president_name || '-' }}</td>
-            <td data-label="當年秘書">{{ item.secretary_name || '-' }}</td>
             <td data-label="重要記事" class="note-cell card-stack">{{ item.notable_events || '-' }}</td>
             <td v-if="canManage" style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
@@ -105,7 +100,7 @@ onMounted(() => {
             </td>
           </tr>
           <tr v-if="!clubHistory.list.length">
-            <td :colspan="canManage ? 5 : 4" style="text-align:center; color:var(--muted);">尚無社的歷程紀錄</td>
+            <td :colspan="canManage ? 4 : 3" style="text-align:center; color:var(--muted);">尚無社的歷程紀錄</td>
           </tr>
         </tbody>
       </table>
@@ -125,10 +120,6 @@ onMounted(() => {
           <div>
             <label class="fl">社長</label>
             <input v-model="form.president_name" class="fi" />
-          </div>
-          <div>
-            <label class="fl">當年秘書</label>
-            <input v-model="form.secretary_name" class="fi" />
           </div>
           <div>
             <label class="fl">重要記事</label>

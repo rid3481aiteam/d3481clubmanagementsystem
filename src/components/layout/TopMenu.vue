@@ -109,7 +109,6 @@ const navItems = computed<NavItem[]>(() => {
       label: '本社歷程',
       items: [
         { to: '/club/history', icon: '📜', label: '社的歷程' },
-        { to: '/club/service-plans', icon: '🌱', label: '服務計劃總覽' },
         { to: '/club/sister-clubs', icon: '🤝', label: '友好社' },
       ],
     })
