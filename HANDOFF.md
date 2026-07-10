@@ -22,7 +22,7 @@
 
 ## ⚠️ 待辦
 
-**【第四十六輪】社友增減月報（比照 RI 半年報 Excel）** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 上正式站實測**：
+**【第四十六輪】社友增減月報（比照 RI 半年報 Excel）** ~~待實作~~ ~~待執行 migration~~ **040 migration 使用者已於 2026-07-10 執行完成 ✅，剩下待上正式站實測**：
 
 背景：使用者提供一份既有的月報 Excel（Google 表單匯出），從 2025/7 到 2026/6 每個月一個分頁，每列一個社，欄位是：RI 半年報基準 男/女/合計社友人數、當月月底 男/女/合計社友人數、淨成長、當月 40歲以下/41歲以上/合計社友人數、例會次數、出席率。使用者要求各社管理頁面比照這些欄位新增填寫表格，地區要能看到全區的總表。
 
@@ -39,7 +39,7 @@
 - **地區端**：新增頁面 [`AdminMembershipReportsView.vue`](src/views/admin/AdminMembershipReportsView.vue)（路由 `/admin/membership-reports`，選單「出席月報」旁新增「社友增減月報」），月份選擇器 + 全區總表（欄位順序、雙層表頭比照原本 Excel 版面，分區可摺疊）
 - [`FeatureFlagsView.vue`](src/views/admin/FeatureFlagsView.vue)／[`PermissionMatrixView.vue`](src/views/admin/PermissionMatrixView.vue) 都補上新項目的標籤
 
-1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/040_club_monthly_membership_reports.sql`
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/040_club_monthly_membership_reports.sql`~~ **使用者已執行完成 ✅**
 2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
 3. **待實測**（這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅，沒有真的登入測試過）：
    - migration 跑完後，社端（執秘/社長）登入 `/club/membership-report`，選一個月份，填入基準人數/當月人數/年齡分布，按「儲存本月報告」，確認合計/淨成長會即時算、例會次數/出席率有自動帶入系統數字
