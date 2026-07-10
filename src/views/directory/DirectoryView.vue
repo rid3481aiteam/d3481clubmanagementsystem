@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import * as XLSX from 'xlsx'
 import { useAuthStore } from '@/stores/auth'
 import { useFeaturesStore } from '@/stores/features'
 import { useClubStore } from '@/stores/club'
@@ -55,6 +56,26 @@ function toggleZone(zone: string) {
   collapsedZones.value = s
 }
 
+function handleExport() {
+  const exportRows = groupedClubs.value.flatMap(g => g.clubs.map(c => ({
+    分區: g.zone,
+    社名: c.name,
+    社長: c.pres_name || '-',
+    執秘: c.sec_name || '-',
+    電話: c.phone || '-',
+    Email: c.email || '-',
+    例會頻率: c.freq || '-',
+    例會時間: c.meeting_time || '-',
+    地點: c.venue || '-',
+    地址: c.addr || '-',
+    訂位電話: c.venue_tel || '-',
+  })))
+  const sheet = XLSX.utils.json_to_sheet(exportRows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, sheet, '例會通訊錄')
+  XLSX.writeFile(wb, '例會通訊錄.xlsx')
+}
+
 onMounted(() => {
   club.fetchAll()
 })
@@ -64,11 +85,10 @@ onMounted(() => {
   <div class="page">
     <div class="ph">
       <h1>地區通訊錄</h1>
-      <RouterLink
-        v-if="features.isEnabled('H3_directory_admin') && auth.isDistrictView"
-        to="/admin/clubs"
-        class="btn btn-g btn-sm"
-      >管理社團</RouterLink>
+      <div v-if="features.isEnabled('H3_directory_admin') && auth.isDistrictView" style="display:flex; gap:8px;">
+        <button class="btn btn-g btn-sm" @click="handleExport">📥 匯出例會通訊錄Excel</button>
+        <RouterLink to="/admin/clubs" class="btn btn-g btn-sm">管理社團</RouterLink>
+      </div>
     </div>
 
     <div v-if="features.isEnabled('H2_directory_search')" style="margin-bottom:14px;">

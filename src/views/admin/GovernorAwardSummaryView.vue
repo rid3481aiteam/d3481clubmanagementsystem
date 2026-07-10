@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import * as XLSX from 'xlsx'
 import { useClubStore } from '@/stores/club'
 import { useGovernorAwardsStore } from '@/stores/governorAwards'
 import {
@@ -78,6 +79,22 @@ const selectedRow = computed(() => {
   return rows.value.find(row => row.club.id === selectedClubId.value) ?? null
 })
 
+function handleExport() {
+  const exportRows = filteredRows.value.map(row => ({
+    社名: row.club.name,
+    分區: row.club.zone,
+    組別: row.app?.group_type || '-',
+    狀態: statusLabel(row.app),
+    總分: row.app?.total_score ?? '-',
+    等級: levelForRow(row).name,
+    更新時間: formatDate(row.app?.updated_at),
+  }))
+  const sheet = XLSX.utils.json_to_sheet(exportRows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, sheet, '全區獎項達標')
+  XLSX.writeFile(wb, `全區獎項達標_${GOVERNOR_AWARD_YEAR_TERM}.xlsx`)
+}
+
 function statusLabel(app: GovernorAwardApplication | null) {
   if (!app) return '未填寫'
   return app.status === 'submitted' ? '已送出' : '草稿'
@@ -131,7 +148,10 @@ onMounted(async () => {
         <h1>總監獎項填報統整</h1>
         <div class="subline">{{ GOVERNOR_AWARD_YEAR_TERM }} 年度</div>
       </div>
-      <button class="btn btn-g" @click="awards.fetchAll()">重新整理</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-g" @click="handleExport">📊 匯出全區獎項達標Excel</button>
+        <button class="btn btn-g" @click="awards.fetchAll()">重新整理</button>
+      </div>
     </div>
 
     <div class="summary-grid">

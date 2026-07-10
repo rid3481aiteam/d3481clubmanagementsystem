@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { useAttendanceStore } from '@/stores/attendance'
 import { useMembershipReportsStore } from '@/stores/membershipReports'
@@ -99,6 +100,37 @@ async function loadMonth() {
   loading.value = false
 }
 
+function handleExport() {
+  const withMembership = features.isEnabled('B6_membership_report')
+  const exportRows = groupedRows.value.flatMap(g => g.list.map(r => {
+    const base: Record<string, string | number> = {
+      分區: g.zone,
+      社名: r.clubName,
+      例會場次: r.rate?.meeting_count ?? 0,
+      應出席: r.rate?.expected ?? 0,
+      實際出席: r.rate?.actual ?? 0,
+      出席率: r.rate?.rate != null ? `${r.rate.rate}%` : '-',
+    }
+    if (withMembership) {
+      base['RI半年報基準-男'] = r.report?.baseline_male ?? '-'
+      base['RI半年報基準-女'] = r.report?.baseline_female ?? '-'
+      base['RI半年報基準-合計'] = r.baselineTotal
+      base[`${selectedMonth.value}月底-男`] = r.report?.current_male ?? '-'
+      base[`${selectedMonth.value}月底-女`] = r.report?.current_female ?? '-'
+      base[`${selectedMonth.value}月底-合計`] = r.currentTotal
+      base['淨成長'] = r.netGrowth ?? '-'
+      base['40歲以下'] = r.report?.age_under_40 ?? '-'
+      base['41歲以上'] = r.report?.age_41_plus ?? '-'
+      base['年齡合計'] = r.ageTotal
+    }
+    return base
+  }))
+  const sheet = XLSX.utils.json_to_sheet(exportRows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, sheet, '全區月報')
+  XLSX.writeFile(wb, `全區月報_${selectedMonth.value}.xlsx`)
+}
+
 onMounted(async () => {
   await loadClubs()
   await loadMonth()
@@ -111,6 +143,7 @@ watch(selectedMonth, loadMonth)
   <div class="page">
     <div class="ph">
       <h1>出席月報（全區）</h1>
+      <button class="btn btn-g" @click="handleExport">📊 匯出全區月報Excel</button>
     </div>
 
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
