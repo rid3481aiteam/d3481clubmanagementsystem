@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-10（第五十四輪，**EDM 產生器改成 Facebook 行銷文案 + 每社每日上限 2 次**——使用者說這個功能是要給各社做 FB 行銷文案用的，不是正式電子報，prompt 改成短文案（100~150字）、`max_tokens` 從 2048 降到 600；另外新增 `edm_generations` 記錄表，Edge Function 呼叫 Anthropic 前先查本社今天（台北時區）已成功產生幾次，達 2 次就擋掉不打 API，**migration 已執行、Edge Function 已重新部署完成 ✅**，詳見下方待辦）
+> 最後更新：2026-07-10（第五十五輪，**新增「地區行事曆」+ 每日自動從 Google Drive 同步**——使用者提供地區辦公室的行事曆 Excel（存在共用 Google Drive 資料夾，檔名含日期版本、每次更新會整份重新上傳），要求平台每天自動抓取顯示，不用手動維護。這輪新增：① [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue) 前端頁面（即將到來/全部/已過期篩選＋逐筆 .ics 下載），掛新 Feature Flag `F1_district_calendar`；② `district_calendar_events`／`district_calendar_sync_log` 兩張表（見 [`046_district_calendar.sql`](supabase/migrations/046_district_calendar.sql)），只開放 SELECT，寫入僅限 Edge Function 用 service role key，一般使用者（含地區管理員）都不能直接改；③ [`sync-district-calendar`](supabase/functions/sync-district-calendar/index.ts) Edge Function：用 Google Drive API v3 依 `modifiedTime` 找資料夾內最新的 xlsx、下載、用 SheetJS 解析、整批覆蓋寫入（沒有穩定唯一 ID 可比對，所以用整批清空重寫而非逐筆 upsert；**只有解析成功且非空才會覆蓋，抓取/解析失敗一律保留舊資料 + 寫一筆失敗紀錄**，前端頁面也會把最近一次失敗顯示成警示 banner）。實作前有把使用者提供的實際檔案（`2026-27年度地區重要行事曆-20260626版.xlsx`）抓下來實測解析邏輯，抓到一個真實 bug：檔案裡「地點」欄位標題實際存的是「地　　點」（中間夾全形空白，不是乾淨的「地點」二字），原本的欄位比對邏輯完全比對不到，會讓每筆活動的地點都變空值——已修正成比對前先去除所有空白字元，重測 51 筆資料全部正確解析。`vue-tsc --noEmit`／`npm run build` 皆已驗證通過。**待使用者完成的部分（Claude 無法代勞）**：詳見下方待辦。
+
+> 最後更新（上一輪）：2026-07-10（第五十四輪，**EDM 產生器改成 Facebook 行銷文案 + 每社每日上限 2 次**——使用者說這個功能是要給各社做 FB 行銷文案用的，不是正式電子報，prompt 改成短文案（100~150字）、`max_tokens` 從 2048 降到 600；另外新增 `edm_generations` 記錄表，Edge Function 呼叫 Anthropic 前先查本社今天（台北時區）已成功產生幾次，達 2 次就擋掉不打 API，**migration 已執行、Edge Function 已重新部署完成 ✅**，詳見下方待辦）
 
 > 最後更新（上一輪）：2026-07-10（第五十三輪，**移除「服務計劃總覽」分頁 + 「社的歷程」暫時拿掉秘書欄位**——使用者指出服務計劃總覽的內容已經在「社的歷程」裡呈現，重複了，要求整頁拿掉；「當年秘書」因為一直沒有資料來源，先從表單/表格移除但 DB 欄位保留，之後有資料再加回來，純前端改動、不需要 migration，`vue-tsc`/`build` 皆已驗證通過）
 
@@ -37,6 +39,30 @@
 ---
 
 ## ⚠️ 待辦
+
+**【第五十五輪】地區行事曆 — 待使用者完成部署設定**：
+
+1. **申請 Google API Key**：console.cloud.google.com 建立/選專案 → 啟用「Google Drive API」→ 建立 API 金鑰（建議限制成只能用 Drive API）
+2. **Supabase Dashboard → Edge Functions → Secrets 設定 3 組**：`GOOGLE_DRIVE_API_KEY`（上面申請的）、`GOOGLE_DRIVE_FOLDER_ID`（`1b4cSz5xl--t9cfYiWi66LPWJX7uTRHYK`，地區辦公室提供的行事曆資料夾，權限「知道連結的人可查看」）、`CRON_SECRET`（自訂一組長亂數字串，防止別人亂呼叫這支 function）
+3. **SQL Editor 執行 `046_district_calendar.sql`**
+4. **部署 Edge Function**：`supabase functions deploy sync-district-calendar --no-verify-jwt`
+5. **設定每日排程**（SQL Editor 執行一次，內含 CRON_SECRET 明碼，不進 git）：
+   ```sql
+   create extension if not exists pg_cron;
+   create extension if not exists pg_net;
+   select cron.schedule(
+     'sync-district-calendar-daily',
+     '0 22 * * *',  -- UTC 22:00 = 台北時間早上 6:00
+     $$
+     select net.http_post(
+       url := 'https://xdwqrgthsxyzclnjlmvy.supabase.co/functions/v1/sync-district-calendar',
+       headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET 的值>'),
+       body := '{}'::jsonb
+     );
+     $$
+   );
+   ```
+6. **待複查**：第一次部署完可以不等排程，手動打一次 function 網址（帶 `x-cron-secret` header）測試能不能正確抓到 51 筆資料且地點欄位有值；之後麻煩上正式站確認「地區行事曆」選單項目跟頁面正常顯示、.ics 下載能正確匯入手機行事曆
 
 **【第五十四輪】EDM 產生器改 FB 行銷文案 + 每社每日 2 次上限** ~~migration 已寫好，待使用者執行 + 部署 Edge Function~~ **使用者已執行 migration + 重新部署 Edge Function 完成 ✅，待複查實測**：
 

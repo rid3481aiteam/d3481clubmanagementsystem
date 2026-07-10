@@ -66,6 +66,13 @@ const router = createRouter({
       component: () => import('@/views/meetings/AttendanceMonthlyView.vue'),
       meta: { feature: 'B2_attendance_summary' as FeatureKey },
     },
+    // F 地區行事曆
+    {
+      path: '/calendar',
+      name: 'district-calendar',
+      component: () => import('@/views/DistrictCalendarView.vue'),
+      meta: { feature: 'F1_district_calendar' as FeatureKey },
+    },
     // D 名冊
     {
       path: '/roster',

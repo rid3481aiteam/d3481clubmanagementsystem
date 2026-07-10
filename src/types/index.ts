@@ -208,6 +208,7 @@ export type FeatureKey =
   | 'D1_roster' | 'D2_roster_excel' | 'D3_prospective' | 'D4_care'
   | 'H1_directory' | 'H2_directory_search' | 'H3_directory_admin'
   | 'E1_activities'
+  | 'F1_district_calendar'
 
 export interface FeatureFlag {
   id: string
@@ -221,6 +222,30 @@ export interface FeatureFlag {
 
 // 前端使用的扁平 map：{ B1_meeting_info: true, B5_edm: false, ... }
 export type FeatureMap = Record<FeatureKey, boolean>
+
+// ── 地區行事曆 ───────────────────────────────────────
+// 由 sync-district-calendar Edge Function 每日從地區辦公室的 Google Drive Excel 整批覆蓋寫入，
+// 前端一律唯讀，不開放使用者直接新增/編輯/刪除。
+export interface DistrictCalendarEvent {
+  id: string
+  start_date: string
+  end_date: string
+  time_slot: string | null
+  title: string
+  location: string | null
+  sort_order: number
+  created_at: string
+}
+
+export interface DistrictCalendarSyncLog {
+  id: string
+  synced_at: string
+  status: 'success' | 'error'
+  source_file_name: string | null
+  source_modified_at: string | null
+  event_count: number | null
+  error_message: string | null
+}
 
 // ── 例會 ─────────────────────────────────────────────
 export interface Meeting {

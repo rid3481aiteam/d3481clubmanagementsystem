@@ -61,6 +61,10 @@ const navItems = computed<NavItem[]>(() => {
     { type: 'link', to: '/', icon: '📊', label: '儀表板' },
   ]
 
+  if (features.isEnabled('F1_district_calendar')) {
+    items.push({ type: 'link', to: '/calendar', icon: '🗓️', label: '地區行事曆' })
+  }
+
   if (auth.isDistrictView) {
     items.push({ type: 'divider' })
     items.push({ type: 'link', to: '/admin/clubs', icon: '🏢', label: '社團總覽' })
