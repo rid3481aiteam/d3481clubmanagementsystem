@@ -34,6 +34,12 @@ function displayName(m: RosterMember) {
   return m.nick_name ? `${m.nick_name}（${m.name}）` : m.name
 }
 
+const avgRate = computed(() => {
+  const rated = attendance.rates.filter(r => r.rate !== null)
+  if (!rated.length) return null
+  return Math.round((rated.reduce((sum, r) => sum + (r.rate ?? 0), 0) / rated.length) * 10) / 10
+})
+
 async function load() {
   const meetingId = route.params.id as string
   await meetings.fetchOne(meetingId)
@@ -69,13 +75,35 @@ watch(() => route.params.id, load)
       <h1>出席記錄 — {{ meetings.current?.date }} {{ meetings.current?.title }}</h1>
     </div>
 
-    <div v-if="attendance.session" style="display:flex; gap:8px; margin-bottom:14px;">
-      <span class="bdg b-n">總人數 {{ attendance.session.total }}</span>
+    <div v-if="attendance.session" class="stat-grid" style="margin-bottom:20px;">
+      <div class="stat-card">
+        <div class="stat-label">社員人數</div>
+        <div class="stat-value">{{ attendance.session.total }}</div>
+      </div>
+      <div class="stat-card c-sky">
+        <div class="stat-label">本次出席率</div>
+        <div class="stat-value">{{ attendance.session.rate }}%</div>
+        <div class="rate-bar-wrap" style="margin-top:10px;">
+          <div class="bar-track rate-bar-track">
+            <div
+              class="bar-fill"
+              :style="{ width: attendance.session.rate + '%', background: attendance.session.rate < 60 ? 'var(--red)' : 'var(--green)' }"
+            ></div>
+            <div class="rate-threshold"></div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card c-gold">
+        <div class="stat-label">全社平均出席率</div>
+        <div class="stat-value">{{ avgRate ?? '-' }}{{ avgRate != null ? '%' : '' }}</div>
+      </div>
+    </div>
+
+    <div v-if="attendance.session" style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
       <span class="bdg b-gr">出席 {{ attendance.session.present }}</span>
       <span class="bdg b-r">缺席 {{ attendance.session.absent }}</span>
       <span class="bdg b-y">請假 {{ attendance.session.leave }}</span>
       <span class="bdg b-g">免計 {{ attendance.session.exempt }}</span>
-      <span class="bdg b-n">出席率 {{ attendance.session.rate }}%</span>
     </div>
 
     <div class="tw">
@@ -139,3 +167,18 @@ watch(() => route.params.id, load)
     </div>
   </div>
 </template>
+
+<style scoped>
+.rate-bar-track {
+  position: relative;
+}
+
+.rate-threshold {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 60%;
+  width: 2px;
+  background: var(--red);
+}
+</style>

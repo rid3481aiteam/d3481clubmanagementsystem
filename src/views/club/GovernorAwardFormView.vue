@@ -6,6 +6,7 @@ import {
   GOVERNOR_AWARD_OTHER_PROMPT,
   GOVERNOR_AWARD_SECTIONS,
   GOVERNOR_AWARD_YEAR_TERM,
+  getAwardLevel,
 } from '@/data/governorAwardCriteria'
 
 const auth = useAuthStore()
@@ -36,6 +37,7 @@ function loadDraftFromStore() {
 }
 
 const totalScore = computed(() => awards.computeTotal(draft.value.responses))
+const currentLevel = computed(() => getAwardLevel(totalScore.value))
 const completedCount = computed(() =>
   Object.values(draft.value.responses).filter(item => Number(item.score) > 0 || item.note.trim()).length,
 )
@@ -97,6 +99,11 @@ onMounted(async () => {
       <div class="tw summary-card">
         <div class="summary-label">目前總分</div>
         <div class="summary-value">{{ totalScore }}</div>
+      </div>
+      <div class="tw summary-card">
+        <div class="summary-label">目前等級</div>
+        <div class="summary-value"><span class="bdg" :class="currentLevel.badgeClass">{{ currentLevel.name }}</span></div>
+        <div class="summary-sub">門檻為系統預估，正式以地區公告為準</div>
       </div>
     </div>
 
@@ -201,6 +208,12 @@ onMounted(async () => {
   color: var(--muted);
   font-size: 12px;
   margin-bottom: 6px;
+}
+
+.summary-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .summary-value {

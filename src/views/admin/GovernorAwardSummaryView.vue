@@ -3,8 +3,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useClubStore } from '@/stores/club'
 import { useGovernorAwardsStore } from '@/stores/governorAwards'
 import {
+  GOVERNOR_AWARD_LEVELS,
   GOVERNOR_AWARD_SECTIONS,
   GOVERNOR_AWARD_YEAR_TERM,
+  getAwardLevel,
 } from '@/data/governorAwardCriteria'
 import type { Club, GovernorAwardApplication, GovernorAwardCriterion } from '@/types'
 
@@ -32,6 +34,43 @@ const avgScore = computed(() => {
   const submitted = rows.value.filter(row => row.app?.status === 'submitted' && row.app.total_score !== null)
   if (!submitted.length) return 0
   return Math.round((submitted.reduce((sum, row) => sum + (row.app?.total_score ?? 0), 0) / submitted.length) * 10) / 10
+})
+
+// 未送出（含草稿/未填寫）一律歸在「尚未達標」——等級是實際送出分數換算出來的達成狀態，還沒送出就談不上達成哪一級。
+function levelForRow(row: { app: GovernorAwardApplication | null }) {
+  return row.app?.status === 'submitted' ? getAwardLevel(row.app.total_score) : getAwardLevel(0)
+}
+
+const levelCounts = computed(() => {
+  const counts = new Map(GOVERNOR_AWARD_LEVELS.map(level => [level.name, 0]))
+  for (const row of rows.value) {
+    const level = levelForRow(row)
+    counts.set(level.name, (counts.get(level.name) ?? 0) + 1)
+  }
+  return counts
+})
+
+const ZONE_ORDER = [
+  '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
+  '第六分區', '第七分區', '第八分區', '第九分區', '第十分區', '第十一分區',
+]
+const zones = computed(() => {
+  const present = new Set(club.allClubs.map(c => c.zone).filter(Boolean))
+  return ZONE_ORDER.filter(z => present.has(z))
+})
+
+const zoneFilter = ref('')
+const levelFilter = ref('')
+const search = ref('')
+
+const filteredRows = computed(() => {
+  const keyword = search.value.trim()
+  return rows.value.filter(row => {
+    if (zoneFilter.value && row.club.zone !== zoneFilter.value) return false
+    if (levelFilter.value && levelForRow(row).name !== levelFilter.value) return false
+    if (keyword && !row.club.name.includes(keyword)) return false
+    return true
+  })
 })
 
 const selectedRow = computed(() => {
@@ -114,6 +153,29 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div class="summary-grid">
+      <div v-for="level in GOVERNOR_AWARD_LEVELS" :key="level.name" class="tw summary-card">
+        <div class="summary-label">
+          <span class="bdg" :class="level.badgeClass">{{ level.name }}</span>
+        </div>
+        <div class="summary-value">{{ levelCounts.get(level.name) ?? 0 }}</div>
+        <div class="summary-sub" v-if="level.min > 0">≥ {{ level.min }} 分</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <select v-model="zoneFilter" class="fi">
+        <option value="">全部分區</option>
+        <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
+      </select>
+      <select v-model="levelFilter" class="fi">
+        <option value="">全部等級</option>
+        <option v-for="level in GOVERNOR_AWARD_LEVELS" :key="level.name" :value="level.name">{{ level.name }}</option>
+      </select>
+      <input v-model="search" class="fi" placeholder="🔍 搜尋社名…" />
+      <span class="filter-count">共 {{ filteredRows.length }} 社</span>
+    </div>
+
     <div class="summary-layout">
       <div class="tw">
         <table class="card-table">
@@ -124,12 +186,13 @@ onMounted(async () => {
               <th>組別</th>
               <th>狀態</th>
               <th>總分</th>
+              <th>等級</th>
               <th>更新時間</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="row in rows"
+              v-for="row in filteredRows"
               :key="row.club.id"
               class="click-row"
               :class="{ selected: selectedClubId === row.club.id }"
@@ -140,7 +203,11 @@ onMounted(async () => {
               <td data-label="組別">{{ row.app?.group_type || '-' }}</td>
               <td data-label="狀態"><span class="bdg" :class="statusClass(row.app)">{{ statusLabel(row.app) }}</span></td>
               <td data-label="總分">{{ row.app?.total_score ?? '-' }}</td>
+              <td data-label="等級"><span class="bdg" :class="levelForRow(row).badgeClass">{{ levelForRow(row).name }}</span></td>
               <td data-label="更新時間">{{ formatDate(row.app?.updated_at) }}</td>
+            </tr>
+            <tr v-if="!filteredRows.length">
+              <td colspan="7" style="text-align:center; color:var(--muted);">沒有符合條件的社</td>
             </tr>
           </tbody>
         </table>
@@ -169,6 +236,10 @@ onMounted(async () => {
               <div>
                 <span>總分</span>
                 <strong>{{ selectedRow.app.total_score }}</strong>
+              </div>
+              <div>
+                <span>等級</span>
+                <strong><span class="bdg" :class="levelForRow(selectedRow).badgeClass">{{ levelForRow(selectedRow).name }}</span></strong>
               </div>
               <div>
                 <span>送出時間</span>
@@ -236,6 +307,30 @@ onMounted(async () => {
   color: var(--navy);
   font-size: 24px;
   font-weight: 700;
+}
+
+.summary-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.filter-bar .fi {
+  width: auto;
+  min-width: 140px;
+}
+
+.filter-count {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .summary-layout {

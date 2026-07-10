@@ -2,6 +2,25 @@ import type { GovernorAwardSection } from '@/types'
 
 export const GOVERNOR_AWARD_YEAR_TERM = '2026-2027'
 
+// 比照 vivian 檔案（rotary3481_platform_12.html 的 LEVELS）的分數門檻，門檻為系統預估，正式以地區公告為準。
+export interface GovernorAwardLevel {
+  name: string
+  min: number
+  badgeClass: string
+}
+
+export const GOVERNOR_AWARD_LEVELS: GovernorAwardLevel[] = [
+  { name: '典範扶輪社', min: 55, badgeClass: 'b-y' },
+  { name: '優質扶輪社', min: 40, badgeClass: 'b-gr' },
+  { name: '活力扶輪社', min: 25, badgeClass: 'b-n' },
+  { name: '尚未達標', min: 0, badgeClass: 'b-g' },
+]
+
+export function getAwardLevel(score: number | null | undefined): GovernorAwardLevel {
+  const s = score ?? 0
+  return GOVERNOR_AWARD_LEVELS.find(level => s >= level.min) ?? GOVERNOR_AWARD_LEVELS[GOVERNOR_AWARD_LEVELS.length - 1]
+}
+
 export const GOVERNOR_AWARD_SECTIONS: GovernorAwardSection[] = [
   {
     "key": "governance",

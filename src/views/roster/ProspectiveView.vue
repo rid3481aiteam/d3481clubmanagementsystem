@@ -34,6 +34,20 @@ const filtered = computed(() => {
   return prospective.prospects.filter(p => p.status === statusFilter.value)
 })
 
+const totalCount = computed(() => prospective.prospects.length)
+const invitedCount = computed(() => prospective.prospects.filter(p => p.status === 'invited').length)
+const joinedCount = computed(() => prospective.prospects.filter(p => p.status === 'joined').length)
+// 需跟進：還在追蹤中（非已入社/婉拒）且下次追蹤日期已經過期超過 30 天
+const needFollowUpCount = computed(() => {
+  const now = Date.now()
+  return prospective.prospects.filter(p => {
+    if (p.status === 'joined' || p.status === 'declined') return false
+    if (!p.follow_up_date) return false
+    const days = (now - new Date(p.follow_up_date).getTime()) / 86400000
+    return days > 30
+  }).length
+})
+
 function followUpClass(dateStr: string | null) {
   if (!dateStr) return ''
   const days = (new Date(dateStr).getTime() - Date.now()) / 86400000
@@ -97,6 +111,26 @@ onMounted(() => {
     <div class="ph">
       <h1>潛在社友追蹤</h1>
       <button v-if="canManage" class="btn btn-gold" @click="openAdd">+ 新增潛在社友</button>
+    </div>
+
+    <div class="summary-grid">
+      <div class="tw summary-card">
+        <div class="summary-label">追蹤中</div>
+        <div class="summary-value">{{ totalCount }}</div>
+      </div>
+      <div class="tw summary-card">
+        <div class="summary-label">已邀請</div>
+        <div class="summary-value">{{ invitedCount }}</div>
+      </div>
+      <div class="tw summary-card">
+        <div class="summary-label">已入社</div>
+        <div class="summary-value">{{ joinedCount }}</div>
+      </div>
+      <div class="tw summary-card">
+        <div class="summary-label">需跟進</div>
+        <div class="summary-value" :style="needFollowUpCount > 0 ? 'color:var(--red)' : ''">{{ needFollowUpCount }}</div>
+        <div class="summary-sub">超30天未聯繫</div>
+      </div>
     </div>
 
     <div style="margin-bottom:14px;">
@@ -196,3 +230,34 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.summary-card {
+  padding: 16px;
+}
+
+.summary-label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.summary-value {
+  color: var(--navy);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.summary-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+</style>

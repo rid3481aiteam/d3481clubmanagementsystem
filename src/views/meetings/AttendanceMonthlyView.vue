@@ -130,8 +130,19 @@ watch(selectedMonth, async () => {
       <div class="stat-card c-sky">
         <div class="stat-label">{{ selectedMonth }} 出席率</div>
         <div class="stat-value">{{ selectedRate?.rate ?? '-' }}{{ selectedRate?.rate != null ? '%' : '' }}</div>
-        <div v-if="selectedRate?.rate != null" class="bar-track" style="margin-top:10px;">
-          <div class="bar-fill" :style="{ width: selectedRate.rate + '%' }"></div>
+        <div v-if="selectedRate?.rate != null" class="rate-bar-wrap" style="margin-top:10px;">
+          <div class="bar-track rate-bar-track">
+            <div
+              class="bar-fill"
+              :style="{ width: selectedRate.rate + '%', background: selectedRate.rate < 60 ? 'var(--red)' : 'var(--green)' }"
+            ></div>
+            <div class="rate-threshold"></div>
+          </div>
+          <div class="rate-bar-labels">
+            <span>0%</span>
+            <span class="rate-threshold-label">60% 最低門檻</span>
+            <span>100%</span>
+          </div>
         </div>
       </div>
       <div class="stat-card c-gold">
@@ -340,5 +351,31 @@ watch(selectedMonth, async () => {
   padding: 8px 12px;
   border-radius: var(--r-sm);
   margin-bottom: 14px;
+}
+
+/* 比照 vivian 檔案月報頁的出席率進度條：加上 60% 最低門檻標線 */
+.rate-bar-track {
+  position: relative;
+}
+
+.rate-threshold {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 60%;
+  width: 2px;
+  background: var(--red);
+}
+
+.rate-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.rate-threshold-label {
+  color: var(--red);
 }
 </style>
