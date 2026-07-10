@@ -284,6 +284,16 @@ export interface MemberAttendanceRate {
   rate: number | null
 }
 
+// 各社每月出席率（來自 club_monthly_attendance_rate view）
+export interface ClubMonthlyAttendanceRate {
+  club_id: string
+  month: string          // 'YYYY-MM'
+  meeting_count: number
+  present: number
+  counted: number
+  rate: number | null
+}
+
 // ── 社友名冊 ─────────────────────────────────────────
 export type RosterClubPosition = 'PP' | 'IPP' | 'P' | 'VP' | 'PE' | 'S' | '社友'
 export type RosterMemberStatus = 'normal' | 'leave' | 'resigned'

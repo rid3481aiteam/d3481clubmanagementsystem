@@ -64,6 +64,7 @@ const navItems = computed<NavItem[]>(() => {
   if (auth.isDistrictView) {
     items.push({ type: 'divider' })
     items.push({ type: 'link', to: '/admin/clubs', icon: '🏢', label: '社團總覽' })
+    items.push({ type: 'link', to: '/admin/attendance', icon: '📈', label: '出席月報' })
     items.push({ type: 'link', to: '/admin/announcements', icon: '📣', label: '地區公告' })
     items.push({ type: 'link', to: '/admin/governor-awards', icon: '🏅', label: '總監獎項統整' })
     if (features.isEnabled('E1_activities')) {
@@ -97,6 +98,9 @@ const navItems = computed<NavItem[]>(() => {
     }
     if (features.isEnabled('B1_meeting_info')) {
       items.push({ type: 'link', to: '/meetings', icon: '📅', label: '例會管理' })
+    }
+    if (features.isEnabled('B2_attendance_summary')) {
+      items.push({ type: 'link', to: '/attendance/monthly', icon: '📈', label: '出席月報' })
     }
     items.push({ type: 'link', to: '/club/officers', icon: '🎖️', label: '社的年度成員' })
     items.push({

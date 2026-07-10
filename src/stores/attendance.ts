@@ -6,12 +6,14 @@ import type {
   AttendanceDetail,
   AttendanceStatus,
   MemberAttendanceRate,
+  ClubMonthlyAttendanceRate,
 } from '@/types'
 
 export const useAttendanceStore = defineStore('attendance', () => {
   const session = ref<AttendanceSession | null>(null)
   const details = ref<AttendanceDetail[]>([])
   const rates = ref<MemberAttendanceRate[]>([])
+  const monthlyRates = ref<ClubMonthlyAttendanceRate[]>([])
   const loading = ref(false)
 
   async function fetchSession(meetingId: string) {
@@ -38,6 +40,25 @@ export const useAttendanceStore = defineStore('attendance', () => {
     if (clubId) query = query.eq('club_id', clubId)
     const { data } = await query
     rates.value = data ?? []
+  }
+
+  // 單一社的歷月出席率（社端「出席月報」頁、地區端社團詳情頁）
+  async function fetchMonthlyRates(clubId: string) {
+    const { data } = await supabase
+      .from('club_monthly_attendance_rate')
+      .select('*')
+      .eq('club_id', clubId)
+      .order('month', { ascending: false })
+    monthlyRates.value = data ?? []
+  }
+
+  // 全地區某一個月，各社出席率（地區端「出席月報」頁）
+  async function fetchDistrictMonthlyRates(month: string) {
+    const { data } = await supabase
+      .from('club_monthly_attendance_rate')
+      .select('*')
+      .eq('month', month)
+    return (data ?? []) as ClubMonthlyAttendanceRate[]
   }
 
   async function save(
@@ -87,5 +108,17 @@ export const useAttendanceStore = defineStore('attendance', () => {
     return { error }
   }
 
-  return { session, details, rates, loading, fetchSession, fetchDetails, fetchRates, save }
+  return {
+    session,
+    details,
+    rates,
+    monthlyRates,
+    loading,
+    fetchSession,
+    fetchDetails,
+    fetchRates,
+    fetchMonthlyRates,
+    fetchDistrictMonthlyRates,
+    save,
+  }
 })

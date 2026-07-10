@@ -41,6 +41,7 @@ function formatLocalDate(date: Date) {
 export const useDashboardStore = defineStore('dashboard', () => {
   const meetingCount = ref(0)
   const avgRate = ref<number | null>(null)
+  const monthlyRate = ref<number | null>(null)
   const memberCount = ref(0)
   const lowAttendance = ref<MemberAttendanceRate[]>([])
   const followUps = ref<ProspectiveMember[]>([])
@@ -171,6 +172,18 @@ export const useDashboardStore = defineStore('dashboard', () => {
       avgRate.value = null
     }
 
+    if (clubId) {
+      const { data: monthlyRow } = await supabase
+        .from('club_monthly_attendance_rate')
+        .select('rate')
+        .eq('club_id', clubId)
+        .eq('month', monthRange.start.slice(0, 7))
+        .maybeSingle()
+      monthlyRate.value = monthlyRow?.rate ?? null
+    } else {
+      monthlyRate.value = null
+    }
+
     let rosterQuery = supabase.from('roster').select('id', { count: 'exact', head: true }).eq('is_active', true)
     if (clubId) rosterQuery = rosterQuery.eq('club_id', clubId)
     const { count } = await rosterQuery
@@ -206,6 +219,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   return {
     meetingCount,
     avgRate,
+    monthlyRate,
     memberCount,
     lowAttendance,
     followUps,

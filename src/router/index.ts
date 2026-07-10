@@ -60,6 +60,12 @@ const router = createRouter({
       component: () => import('@/views/meetings/AttendanceView.vue'),
       meta: { feature: 'B2_attendance_summary' as FeatureKey },
     },
+    {
+      path: '/attendance/monthly',
+      name: 'attendance-monthly',
+      component: () => import('@/views/meetings/AttendanceMonthlyView.vue'),
+      meta: { feature: 'B2_attendance_summary' as FeatureKey },
+    },
     // D 名冊
     {
       path: '/roster',
@@ -146,6 +152,12 @@ const router = createRouter({
       path: '/admin/governor-awards',
       name: 'admin-governor-awards',
       component: () => import('@/views/admin/GovernorAwardSummaryView.vue'),
+      meta: { districtViewer: true },
+    },
+    {
+      path: '/admin/attendance',
+      name: 'admin-attendance',
+      component: () => import('@/views/admin/AdminAttendanceView.vue'),
       meta: { districtViewer: true },
     },
     {

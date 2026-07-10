@@ -7,6 +7,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import { useProspectiveStore } from '@/stores/prospective'
 import { useMeetingsStore } from '@/stores/meetings'
+import { useAttendanceStore } from '@/stores/attendance'
 import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus, UserProfile, UserRole, ProspectStatus } from '@/types'
 
 const route = useRoute()
@@ -15,6 +16,7 @@ const roster = useRosterStore()
 const officers = useOfficersStore()
 const prospective = useProspectiveStore()
 const meetingsStore = useMeetingsStore()
+const attendance = useAttendanceStore()
 const club = ref<Club | null>(null)
 const lastMeeting = ref<Meeting | null>(null)
 const avgRate = ref<number | null>(null)
@@ -104,6 +106,7 @@ async function load() {
   await officers.fetchAll(id, yearTerm)
   await prospective.fetchAll(id)
   await meetingsStore.fetchAll(id)
+  await attendance.fetchMonthlyRates(id)
 
   const { data: accounts } = await supabase
     .from('user_profiles')
@@ -262,6 +265,35 @@ watch(() => route.params.id, load)
           </tr>
           <tr v-if="!meetingsStore.meetings.length">
             <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無例會紀錄</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-h">歷月出席率</h2>
+    <div class="tw" style="margin-bottom:24px;">
+      <table>
+        <thead class="th">
+          <tr>
+            <th>月份</th>
+            <th>例會場次</th>
+            <th>出席 / 計入人次</th>
+            <th>出席率</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in attendance.monthlyRates" :key="r.month">
+            <td>{{ r.month }}</td>
+            <td>{{ r.meeting_count }}</td>
+            <td>{{ r.present }} / {{ r.counted }}</td>
+            <td>
+              <span class="bdg" :class="r.rate !== null && r.rate < 75 ? 'b-r' : 'b-gr'">
+                {{ r.rate !== null ? r.rate + '%' : '-' }}
+              </span>
+            </td>
+          </tr>
+          <tr v-if="!attendance.monthlyRates.length">
+            <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無出席資料</td>
           </tr>
         </tbody>
       </table>

@@ -70,7 +70,10 @@ function toggleZone(zone: string) {
       </div>
 
       <div>
-        <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">各社出席率 / 入社退社人數</h2>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <h2 style="font-size:14px; font-weight:700; color:var(--navy);">各社出席率 / 入社退社人數（本扶輪年度）</h2>
+          <RouterLink to="/admin/attendance" class="btn btn-g btn-sm">查看各月出席率 →</RouterLink>
+        </div>
         <div class="tw">
           <table>
             <thead class="th">
@@ -124,7 +127,14 @@ function toggleZone(zone: string) {
         <div class="stat-value">{{ dashboard.meetingCount }}</div>
       </div>
       <div class="stat-card c-sky">
-        <div class="stat-label">平均出席率</div>
+        <div class="stat-label">本月出席率</div>
+        <div class="stat-value">{{ dashboard.monthlyRate !== null ? dashboard.monthlyRate + '%' : '-' }}</div>
+        <div v-if="dashboard.monthlyRate !== null" class="bar-track" style="margin-top:10px;">
+          <div class="bar-fill" :style="{ width: dashboard.monthlyRate + '%' }"></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">本年度平均出席率</div>
         <div class="stat-value">{{ dashboard.avgRate !== null ? dashboard.avgRate + '%' : '-' }}</div>
         <div v-if="dashboard.avgRate !== null" class="bar-track" style="margin-top:10px;">
           <div class="bar-fill" :style="{ width: dashboard.avgRate + '%' }"></div>
@@ -134,6 +144,10 @@ function toggleZone(zone: string) {
         <div class="stat-label">社友人數</div>
         <div class="stat-value">{{ dashboard.memberCount }}</div>
       </div>
+      </div>
+
+      <div v-if="auth.clubId" style="margin-bottom:16px;">
+        <RouterLink to="/attendance/monthly" class="btn btn-g btn-sm">查看歷月出席率 →</RouterLink>
       </div>
 
       <div v-if="auth.clubId" style="margin-bottom:24px;">

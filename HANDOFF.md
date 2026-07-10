@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-07（第四十四輪，**LINE 官方帳號通知 Demo（給和平社展示用）**——使用者想讓和平社實際看到「LINE 通知」這個構想可行，這輪做了最小可動版本：人工核對手機號碼綁定 + 測試訊息發送，安全性留到正式導入前再加強，詳見下方待辦，**需要使用者到 LINE Developers Console 申請頻道 + 用 Supabase CLI 部署 2 支 Edge Function，Claude 無法代勞**）
+> 最後更新：2026-07-10（第四十五輪，**新增「出席月報」（各社當月出席率 + 歷月查詢 + 地區月報）**——使用者要求各社儀表板要顯示當月出席率、可查詢各月份出席率，並且要讓地區也能查詢各社各月出席率，詳見下方待辦）
+
+> 最後更新（上一輪）：2026-07-07（第四十四輪，**LINE 官方帳號通知 Demo（給和平社展示用）**——使用者想讓和平社實際看到「LINE 通知」這個構想可行，這輪做了最小可動版本：人工核對手機號碼綁定 + 測試訊息發送，安全性留到正式導入前再加強，詳見下方待辦，**需要使用者到 LINE Developers Console 申請頻道 + 用 Supabase CLI 部署 2 支 Edge Function，Claude 無法代勞**）
 
 > 最後更新（上一輪）：2026-07-07（第四十三輪，**開始製作兩份 SOP 文件（PDF），文件二中途被使用者打斷、換電腦/帳號接手**——使用者要把「怎麼從0建置這個平台」跟「各功能怎麼操作」整理成給人看的 SOP，詳見下方待辦與 `docs/sop/PROGRESS.md`）
 
@@ -17,6 +19,30 @@
 ---
 
 ## ⚠️ 待辦
+
+**【第四十五輪】出席月報（各社當月出席率 + 歷月查詢 + 地區月報）** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 上正式站實測**：
+
+背景：使用者要求「各社儀表板要有當月的出席率統計，還可以查詢各月份的出席率，並且此出席率每月要自動同步到地區，地區可以查詢各月各社的出席率」。
+
+**關鍵設計決定（沒有另外做批次/排程同步）**：這個系統所有社的出席資料本來就存在同一個 Supabase 專案裡，`meetings`／`attendance_sessions` 的 RLS 本來就是「本社可見 OR 地區（唯讀/管理員）可見全部」（見 003、030 兩支 migration）。所以「每月自動同步到地區」不需要另外寫 cron job 或批次複製資料表——只要新增一個以「月份」為單位的統計 view，地區角色本來就查得到全部社團的資料，等於即時同步，比批次同步更即時、也不會有資料過期的問題。既有的 `member_attendance_rate`（個人出席率）也是用同樣的「view + RLS 繼承」模式，這輪延續同一套做法。
+
+`ARCHITECTURE.md` 記載「所有出席率統計以 year_term（扶輪年度）為單位」是既有的設計決定，這輪**沒有**去改動既有的年度出席率邏輯（各儀表板的「平均出席率」欄位語意不變，只是在 club 端儀表板加上「本年度」字樣做區隔），而是另外新增一層「以月份為單位」的統計，兩者並存。
+
+實作內容：
+- `039_monthly_attendance_rate.sql`：新增 view `club_monthly_attendance_rate`（`club_id`／`month`(`'YYYY-MM'`)／`meeting_count`／`present`／`counted`／`rate`），`security_invoker=true` 繼承底層表 RLS
+- `src/stores/attendance.ts`：新增 `monthlyRates` + `fetchMonthlyRates(clubId)`（單一社的全部月份，給社端歷月查詢 + 地區端社團詳情頁用）+ `fetchDistrictMonthlyRates(month)`（全地區某一個月，給地區端月報頁用）
+- `src/stores/dashboard.ts`：新增 `monthlyRate`（當月出席率，`load()` 內順便查）
+- **社端**：[`DashboardView.vue`](src/views/DashboardView.vue) 儀表板新增「本月出席率」卡片（原本的「平均出席率」卡片改標「本年度平均出席率」做區隔，計算邏輯沒動）+ 「查看歷月出席率」連結；新增頁面 [`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue)（路由 `/attendance/monthly`，選單「例會管理」旁新增「出席月報」），月份選擇器（`<input type="month">`）+ 該月統計卡 + 歷月出席率表格
+- **地區端**：Dashboard 的「各社出席率」表格標題加註「（本扶輪年度）」+ 「查看各月出席率」連結；新增頁面 [`AdminAttendanceView.vue`](src/views/admin/AdminAttendanceView.vue)（路由 `/admin/attendance`，選單「社團總覽」旁新增「出席月報」），月份選擇器 + 全區各社出席率表格（比照 Dashboard 既有的分區摺疊 UI）；[`ClubDetailView.vue`](src/views/admin/ClubDetailView.vue)（社團詳情頁）新增「歷月出席率」表格，方便地區單獨查某一社的月趨勢
+
+1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/039_monthly_attendance_rate.sql`
+2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
+3. **待實測**（本機這輪有真實 `.env.local`，但 migration 還沒在正式站執行、也沒有真實帳密登入，這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅）：
+   - migration 跑完後，社端登入儀表板，確認「本月出席率」卡片有數字（該社本月要有例會 + 已記錄出席才會顯示，沒有的話是「-」）
+   - 社端點「查看歷月出席率」，進 `/attendance/monthly`，切換月份選擇器應該能看到不同月份的統計 + 下方歷月表格
+   - 地區（唯讀/管理員）登入儀表板，點「查看各月出席率」，進 `/admin/attendance`，切換月份應該能看到全區各社當月出席率，分區可摺疊
+   - 地區進「社團總覽」點進任一社的詳情頁，「歷月出席率」表格應該有資料
+4. 已知限制：`club_monthly_attendance_rate` view 用 `date_trunc('month', meetings.date)` 分組，只有「已經記錄出席（`attendance_sessions` 有資料）」的月份才會出現在表格裡；某月有開例會但執秘還沒登記出席，該月不會出現一列（跟既有 `member_attendance_rate` 的行為一致，不是 bug）
 
 **【第四十四輪】LINE 官方帳號通知 Demo（給和平社展示用）** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 申請 LINE 頻道 + 部署 Edge Function**：
 
