@@ -46,8 +46,8 @@
 2. **新增每社每日 2 次上限**（[`supabase/migrations/045_edm_generations.sql`](supabase/migrations/045_edm_generations.sql)）：新表 `edm_generations` 只記錄「哪個社、什麼時候、成功產生過一次」，不存文案內容本身。Edge Function 在打 Anthropic API **之前**，先查本社在台北時區「今天」範圍內已成功產生幾次，達到 2 次就直接擋掉回傳 429（不會浪費 API 費用），成功產生後才寫入一筆紀錄。**只限制 `scope='club'`**（各社自己用的），`scope='district'`（地區視角用的）不受這個上限影響，因為使用者只提到「每社」。
 3. **失敗不計次**：只有真的成功拿到 AI 回覆才會寫入 `edm_generations`，中途出錯（AI 服務掛掉、格式錯誤等）不會浪費使用者的每日額度。
 4. **前端不用改**：[`stores/edm.ts`](src/stores/edm.ts) 本來就會把 Edge Function 回傳的 `{error: "..."}` 原樣顯示在畫面上（[`EdmGeneratorView.vue`](src/views/edm/EdmGeneratorView.vue) 第62行），429 擋下來的訊息「本社今日 EDM 產生次數已達上限（每日 2 次），請明天再試」會自動顯示，不需要額外改畫面。
-5. **待使用者執行**：① Supabase SQL Editor 跑 `045_edm_generations.sql`；② 用 Supabase CLI 重新部署 `generate-edm` 這支 Edge Function（`supabase functions deploy generate-edm`，這台環境沒有已登入的 Supabase CLI，Claude 沒辦法代為部署，跟先前 LINE 通知功能部署卡住的原因一樣）。
-6. **待複查**：部署完成後麻煩用同一個社的帳號連續產生 3 次，確認前 2 次正常、第 3 次會被擋下來並顯示上限訊息；隔天（或手動改系統時間測試如果方便的話）確認額度有重置。
+5. **使用者已執行**：① Supabase SQL Editor 跑完 `045_edm_generations.sql`；② 用 Supabase CLI 重新部署 `generate-edm` Edge Function，都已確認完成 ✅。
+6. **目前卡住、還沒辦法實測**：使用者回報「API 還沒串」——`generate-edm` 目前部署的環境還沒設定有效的 `ANTHROPIC_API_KEY`（或額度沒加值），所以呼叫 Anthropic 一定會失敗。**這連帶讓每日 2 次上限的邏輯也還測不了**：程式碼設計是「只有真的成功拿到 AI 回覆才會寫進 `edm_generations` 計次」（見上面第3點），API 還沒接通的狀態下永遠不會成功、永遠不會計次，所以現在測「連續產生 3 次」不會看到上限生效，是預期中的行為，不是 bug。**等使用者把 `ANTHROPIC_API_KEY` 設定好（Supabase Dashboard → Edge Functions → Secrets）之後**，才能真的測：① 正常產生一次確認文案是短版 FB 貼文（100~150字、有 hashtag）；② 連續產生 3 次確認前 2 次成功、第 3 次被擋且顯示「本社今日 EDM 產生次數已達上限（每日 2 次），請明天再試」；③ 隔天額度重置。
 
 **【第五十三輪】移除「服務計劃總覽」+「社的歷程」暫拿掉秘書欄位** **純前端改動，程式碼已完成，無 migration 需執行**：
 
