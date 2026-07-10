@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-10（第五十六輪，**地區行事曆版面比照原型 `vivianrotary-cloud/3481rotarymember`（`rotary3481_platform_12.html`）重做**——上一輪先做出來的是簡化版單欄卡片，這輪改成跟原型一致的「月份分組＋倒數徽章」呈現：月份深藍色標題列（顯示年月+項數）、每筆活動一列（左：日期/時段，中：標題/📍地點·日期範圍，右：依緊急程度變色的倒數徽章＋加入行事曆按鈕）。徽章邏輯完全比照原型：已過期灰階＋整列淡化不顯示按鈕、進行中紅、7天內金、30天內綠、更遠淺藍底。因為本機沒有真實 Supabase 連線跑不了登入後的頁面，改用使用者提供的實際 Excel 檔案解析出的 51 筆真實資料，做了一份獨立的靜態 HTML 視覺驗證（CSS 直接對照 [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue) 的 `<style scoped>`），在瀏覽器裡實測「即將到來/全部/已過期」三個分頁 + 手機版排版都正常，才確認合併。`vue-tsc --noEmit` 已重新驗證通過。**待複查**：上正式站後麻煩確認實際登入畫面跟這次的視覺驗證一致（理論上應該一致，因為 CSS 是直接對照的，但沒有用真帳號跑過完整登入流程）。
+> 最後更新：2026-07-10（第五十七輪，**地區行事曆改成手動匯入資料，Google Drive 自動同步暫緩**——使用者問了改用 Make.com 做自動同步會不會比較簡單（Make.com 的 Google Drive 連接是 OAuth 授權，不用像現在這樣手動去 Google Cloud Console 申請 API Key，這點確實比較省事，但 Make.com 免費方案有每月操作次數限制，且視覺化模組要處理像這份 Excel「地點」欄位標題夾雜全形空白這種怪癖會比較麻煩，可能還是要另外接 Code 模組），討論後使用者決定**這段自動同步先不做**，改成直接把已經解析驗證過的 51 筆 Excel 資料用 `INSERT` 寫死進資料庫（新增 [`047_district_calendar_seed.sql`](supabase/migrations/047_district_calendar_seed.sql)），讓「地區行事曆」頁面先有真實資料可用。原本規劃的 Google Drive API + Edge Function + pg_cron 自動同步程式碼（第五十五輪寫的）維持留在 repo 裡沒有刪除，之後要恢復自動更新（不管是自建方案還是改用 Make.com）都可以直接接上去。**待使用者到 SQL Editor 執行 047**（需在 046 之後執行）。
+
+> 最後更新（上一輪）：2026-07-10（第五十六輪，**地區行事曆版面比照原型 `vivianrotary-cloud/3481rotarymember`（`rotary3481_platform_12.html`）重做**——上一輪先做出來的是簡化版單欄卡片，這輪改成跟原型一致的「月份分組＋倒數徽章」呈現：月份深藍色標題列（顯示年月+項數）、每筆活動一列（左：日期/時段，中：標題/📍地點·日期範圍，右：依緊急程度變色的倒數徽章＋加入行事曆按鈕）。徽章邏輯完全比照原型：已過期灰階＋整列淡化不顯示按鈕、進行中紅、7天內金、30天內綠、更遠淺藍底。因為本機沒有真實 Supabase 連線跑不了登入後的頁面，改用使用者提供的實際 Excel 檔案解析出的 51 筆真實資料，做了一份獨立的靜態 HTML 視覺驗證（CSS 直接對照 [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue) 的 `<style scoped>`），在瀏覽器裡實測「即將到來/全部/已過期」三個分頁 + 手機版排版都正常，才確認合併。`vue-tsc --noEmit` 已重新驗證通過。**待複查**：上正式站後麻煩確認實際登入畫面跟這次的視覺驗證一致（理論上應該一致，因為 CSS 是直接對照的，但沒有用真帳號跑過完整登入流程）。
 
 > 最後更新（上一輪）：2026-07-10（第五十五輪，**新增「地區行事曆」+ 每日自動從 Google Drive 同步**——使用者提供地區辦公室的行事曆 Excel（存在共用 Google Drive 資料夾，檔名含日期版本、每次更新會整份重新上傳），要求平台每天自動抓取顯示，不用手動維護。這輪新增：① [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue) 前端頁面（即將到來/全部/已過期篩選＋逐筆 .ics 下載），掛新 Feature Flag `F1_district_calendar`；② `district_calendar_events`／`district_calendar_sync_log` 兩張表（見 [`046_district_calendar.sql`](supabase/migrations/046_district_calendar.sql)），只開放 SELECT，寫入僅限 Edge Function 用 service role key，一般使用者（含地區管理員）都不能直接改；③ [`sync-district-calendar`](supabase/functions/sync-district-calendar/index.ts) Edge Function：用 Google Drive API v3 依 `modifiedTime` 找資料夾內最新的 xlsx、下載、用 SheetJS 解析、整批覆蓋寫入（沒有穩定唯一 ID 可比對，所以用整批清空重寫而非逐筆 upsert；**只有解析成功且非空才會覆蓋，抓取/解析失敗一律保留舊資料 + 寫一筆失敗紀錄**，前端頁面也會把最近一次失敗顯示成警示 banner）。實作前有把使用者提供的實際檔案（`2026-27年度地區重要行事曆-20260626版.xlsx`）抓下來實測解析邏輯，抓到一個真實 bug：檔案裡「地點」欄位標題實際存的是「地　　點」（中間夾全形空白，不是乾淨的「地點」二字），原本的欄位比對邏輯完全比對不到，會讓每筆活動的地點都變空值——已修正成比對前先去除所有空白字元，重測 51 筆資料全部正確解析。`vue-tsc --noEmit`／`npm run build` 皆已驗證通過。**待使用者完成的部分（Claude 無法代勞）**：詳見下方待辦。
 
@@ -42,29 +44,22 @@
 
 ## ⚠️ 待辦
 
-**【第五十五輪】地區行事曆 — 待使用者完成部署設定**：**使用者已在 Supabase SQL Editor 執行 `046_district_calendar.sql` 完成 ✅**（`district_calendar_events`／`district_calendar_sync_log` 兩張表已建立），以下步驟待辦：
+**【第五十七輪】地區行事曆 — 先手動匯入資料，Google Drive 自動同步暫緩**：使用者問了 Make.com 做這段自動化會不會比較簡單（有道理，Make.com 的 Google Drive 連結是用 OAuth 點一點就好，不用自己去 Google Cloud Console 申請 API Key，值得列入之後選項），但決定**先不做自動同步這段**，改成直接把使用者提供的 Excel 資料寫進資料庫，讓頁面先有真實資料可用。
 
-1. **申請 Google API Key**：console.cloud.google.com 建立/選專案 → 啟用「Google Drive API」→ 建立 API 金鑰（建議限制成只能用 Drive API）
-2. **Supabase Dashboard → Edge Functions → Secrets 設定 3 組**：`GOOGLE_DRIVE_API_KEY`（上面申請的）、`GOOGLE_DRIVE_FOLDER_ID`（`1b4cSz5xl--t9cfYiWi66LPWJX7uTRHYK`，地區辦公室提供的行事曆資料夾，權限「知道連結的人可查看」）、`CRON_SECRET`（自訂一組長亂數字串，防止別人亂呼叫這支 function）
+1. **新增 [`047_district_calendar_seed.sql`](supabase/migrations/047_district_calendar_seed.sql)**：把 51 筆行事曆資料（來自使用者提供的《2026-27年度地區重要行事曆-20260626版.xlsx》）直接用 `INSERT` 寫死進 `district_calendar_events`，同時補一筆 `district_calendar_sync_log`（`source_file_name` 備註「手動匯入，未啟用自動同步」），讓頁面的「最後同步」欄位不會是空的。**待使用者到 SQL Editor 執行**（要在 046 之後執行，因為要用到 046 建的表）。
+2. **Google Drive 每日自動同步這段（Edge Function／pg_cron／Google API Key）先擱置**，程式碼已經寫好留在 repo 裡（[`sync-district-calendar`](supabase/functions/sync-district-calendar/index.ts)），之後行事曆要改版或想要恢復自動更新時再回頭做，屆時：
+   - 若決定照原計畫用 Google Drive API + 自建 Edge Function：申請 Google API Key → Supabase Secrets 設定 3 組 → 部署 Edge Function → 排程 SQL（步驟見上一輪紀錄）
+   - 若決定改用 Make.com：Make 建一個「Watch files in folder（Google Drive，OAuth 免申請 API Key）→ 解析 Excel → HTTP 模組呼叫 Supabase REST API upsert `district_calendar_events`」的 scenario，可以完全不用碰 Edge Function/pg_cron，但要注意 Make.com 的免費方案有每月操作次數上限，且解析邏輯（例如這次抓到的「地點」欄位標題夾雜全形空白的怪癖）在 Make 的視覺化模組裡比較難處理，可能要另外接一個 Code/Function 模組
+3. **之後行事曆要更新怎麼辦**：目前這批資料是靜態寫死的，之後地區辦公室更新行事曆版本時，得再麻煩使用者提供新檔案、由 Claude 重新產生一份類似的 seed migration 執行，直到自動同步這段真正上線為止
+
+**【第五十六輪之前】待使用者完成的舊步驟（已擱置，見上）**：
+
+1. ~~申請 Google API Key~~ 擱置
+2. ~~Supabase Dashboard → Edge Functions → Secrets 設定 3 組~~ 擱置
 3. ~~SQL Editor 執行 `046_district_calendar.sql`~~ 已完成 ✅
-4. **部署 Edge Function**：`supabase functions deploy sync-district-calendar --no-verify-jwt`
-5. **設定每日排程**（SQL Editor 執行一次，內含 CRON_SECRET 明碼，不進 git）：
-   ```sql
-   create extension if not exists pg_cron;
-   create extension if not exists pg_net;
-   select cron.schedule(
-     'sync-district-calendar-daily',
-     '0 22 * * *',  -- UTC 22:00 = 台北時間早上 6:00
-     $$
-     select net.http_post(
-       url := 'https://xdwqrgthsxyzclnjlmvy.supabase.co/functions/v1/sync-district-calendar',
-       headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET 的值>'),
-       body := '{}'::jsonb
-     );
-     $$
-   );
-   ```
-6. **待複查**：第一次部署完可以不等排程，手動打一次 function 網址（帶 `x-cron-secret` header）測試能不能正確抓到 51 筆資料且地點欄位有值；之後麻煩上正式站確認「地區行事曆」選單項目跟頁面正常顯示、.ics 下載能正確匯入手機行事曆
+4. ~~部署 Edge Function~~ 擱置
+5. ~~設定每日排程（pg_cron）~~ 擱置，指令備份見上一版 HANDOFF 或 git log
+6. **待複查（第五十七輪改成這個）**：`047_district_calendar_seed.sql` 執行後，麻煩上正式站確認「地區行事曆」選單項目跟頁面正常顯示 51 筆資料、地點欄位有值、.ics 下載能正確匯入手機行事曆
 
 **【第五十四輪】EDM 產生器改 FB 行銷文案 + 每社每日 2 次上限** ~~migration 已寫好，待使用者執行 + 部署 Edge Function~~ **使用者已執行 migration + 重新部署 Edge Function 完成 ✅，待複查實測**：
 
