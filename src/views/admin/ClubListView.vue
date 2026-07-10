@@ -83,7 +83,7 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>社名</th>
@@ -105,18 +105,18 @@ onMounted(() => {
           </tr>
           <template v-if="!collapsedZones.has(g.zone)">
             <tr v-for="(c, i) in g.clubs" :key="c.id">
-              <td>
+              <td data-label="社名">
                 <span v-if="auth.isDistrictAdminView" class="order-btns">
                   <button class="order-btn" :disabled="i === 0" @click="moveClub(g.clubs, i, -1)">▲</button>
                   <button class="order-btn" :disabled="i === g.clubs.length - 1" @click="moveClub(g.clubs, i, 1)">▼</button>
                 </span>
                 {{ c.name }}
               </td>
-              <td>{{ c.zone }}</td>
-              <td>{{ c.pres_name || '-' }}</td>
-              <td>{{ c.sec_name || '-' }}</td>
-              <td>{{ c.email || '-' }}</td>
-              <td>{{ c.phone || '-' }}</td>
+              <td data-label="分區">{{ c.zone }}</td>
+              <td data-label="社長">{{ c.pres_name || '-' }}</td>
+              <td data-label="執秘">{{ c.sec_name || '-' }}</td>
+              <td data-label="Email">{{ c.email || '-' }}</td>
+              <td data-label="電話">{{ c.phone || '-' }}</td>
               <td style="display:flex; gap:6px;">
                 <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社團資訊</RouterLink>
                 <RouterLink v-if="auth.isDistrictAdminView" :to="`/admin/clubs/${c.id}/edit`" class="btn btn-sky btn-sm">編輯</RouterLink>

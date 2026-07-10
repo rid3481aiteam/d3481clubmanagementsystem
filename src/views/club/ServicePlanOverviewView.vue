@@ -23,7 +23,7 @@ onMounted(() => {
     </p>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th style="width:140px;">年份</th>
@@ -32,8 +32,8 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="item in plans" :key="item.id">
-            <td><strong>{{ item.year_term }}</strong></td>
-            <td class="note-cell">{{ item.service_plan }}</td>
+            <td data-label="年份"><strong>{{ item.year_term }}</strong></td>
+            <td data-label="社區服務計劃" class="note-cell card-stack">{{ item.service_plan }}</td>
           </tr>
           <tr v-if="!plans.length">
             <td colspan="2" style="text-align:center; color:var(--muted);">尚無社區服務計劃紀錄</td>

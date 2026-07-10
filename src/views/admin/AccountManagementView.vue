@@ -303,7 +303,7 @@ onMounted(async () => {
       </button>
     </div>
     <div v-if="showInviteLog" class="tw" style="margin-bottom:24px;">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>Email</th>
@@ -315,11 +315,11 @@ onMounted(async () => {
         </thead>
         <tbody>
           <tr v-for="i in invites.log" :key="i.id">
-            <td>{{ i.invited_email }}</td>
-            <td>{{ roleLabel(i.role) }}</td>
-            <td>{{ clubName(i.club_id) }}</td>
-            <td>{{ new Date(i.invited_at).toLocaleString() }}</td>
-            <td>
+            <td data-label="Email">{{ i.invited_email }}</td>
+            <td data-label="角色">{{ roleLabel(i.role) }}</td>
+            <td data-label="社團">{{ clubName(i.club_id) }}</td>
+            <td data-label="邀請時間">{{ new Date(i.invited_at).toLocaleString() }}</td>
+            <td data-label="接受時間">
               <span v-if="i.accepted_at" class="bdg b-gr">已接受</span>
               <span v-else class="bdg b-y">待接受</span>
             </td>
@@ -334,7 +334,7 @@ onMounted(async () => {
     <template v-if="canManagePending">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號審核</h2>
       <div class="tw" style="margin-bottom:24px;">
-        <table>
+        <table class="card-table">
           <thead class="th">
             <tr>
               <th>姓名</th>
@@ -345,9 +345,9 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="p in accounts.pending" :key="p.id">
-              <td>{{ p.name }}</td>
-              <td>{{ clubName(p.club_id) }}</td>
-              <td>{{ pendingTitleLabel(p) }}</td>
+              <td data-label="姓名">{{ p.name }}</td>
+              <td data-label="社團">{{ clubName(p.club_id) }}</td>
+              <td data-label="申請職稱">{{ pendingTitleLabel(p) }}</td>
               <td style="display:flex; gap:6px;">
                 <select
                   class="fi"
@@ -371,7 +371,7 @@ onMounted(async () => {
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號總覽</h2>
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>姓名</th>
@@ -384,10 +384,10 @@ onMounted(async () => {
         </thead>
         <tbody>
           <tr v-for="a in allAccounts" :key="a.id">
-            <td>{{ a.name }}</td>
-            <td v-if="isDistrictAdminView">{{ clubName(a.club_id) }}</td>
-            <td>{{ a.phone ?? '-' }}</td>
-            <td>
+            <td data-label="姓名">{{ a.name }}</td>
+            <td v-if="isDistrictAdminView" data-label="社團">{{ clubName(a.club_id) }}</td>
+            <td data-label="手機號碼">{{ a.phone ?? '-' }}</td>
+            <td data-label="權限">
               <button
                 v-if="isDistrictAdminView"
                 type="button"
@@ -413,7 +413,7 @@ onMounted(async () => {
                 <span class="label">{{ a.role === 'club_member' ? '檢視' : '編輯' }}</span>
               </button>
             </td>
-            <td><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
+            <td data-label="狀態"><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
             <td style="display:flex; gap:6px; flex-wrap:wrap;">
               <button v-if="a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a.id, a.name)">
                 重設密碼
@@ -439,7 +439,7 @@ onMounted(async () => {
         這些人原本是別的社的帳號，被本社額外授權管理，不佔本社的帳號名額。撤銷協作不影響對方原本所屬社的帳號。
       </p>
       <div class="tw">
-        <table>
+        <table class="card-table">
           <thead class="th">
             <tr>
               <th>姓名</th>
@@ -449,8 +449,8 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="c in accounts.collaborators" :key="`${c.user_id}-${c.club_id}`">
-              <td>{{ c.user_profiles?.name ?? '-' }}</td>
-              <td>
+              <td data-label="姓名">{{ c.user_profiles?.name ?? '-' }}</td>
+              <td data-label="權限">
                 <button
                   type="button"
                   class="toggle-switch"

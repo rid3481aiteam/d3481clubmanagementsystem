@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-10（第四十八輪，**出席月報表格配色比照使用者提供的 RI 半年報 Excel**——直接從使用者的 `2025-26年度出席率.xlsx` 讀出表頭的實際顏色代碼，套到社端／地區端出席月報的表格與表單區塊上，詳見下方待辦）
+> 最後更新：2026-07-10（第四十九輪，**全平台表格改成手機卡片式版型**——使用者要求整個平台更適合手機瀏覽，選了「全面改成手機卡片式」，這輪把全站所有 `<table>`（約 20 個頁面、35+ 張表）加上手機寬度（≤700px）自動轉成一列一張卡片（label:value 堆疊）的版型，取代原本「整張表左右滑動」的閱讀方式，詳見下方待辦）
+
+> 最後更新（上一輪）：2026-07-10（第四十八輪，**出席月報表格配色比照使用者提供的 RI 半年報 Excel**——直接從使用者的 `2025-26年度出席率.xlsx` 讀出表頭的實際顏色代碼，套到社端／地區端出席月報的表格與表單區塊上，詳見下方待辦）
 
 > 最後更新（上一輪）：2026-07-10（第四十七輪，**「出席月報」與「社友增減月報」合併成一個頁面，改用應出席/實際出席人數 + 新增例會快速補登**——使用者要求把上兩輪的兩個獨立月報頁面合併、拿掉「計入人次」的呈現方式改用應出席/實際出席，並且要能在月報頁直接補登沒走「新增例會」流程的出席資料，詳見下方待辦）
 
@@ -25,6 +27,32 @@
 ---
 
 ## ⚠️ 待辦
+
+**【第四十九輪】全平台表格改成手機卡片式版型** ~~待實作~~ **程式碼已完成，純前端 CSS/樣板改動，不需要 migration**：
+
+背景：使用者問「整個平台排版，想讓他更適合手機瀏覽與呈現，可以如何調整」。盤點後發現這個平台在更早的第三十八、三十九輪已經把頂部選單（`TopMenu.vue`）改成手機友善的橫向捲動＋左右箭頭，`.stat-grid`（儀表板統計卡）跟 `.mo`/`.mb`（Modal 彈窗）也都已經是流動寬度、手機上會自動收成一欄，所以不是從零開始。問使用者要做到什麼程度後，選了「全面改成手機卡片式」（相對於「只做橫向捲動的邊緣提示」這個更輕量的選項）。
+
+**核心問題**：全站大部分頁面用同一套共用表格 CSS（`App.vue` 的 `.tw`/`table`），手機上目前的行為是整張表 `overflow:auto` 左右滑動——滑得到，但很難對照最左邊的社名/姓名和滑到最右邊的欄位數字，尤其像「出席月報（全區）」有 15 欄、社員名單有 11 欄。
+
+**做法**：在 `App.vue` 新增一個共用的 `@media (max-width: 700px)` 規則（跟 `DashboardView.vue` 已經在用的斷點一致），套用在任何加了 `card-table` class 的 `<table>` 上：
+- `thead` 隱藏，每個 `<tr>` 變成一張卡片（`display:block` + 底部留白分隔）
+- 每個 `<td>` 變成 `display:flex; justify-content:space-between`，左邊用 `td[data-label]::before { content: attr(data-label) }` 自動長出欄位名稱當 label，右邊是原本的值——不用另外寫 v-if 分支，同一份 template 桌機版跟手機版共用
+- 額外做了一個 `.card-stack` 修飾 class，給內容比較長/多行的欄位用（例如公告標題+預覽、社區服務計劃說明、備註），這種欄位 label 改放上面、內容整行放下面，不跟 label 擠在同一行
+- `.zone-row`（分區摺疊標題那種橫跨整列的列，出席月報、社團總覽、儀表板都有用）維持原本橫式呈現，不套用 label:value 那一套
+
+實作範圍：全站目前所有用到 `<table>` 的頁面都已經加上 `card-table` class + 每個 `<td>` 補上對應的 `data-label`，總共約 20 個 `.vue` 檔案、35+ 張表，包括：`ClubDetailView`（6 張表）、`AccountManagementView`（4 張表）、`AdminAttendanceView`（15 欄雙層表頭的全區大表）、`AttendanceMonthlyView`、`AttendanceView`、`DashboardView`、`ProspectiveView`、`ClubListView`、`ActivityListView`/`ActivityDetailView`、`MeetingListView`、`GovernorAwardSummaryView`、`GovernorAwardFormView`（總監獎項填寫表，含 textarea/number input）、`RosterView`（社友名冊，含批次編輯模式跟 Excel 匯入預覽，最複雜的一張）、`SisterClubsView`、`ClubHistoryView`、`ClubAnnouncementsView`、`DistrictAnnouncementsView`、`OfficersView`、`LineNotifyView`、`ServicePlanOverviewView`、`PermissionMatrixView`、`FeatureFlagsView`。
+
+**踩到的坑**：有 3 個頁面（`RosterView.vue` 的 `.roster-table`/`.import-table`、`GovernorAwardFormView.vue` 的 `.award-table`）自己的 scoped `<style>` 有寫死 `min-width:1120px~1320px`（原本是為了桌機版不要欄位擠在一起），這些 scoped class 因為 Vue 會自動加上 `[data-v-xxx]` 屬性選擇器，specificity 比 `App.vue` 全域的 `table.card-table{min-width:0}` 還高，會贏過去、蓋掉卡片版型，手機上table還是會被撐開卡片就沒作用。三個頁面都已經各自在自己的 scoped style 補一條 `@media(max-width:700px){ .xxx-table{min-width:0} }` 蓋回來。**如果之後新增表格要比照這個模式，記得檢查有沒有類似的 scoped min-width 設定**。
+
+驗證方式：因為大部分頁面都要登入才進得去，這台環境沒有真實帳密，這輪除了 `npx vue-tsc --noEmit` + `npm run build` 皆通過 ✅ 之外，另外啟動本機 dev server、在 375px 手機視窗用 `preview_eval` 動態塞一個 `card-table` 進 DOM 直接量測 computed style（`thead display:none`、`td display:flex`、`td::before` 有正確帶出 `data-label`、`card-stack` 的 `td` 是 `display:block`、`table min-width:0`），並截圖確認畫面上真的長成「姓名 王小明 / 出席率 92% / 備註（整行）」這種卡片版型，結果符合預期。
+
+1. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
+2. **待實測**（這輪驗證只做到「合成的測試表格」層級，沒有用真實帳密登入把每一個頁面實際跑過一遍）：
+   - 各社/地區帳號用手機（或縮小瀏覽器視窗到 375px 左右）登入，挑幾個代表性的寬表格頁面確認卡片版型正常：出席月報（全區，15欄最寬）、社員名單（含切換「批次編輯」模式）、Excel 匯入預覽
+   - 社員名單批次編輯模式下，卡片版型裡的 input/select 欄位是否能正常點擊操作、不會跟旁邊的 label 擠壓變形
+   - 平板寬度（例如 iPad 768px～900px，剛好在 700px 斷點之上）確認還是維持原本桌機的橫式表格（沒有誤觸發卡片版型）
+   - 桌機版（>700px）所有表格畫面應該完全沒變化，這輪的 CSS 只在 ≤700px 生效
+3. 已知限制：這輪只處理「表格」這一種版面元件，沒有全面重新檢視每個頁面的表單網格（`form-grid`／`meta-panel` 等）在極窄螢幕（<320px，非常舊的手機）下的表現，多數頁面用的是 `auto-fill/auto-fit minmax()` 網格會自動收成一欄，理論上沒問題但沒有逐一實測
 
 **【第四十八輪】出席月報表格配色比照 RI 半年報 Excel** ~~待實作~~ **程式碼已完成，純前端 CSS 改動，不需要 migration**：
 

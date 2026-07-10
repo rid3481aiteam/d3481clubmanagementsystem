@@ -79,7 +79,7 @@ watch(() => route.params.id, load)
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>姓名</th>
@@ -89,9 +89,9 @@ watch(() => route.params.id, load)
         </thead>
         <tbody>
           <tr v-for="m in roster.members.filter(isAttendanceMember)" :key="m.id">
-            <td>{{ displayName(m) }}</td>
-            <td>{{ m.club_position || '社友' }}</td>
-            <td>
+            <td data-label="姓名">{{ displayName(m) }}</td>
+            <td data-label="社內職稱">{{ m.club_position || '社友' }}</td>
+            <td data-label="狀態">
               <select v-if="canManage" v-model="statuses[m.id]" class="fi" style="max-width:120px;">
                 <option v-for="(label, key) in STATUS_LABEL" :key="key" :value="key">{{ label }}</option>
               </select>
@@ -111,7 +111,7 @@ watch(() => route.params.id, load)
 
     <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin:28px 0 12px;">個人出席率</h2>
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>姓名</th>
@@ -124,12 +124,12 @@ watch(() => route.params.id, load)
         </thead>
         <tbody>
           <tr v-for="r in attendance.rates" :key="r.member_id">
-            <td>{{ r.member_name }}</td>
-            <td>{{ r.counted }}</td>
-            <td>{{ r.present }}</td>
-            <td>{{ r.absent }}</td>
-            <td>{{ r.leave }}</td>
-            <td>{{ r.rate ?? '-' }}{{ r.rate !== null ? '%' : '' }}</td>
+            <td data-label="姓名">{{ r.member_name }}</td>
+            <td data-label="計算次數">{{ r.counted }}</td>
+            <td data-label="出席">{{ r.present }}</td>
+            <td data-label="缺席">{{ r.absent }}</td>
+            <td data-label="請假">{{ r.leave }}</td>
+            <td data-label="出席率">{{ r.rate ?? '-' }}{{ r.rate !== null ? '%' : '' }}</td>
           </tr>
           <tr v-if="!attendance.rates.length">
             <td colspan="6" style="text-align:center; color:var(--muted);">尚無出席資料</td>

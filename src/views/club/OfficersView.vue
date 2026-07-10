@@ -253,7 +253,7 @@ watch(yearTerm, load)
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">委員會成員</h2>
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>委員會</th>
@@ -263,8 +263,8 @@ watch(yearTerm, load)
         </thead>
         <tbody v-if="editing">
           <tr v-for="m in draftCommitteeMembers" :key="m.key">
-            <td><input v-model="m.committee_name" class="fi table-input" /></td>
-            <td>
+            <td data-label="委員會"><input v-model="m.committee_name" class="fi table-input" /></td>
+            <td data-label="英文名稱">
               <select v-model="m.name" class="fi table-input">
                 <option value="">請選擇</option>
                 <option v-for="n in memberOptions(m.name)" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
@@ -280,8 +280,8 @@ watch(yearTerm, load)
         </tbody>
         <tbody v-else>
           <tr v-for="m in committeeMembers" :key="m.id">
-            <td>{{ m.committee_name || '-' }}</td>
-            <td>{{ memberDisplayName(m.name) }}</td>
+            <td data-label="委員會">{{ m.committee_name || '-' }}</td>
+            <td data-label="英文名稱">{{ memberDisplayName(m.name) }}</td>
           </tr>
           <tr v-if="!committeeMembers.length">
             <td colspan="2" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>

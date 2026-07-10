@@ -87,7 +87,7 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>社名</th>
@@ -99,10 +99,10 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="item in sisterClubs.list" :key="item.id">
-            <td><strong>{{ item.partner_name }}</strong></td>
-            <td>{{ formatDate(item.established_date) }}</td>
-            <td>{{ item.president_name || '-' }}</td>
-            <td class="note-cell">{{ item.relationship_note || '-' }}</td>
+            <td data-label="社名"><strong>{{ item.partner_name }}</strong></td>
+            <td data-label="結盟時間">{{ formatDate(item.established_date) }}</td>
+            <td data-label="當屆社長">{{ item.president_name || '-' }}</td>
+            <td data-label="兩社情誼說明" class="note-cell card-stack">{{ item.relationship_note || '-' }}</td>
             <td v-if="canManage" style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
               <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>

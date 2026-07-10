@@ -75,7 +75,7 @@ function toggleZone(zone: string) {
           <RouterLink to="/admin/attendance" class="btn btn-g btn-sm">查看各月出席率 →</RouterLink>
         </div>
         <div class="tw">
-          <table>
+          <table class="card-table">
             <thead class="th">
               <tr>
                 <th>社名</th>
@@ -94,8 +94,8 @@ function toggleZone(zone: string) {
               </tr>
               <template v-if="!collapsedZones.has(g.zone)">
                 <tr v-for="row in g.clubs" :key="row.clubId">
-                  <td>{{ row.clubName }}</td>
-                  <td>
+                  <td data-label="社名">{{ row.clubName }}</td>
+                  <td data-label="出席率">
                     <div style="display:flex; align-items:center; gap:8px; min-width:120px;">
                       <span class="bdg" :class="row.rate !== null && row.rate < 75 ? 'b-r' : 'b-gr'">
                         {{ row.rate !== null ? row.rate + '%' : '-' }}
@@ -105,8 +105,8 @@ function toggleZone(zone: string) {
                       </div>
                     </div>
                   </td>
-                  <td>{{ row.joinedCount }}</td>
-                  <td>{{ row.resignedCount }}</td>
+                  <td data-label="申請入社">{{ row.joinedCount }}</td>
+                  <td data-label="退社">{{ row.resignedCount }}</td>
                 </tr>
               </template>
             </tbody>
@@ -186,11 +186,11 @@ function toggleZone(zone: string) {
       </div>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div class="two-col">
       <div>
         <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">低出席率警示（&lt;75%）</h2>
         <div class="tw">
-          <table>
+          <table class="card-table">
             <thead class="th">
               <tr>
                 <th>姓名</th>
@@ -199,8 +199,8 @@ function toggleZone(zone: string) {
             </thead>
             <tbody>
               <tr v-for="r in dashboard.lowAttendance" :key="r.member_id">
-                <td>{{ r.member_name }}</td>
-                <td><span class="bdg b-r">{{ r.rate }}%</span></td>
+                <td data-label="姓名">{{ r.member_name }}</td>
+                <td data-label="出席率"><span class="bdg b-r">{{ r.rate }}%</span></td>
               </tr>
               <tr v-if="!dashboard.lowAttendance.length">
                 <td colspan="2" style="text-align:center; color:var(--muted);">目前無低出席率社友</td>
@@ -213,7 +213,7 @@ function toggleZone(zone: string) {
       <div>
         <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">待追蹤潛在社友</h2>
         <div class="tw">
-          <table>
+          <table class="card-table">
             <thead class="th">
               <tr>
                 <th>姓名</th>
@@ -222,8 +222,8 @@ function toggleZone(zone: string) {
             </thead>
             <tbody>
               <tr v-for="p in dashboard.followUps" :key="p.id">
-                <td>{{ p.name }}</td>
-                <td>{{ p.follow_up_date || '-' }}</td>
+                <td data-label="姓名">{{ p.name }}</td>
+                <td data-label="追蹤日">{{ p.follow_up_date || '-' }}</td>
               </tr>
               <tr v-if="!dashboard.followUps.length">
                 <td colspan="2" style="text-align:center; color:var(--muted);">目前無待追蹤名單</td>
@@ -238,6 +238,12 @@ function toggleZone(zone: string) {
 </template>
 
 <style scoped>
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
 .zone-row {
   cursor: pointer;
   background: var(--gold-p);
@@ -290,6 +296,9 @@ function toggleZone(zone: string) {
 
 @media (max-width: 700px) {
   .announcement-item {
+    grid-template-columns: 1fr;
+  }
+  .two-col {
     grid-template-columns: 1fr;
   }
 }

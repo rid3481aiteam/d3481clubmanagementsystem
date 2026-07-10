@@ -121,7 +121,7 @@ onMounted(async () => {
         <span class="bdg b-n">小計 {{ sectionScore(section.key) }}</span>
       </div>
       <div class="tw">
-        <table class="award-table">
+        <table class="award-table card-table">
           <thead class="th">
             <tr>
               <th class="col-no">項次</th>
@@ -133,13 +133,13 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="criterion in section.criteria" :key="criterion.key">
-              <td>{{ criterion.itemNo }}</td>
-              <td>{{ criterion.category }}</td>
-              <td>
+              <td data-label="項次">{{ criterion.itemNo }}</td>
+              <td data-label="項目">{{ criterion.category }}</td>
+              <td data-label="目標說明" class="card-stack">
                 <div>{{ criterion.description }}</div>
                 <div v-if="criterion.referenceScore" class="reference-score">參考 {{ criterion.referenceScore }} 分</div>
               </td>
-              <td>
+              <td data-label="達成分數">
                 <input
                   v-model.number="draft.responses[criterion.key].score"
                   type="number"
@@ -148,7 +148,7 @@ onMounted(async () => {
                   class="fi score-input"
                 />
               </td>
-              <td>
+              <td data-label="說明" class="card-stack">
                 <textarea
                   v-model="draft.responses[criterion.key].note"
                   class="fi note-input"
@@ -236,6 +236,12 @@ onMounted(async () => {
 
 .award-table {
   min-width: 1120px;
+}
+
+@media (max-width: 700px) {
+  .award-table {
+    min-width: 0;
+  }
 }
 
 .col-no {

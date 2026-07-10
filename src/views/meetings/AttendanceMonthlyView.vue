@@ -146,7 +146,7 @@ watch(selectedMonth, async () => {
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">{{ selectedMonth }} 例會清單</h2>
     <div class="tw" style="margin-bottom:20px;">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>日期</th>
@@ -159,19 +159,19 @@ watch(selectedMonth, async () => {
         </thead>
         <tbody>
           <tr v-for="m in attendance.meetingSummaries" :key="m.id">
-            <td>{{ m.date }}</td>
-            <td>
+            <td data-label="日期">{{ m.date }}</td>
+            <td data-label="主題 / 講者">
               {{ m.title || '-' }}
               <span v-if="m.speaker_name" style="color:var(--muted);">｜{{ m.speaker_name }}</span>
               <span v-if="!m.hasDetail && m.expected != null" class="bdg b-y" style="margin-left:6px;">未逐人登記</span>
             </td>
-            <td>{{ m.expected ?? '-' }}</td>
-            <td>{{ m.actual ?? '-' }}</td>
-            <td>
+            <td data-label="應出席">{{ m.expected ?? '-' }}</td>
+            <td data-label="實際出席">{{ m.actual ?? '-' }}</td>
+            <td data-label="出席率">
               <span v-if="m.rate != null" class="bdg" :class="m.rate < 75 ? 'b-r' : 'b-gr'">{{ m.rate }}%</span>
               <span v-else>-</span>
             </td>
-            <td><RouterLink :to="`/meetings/${m.id}/attendance`" class="btn btn-g btn-sm">逐人出席</RouterLink></td>
+            <td data-label="操作"><RouterLink :to="`/meetings/${m.id}/attendance`" class="btn btn-g btn-sm">逐人出席</RouterLink></td>
           </tr>
           <tr v-if="!attendance.meetingSummaries.length">
             <td colspan="6" style="text-align:center; color:var(--muted);">本月尚無例會紀錄</td>
@@ -271,7 +271,7 @@ watch(selectedMonth, async () => {
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">歷月出席月報</h2>
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th class="hdr-purple">月份</th>
@@ -288,24 +288,24 @@ watch(selectedMonth, async () => {
             :key="r.month"
             :style="r.month === selectedMonth ? { background: 'var(--gold-p)' } : {}"
           >
-            <td>{{ r.month }}</td>
-            <td>{{ r.meeting_count }}</td>
-            <td>{{ r.expected }} / {{ r.actual }}</td>
-            <td>
+            <td data-label="月份">{{ r.month }}</td>
+            <td data-label="例會場次">{{ r.meeting_count }}</td>
+            <td data-label="應出席 / 實際出席">{{ r.expected }} / {{ r.actual }}</td>
+            <td data-label="出席率">
               <span class="bdg" :class="r.rate !== null && r.rate < 75 ? 'b-r' : 'b-gr'">
                 {{ r.rate !== null ? r.rate + '%' : '-' }}
               </span>
             </td>
             <template v-if="features.isEnabled('B6_membership_report') && membershipFor(r.month)">
-              <td>{{ (membershipFor(r.month)!.current_male ?? 0) + (membershipFor(r.month)!.current_female ?? 0) }}</td>
-              <td>
+              <td data-label="當月社友合計">{{ (membershipFor(r.month)!.current_male ?? 0) + (membershipFor(r.month)!.current_female ?? 0) }}</td>
+              <td data-label="淨成長">
                 {{ ((membershipFor(r.month)!.current_male ?? 0) + (membershipFor(r.month)!.current_female ?? 0))
                   - ((membershipFor(r.month)!.baseline_male ?? 0) + (membershipFor(r.month)!.baseline_female ?? 0)) }}
               </td>
             </template>
             <template v-else-if="features.isEnabled('B6_membership_report')">
-              <td>-</td>
-              <td>-</td>
+              <td data-label="當月社友合計">-</td>
+              <td data-label="淨成長">-</td>
             </template>
           </tr>
           <tr v-if="!attendance.monthlyRates.length">

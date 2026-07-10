@@ -83,7 +83,7 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>年份</th>
@@ -95,10 +95,10 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="item in clubHistory.list" :key="item.id">
-            <td><strong>{{ item.year_term }}</strong></td>
-            <td>{{ item.president_name || '-' }}</td>
-            <td>{{ item.secretary_name || '-' }}</td>
-            <td class="note-cell">{{ item.service_plan || '-' }}</td>
+            <td data-label="年份"><strong>{{ item.year_term }}</strong></td>
+            <td data-label="社長">{{ item.president_name || '-' }}</td>
+            <td data-label="當年秘書">{{ item.secretary_name || '-' }}</td>
+            <td data-label="社區服務計劃" class="note-cell card-stack">{{ item.service_plan || '-' }}</td>
             <td v-if="canManage" style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
               <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>

@@ -70,7 +70,7 @@ onMounted(() => {
         {{ RESOURCE_LABELS[resource] }}
       </h2>
       <div class="tw">
-        <table>
+        <table class="card-table">
           <thead class="th">
             <tr>
               <th>角色</th>
@@ -79,8 +79,8 @@ onMounted(() => {
           </thead>
           <tbody>
             <tr v-for="role in ROLES" :key="role">
-              <td>{{ ROLE_LABELS[role] }}</td>
-              <td v-for="action in ACTIONS" :key="action">
+              <td data-label="角色">{{ ROLE_LABELS[role] }}</td>
+              <td v-for="action in ACTIONS" :key="action" :data-label="action === 'view' ? '檢視' : '編輯'">
                 <span
                   class="bdg"
                   :class="isAllowed(resource, role, action) ? 'b-gr' : 'b-g'"
@@ -97,15 +97,15 @@ onMounted(() => {
     <div style="margin-bottom:20px;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">結構性管理（僅地區管理員，不可調整）</h2>
       <div class="tw">
-        <table>
+        <table class="card-table">
           <tbody>
             <tr>
-              <td>社團資料 (clubs)</td>
-              <td><span class="bdg b-n">僅 district_admin</span></td>
+              <td data-label="項目">社團資料 (clubs)</td>
+              <td data-label="權限"><span class="bdg b-n">僅 district_admin</span></td>
             </tr>
             <tr>
-              <td>功能開關 (feature_flags)</td>
-              <td><span class="bdg b-n">僅 district_admin</span></td>
+              <td data-label="項目">功能開關 (feature_flags)</td>
+              <td data-label="權限"><span class="bdg b-n">僅 district_admin</span></td>
             </tr>
           </tbody>
         </table>

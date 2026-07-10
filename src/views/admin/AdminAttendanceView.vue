@@ -119,7 +119,7 @@ watch(selectedMonth, loadMonth)
     </div>
 
     <div class="tw" style="overflow-x:auto;">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">社名</th>
@@ -152,26 +152,26 @@ watch(selectedMonth, loadMonth)
           </tr>
           <template v-if="!collapsedZones.has(g.zone)">
             <tr v-for="r in g.list" :key="r.clubId">
-              <td>{{ r.clubName }}</td>
-              <td>{{ r.rate?.meeting_count ?? 0 }}</td>
-              <td>{{ r.rate?.expected ?? 0 }}</td>
-              <td>{{ r.rate?.actual ?? 0 }}</td>
-              <td>
+              <td data-label="社名">{{ r.clubName }}</td>
+              <td data-label="例會場次">{{ r.rate?.meeting_count ?? 0 }}</td>
+              <td data-label="應出席">{{ r.rate?.expected ?? 0 }}</td>
+              <td data-label="實際出席">{{ r.rate?.actual ?? 0 }}</td>
+              <td data-label="出席率">
                 <span class="bdg" :class="r.rate?.rate != null && r.rate.rate < 75 ? 'b-r' : 'b-gr'">
                   {{ r.rate?.rate != null ? r.rate.rate + '%' : '-' }}
                 </span>
               </td>
               <template v-if="features.isEnabled('B6_membership_report')">
-                <td>{{ r.report?.baseline_male ?? '-' }}</td>
-                <td>{{ r.report?.baseline_female ?? '-' }}</td>
-                <td>{{ r.baselineTotal }}</td>
-                <td>{{ r.report?.current_male ?? '-' }}</td>
-                <td>{{ r.report?.current_female ?? '-' }}</td>
-                <td>{{ r.currentTotal }}</td>
-                <td>{{ r.netGrowth ?? '-' }}</td>
-                <td>{{ r.report?.age_under_40 ?? '-' }}</td>
-                <td>{{ r.report?.age_41_plus ?? '-' }}</td>
-                <td>{{ r.ageTotal }}</td>
+                <td data-label="基準-男">{{ r.report?.baseline_male ?? '-' }}</td>
+                <td data-label="基準-女">{{ r.report?.baseline_female ?? '-' }}</td>
+                <td data-label="基準-合計">{{ r.baselineTotal }}</td>
+                <td data-label="當月-男">{{ r.report?.current_male ?? '-' }}</td>
+                <td data-label="當月-女">{{ r.report?.current_female ?? '-' }}</td>
+                <td data-label="當月-合計">{{ r.currentTotal }}</td>
+                <td data-label="淨成長">{{ r.netGrowth ?? '-' }}</td>
+                <td data-label="40歲以下">{{ r.report?.age_under_40 ?? '-' }}</td>
+                <td data-label="41歲以上">{{ r.report?.age_41_plus ?? '-' }}</td>
+                <td data-label="年齡合計">{{ r.ageTotal }}</td>
               </template>
             </tr>
           </template>

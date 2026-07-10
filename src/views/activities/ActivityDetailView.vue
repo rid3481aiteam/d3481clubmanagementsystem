@@ -170,7 +170,7 @@ onMounted(load)
       <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:12px;">
         報名清單（{{ registeredCount }} 人）
       </h2>
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>社團</th>
@@ -184,13 +184,13 @@ onMounted(load)
         </thead>
         <tbody>
           <tr v-for="r in activitiesStore.registrations" :key="r.id">
-            <td>{{ r.clubs?.name ?? '-' }}</td>
-            <td>{{ r.form_data.name }}</td>
-            <td>{{ r.form_data.phone || '-' }}</td>
-            <td>{{ r.form_data.guest_count ?? 1 }}</td>
-            <td>{{ r.form_data.note || '-' }}</td>
-            <td>{{ formatDateTime(r.created_at) }}</td>
-            <td>
+            <td data-label="社團">{{ r.clubs?.name ?? '-' }}</td>
+            <td data-label="姓名">{{ r.form_data.name }}</td>
+            <td data-label="電話">{{ r.form_data.phone || '-' }}</td>
+            <td data-label="人數">{{ r.form_data.guest_count ?? 1 }}</td>
+            <td data-label="備註">{{ r.form_data.note || '-' }}</td>
+            <td data-label="報名時間">{{ formatDateTime(r.created_at) }}</td>
+            <td data-label="狀態">
               <span class="bdg" :class="r.status === 'registered' ? 'b-gr' : 'b-g'">
                 {{ r.status === 'registered' ? '已報名' : '已取消' }}
               </span>

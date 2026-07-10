@@ -442,7 +442,7 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table class="roster-table" :class="{ editing: bulkEditing }">
+      <table class="roster-table card-table" :class="{ editing: bulkEditing }">
         <thead class="th">
           <tr>
             <th class="col-index">項次</th>
@@ -464,31 +464,31 @@ onMounted(() => {
             v-for="(m, index) in filteredDraftRows"
             :key="m.id"
           >
-            <td>{{ index + 1 }}</td>
-            <td>
+            <td data-label="項次">{{ index + 1 }}</td>
+            <td data-label="英文名稱">
               <input v-model="m.nick_name" class="fi table-input" />
             </td>
-            <td>
+            <td data-label="中文姓名">
               <input v-model="m.name" class="fi table-input required-input" />
             </td>
-            <td>
+            <td data-label="社內職稱">
               <select v-model="m.club_position" class="fi table-input">
                 <option v-for="p in CLUB_POSITIONS" :key="p" :value="p">{{ p }}</option>
               </select>
             </td>
-            <td>
+            <td data-label="職業分類">
               <select v-model="m.classification" class="fi table-input">
                 <option :value="null">-</option>
                 <option v-for="c in CLASSIFICATIONS" :key="c" :value="c">{{ c }}</option>
               </select>
             </td>
-            <td><input v-model="m.company" class="fi table-input" /></td>
-            <td><input v-model="m.job_title" class="fi table-input" /></td>
-            <td><input v-model="m.personal_phone" class="fi table-input" /></td>
-            <td><input v-model="m.company_phone" class="fi table-input" /></td>
-            <td><input v-model="m.email" class="fi table-input email-input" /></td>
-            <td><input v-model="m.join_date" type="date" class="fi table-input date-input" /></td>
-            <td>
+            <td data-label="公司"><input v-model="m.company" class="fi table-input" /></td>
+            <td data-label="職稱"><input v-model="m.job_title" class="fi table-input" /></td>
+            <td data-label="個人電話"><input v-model="m.personal_phone" class="fi table-input" /></td>
+            <td data-label="公司電話"><input v-model="m.company_phone" class="fi table-input" /></td>
+            <td data-label="Email"><input v-model="m.email" class="fi table-input email-input" /></td>
+            <td data-label="入社日期"><input v-model="m.join_date" type="date" class="fi table-input date-input" /></td>
+            <td data-label="狀態">
               <select v-model="m.member_status" class="fi table-input status-input">
                 <option value="normal">正常</option>
                 <option value="leave">請假</option>
@@ -502,18 +502,18 @@ onMounted(() => {
         </tbody>
         <tbody v-else>
           <tr v-for="(m, index) in filtered" :key="m.id">
-            <td>{{ index + 1 }}</td>
-            <td>{{ m.nick_name || '-' }}</td>
-            <td>{{ m.name }}</td>
-            <td>{{ m.club_position || '社友' }}</td>
-            <td>{{ m.classification || '-' }}</td>
-            <td>{{ m.company || '-' }}</td>
-            <td>{{ m.job_title || '-' }}</td>
-            <td>{{ m.personal_phone || m.phone || '-' }}</td>
-            <td>{{ m.company_phone || '-' }}</td>
-            <td>{{ m.email || '-' }}</td>
-            <td>{{ m.join_date || '-' }}</td>
-            <td>
+            <td data-label="項次">{{ index + 1 }}</td>
+            <td data-label="英文名稱">{{ m.nick_name || '-' }}</td>
+            <td data-label="中文姓名">{{ m.name }}</td>
+            <td data-label="社內職稱">{{ m.club_position || '社友' }}</td>
+            <td data-label="職業分類">{{ m.classification || '-' }}</td>
+            <td data-label="公司">{{ m.company || '-' }}</td>
+            <td data-label="職稱">{{ m.job_title || '-' }}</td>
+            <td data-label="個人電話">{{ m.personal_phone || m.phone || '-' }}</td>
+            <td data-label="公司電話">{{ m.company_phone || '-' }}</td>
+            <td data-label="Email">{{ m.email || '-' }}</td>
+            <td data-label="入社日期">{{ m.join_date || '-' }}</td>
+            <td data-label="狀態">
               <span class="bdg" :class="memberStatus(m) === 'resigned' ? 'b-g' : memberStatus(m) === 'leave' ? 'b-y' : 'b-gr'">
                 {{ MEMBER_STATUS_LABEL[memberStatus(m)] }}
               </span>
@@ -610,7 +610,7 @@ onMounted(() => {
             <span class="bdg b-y">更新 {{ importPreview.filter(i => i.action === 'update').length }}</span>
           </div>
           <div class="tw">
-            <table class="import-table">
+            <table class="import-table card-table">
               <thead class="th">
                 <tr>
                   <th>動作</th>
@@ -622,11 +622,11 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr v-for="item in importPreview" :key="item.key">
-                  <td><span class="bdg" :class="item.action === 'insert' ? 'b-gr' : 'b-y'">{{ item.action === 'insert' ? '新增' : '更新' }}</span></td>
-                  <td>{{ item.payload.name }}</td>
-                  <td>{{ item.payload.nick_name || '-' }}</td>
-                  <td>{{ item.payload.personal_phone || '-' }}</td>
-                  <td>{{ item.payload.email || '-' }}</td>
+                  <td data-label="動作"><span class="bdg" :class="item.action === 'insert' ? 'b-gr' : 'b-y'">{{ item.action === 'insert' ? '新增' : '更新' }}</span></td>
+                  <td data-label="姓名">{{ item.payload.name }}</td>
+                  <td data-label="英文名">{{ item.payload.nick_name || '-' }}</td>
+                  <td data-label="個人電話">{{ item.payload.personal_phone || '-' }}</td>
+                  <td data-label="Email">{{ item.payload.email || '-' }}</td>
                 </tr>
                 <tr v-if="!importPreview.length">
                   <td colspan="5" style="text-align:center; color:var(--muted);">沒有可匯入資料</td>
@@ -651,6 +651,15 @@ onMounted(() => {
 
 .roster-table.editing {
   min-width: 1320px;
+}
+
+/* card-table 手機卡片模式要贏過上面兩條同層級的 scoped min-width，
+   不然表格還是會被撐開成要橫向捲動，卡片版型就沒有用 */
+@media (max-width: 700px) {
+  .roster-table,
+  .roster-table.editing {
+    min-width: 0;
+  }
 }
 
 .table-input {
@@ -698,5 +707,11 @@ onMounted(() => {
 
 .import-table {
   min-width: 720px;
+}
+
+@media (max-width: 700px) {
+  .import-table {
+    min-width: 0;
+  }
 }
 </style>

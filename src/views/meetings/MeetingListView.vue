@@ -87,7 +87,7 @@ onMounted(loadAll)
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>日期</th>
@@ -100,11 +100,11 @@ onMounted(loadAll)
         </thead>
         <tbody>
           <tr v-for="m in meetings.meetings" :key="m.id">
-            <td>{{ m.date }}</td>
-            <td>{{ m.session_no ?? '-' }}</td>
-            <td>{{ m.title || '-' }}</td>
-            <td>{{ m.speaker_name || '-' }}</td>
-            <td>{{ m.venue || '-' }}</td>
+            <td data-label="日期">{{ m.date }}</td>
+            <td data-label="第幾次">{{ m.session_no ?? '-' }}</td>
+            <td data-label="主題">{{ m.title || '-' }}</td>
+            <td data-label="講者">{{ m.speaker_name || '-' }}</td>
+            <td data-label="地點">{{ m.venue || '-' }}</td>
             <td style="display:flex; gap:6px;">
               <button v-if="canManage" class="btn btn-g btn-sm" @click="openEdit(m)">編輯</button>
               <RouterLink :to="`/meetings/${m.id}/attendance`" class="btn btn-g btn-sm">出席記錄</RouterLink>

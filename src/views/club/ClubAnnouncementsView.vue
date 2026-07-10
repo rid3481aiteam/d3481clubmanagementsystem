@@ -109,7 +109,7 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>標題</th>
@@ -121,17 +121,17 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="item in announcements.adminClubAnnouncements" :key="item.id">
-            <td>
+            <td data-label="標題" class="card-stack">
               <strong>{{ item.title }}</strong>
               <div class="announcement-preview">{{ item.body }}</div>
             </td>
-            <td>
+            <td data-label="狀態">
               <span class="bdg" :class="item.is_published ? 'b-gr' : 'b-g'">
                 {{ item.is_published ? '已發布' : '草稿' }}
               </span>
             </td>
-            <td>{{ formatDateTime(item.published_at) }}</td>
-            <td>{{ formatDateTime(item.expires_at) }}</td>
+            <td data-label="發布時間">{{ formatDateTime(item.published_at) }}</td>
+            <td data-label="到期時間">{{ formatDateTime(item.expires_at) }}</td>
             <td style="display:flex; gap:6px;">
               <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
               <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>

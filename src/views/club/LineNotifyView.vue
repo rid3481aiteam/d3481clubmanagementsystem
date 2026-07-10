@@ -128,7 +128,7 @@ onMounted(() => {
 
     <div class="tw" style="padding:20px;">
       <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:12px;">已綁定社友（{{ lineNotify.bindings.length }} 人）</h2>
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>姓名</th>
@@ -138,9 +138,9 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="b in lineNotify.bindings" :key="b.id">
-            <td>{{ b.member_name }}</td>
-            <td>{{ b.phone }}</td>
-            <td>{{ formatDateTime(b.bound_at) }}</td>
+            <td data-label="姓名">{{ b.member_name }}</td>
+            <td data-label="手機">{{ b.phone }}</td>
+            <td data-label="綁定時間">{{ formatDateTime(b.bound_at) }}</td>
           </tr>
           <tr v-if="!lineNotify.bindings.length">
             <td colspan="3" style="text-align:center; color:var(--muted);">還沒有人綁定，請社友加 LINE 好友後輸入手機號碼</td>

@@ -107,7 +107,7 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>姓名</th>
@@ -123,14 +123,14 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="p in filtered" :key="p.id">
-            <td>{{ p.name }}</td>
-            <td>{{ p.job_title || '-' }}</td>
-            <td>{{ p.company || '-' }}</td>
-            <td>{{ p.ref_name || '-' }}</td>
-            <td>{{ p.invited_date || '-' }}</td>
-            <td :style="followUpClass(p.follow_up_date)">{{ p.follow_up_date || '-' }}</td>
-            <td><span class="bdg" :class="STATUS_BADGE[p.status]">{{ STATUS_LABEL[p.status] }}</span></td>
-            <td>{{ p.owner_name || '-' }}</td>
+            <td data-label="姓名">{{ p.name }}</td>
+            <td data-label="職稱">{{ p.job_title || '-' }}</td>
+            <td data-label="公司">{{ p.company || '-' }}</td>
+            <td data-label="推薦人">{{ p.ref_name || '-' }}</td>
+            <td data-label="邀請日">{{ p.invited_date || '-' }}</td>
+            <td data-label="追蹤日" :style="followUpClass(p.follow_up_date)">{{ p.follow_up_date || '-' }}</td>
+            <td data-label="狀態"><span class="bdg" :class="STATUS_BADGE[p.status]">{{ STATUS_LABEL[p.status] }}</span></td>
+            <td data-label="負責人">{{ p.owner_name || '-' }}</td>
             <td v-if="canManage">
               <button class="btn btn-g btn-sm" @click="openEdit(p)">編輯</button>
             </td>

@@ -116,7 +116,7 @@ onMounted(async () => {
 
     <div class="summary-layout">
       <div class="tw">
-        <table>
+        <table class="card-table">
           <thead class="th">
             <tr>
               <th>社名</th>
@@ -135,12 +135,12 @@ onMounted(async () => {
               :class="{ selected: selectedClubId === row.club.id }"
               @click="selectClub(row.club)"
             >
-              <td>{{ row.club.name }}</td>
-              <td>{{ row.club.zone }}</td>
-              <td>{{ row.app?.group_type || '-' }}</td>
-              <td><span class="bdg" :class="statusClass(row.app)">{{ statusLabel(row.app) }}</span></td>
-              <td>{{ row.app?.total_score ?? '-' }}</td>
-              <td>{{ formatDate(row.app?.updated_at) }}</td>
+              <td data-label="社名">{{ row.club.name }}</td>
+              <td data-label="分區">{{ row.club.zone }}</td>
+              <td data-label="組別">{{ row.app?.group_type || '-' }}</td>
+              <td data-label="狀態"><span class="bdg" :class="statusClass(row.app)">{{ statusLabel(row.app) }}</span></td>
+              <td data-label="總分">{{ row.app?.total_score ?? '-' }}</td>
+              <td data-label="更新時間">{{ formatDate(row.app?.updated_at) }}</td>
             </tr>
           </tbody>
         </table>

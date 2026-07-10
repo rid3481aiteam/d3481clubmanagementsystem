@@ -138,7 +138,7 @@ onMounted(() => {
     </div>
 
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>狀態</th>
@@ -152,16 +152,16 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="a in filtered" :key="a.id">
-            <td><span class="bdg" :class="STATUS_BADGE[a.status]">{{ STATUS_LABELS[a.status] }}</span></td>
-            <td>{{ formatDateTime(a.start_at) }}</td>
-            <td>
+            <td data-label="狀態"><span class="bdg" :class="STATUS_BADGE[a.status]">{{ STATUS_LABELS[a.status] }}</span></td>
+            <td data-label="活動時間">{{ formatDateTime(a.start_at) }}</td>
+            <td data-label="標題">
               <RouterLink :to="`/activities/${a.id}`" style="color:var(--navy); font-weight:600;">{{ a.title }}</RouterLink>
               <span v-if="a.meeting_id" class="bdg b-n" style="margin-left:6px; font-size:10.5px; padding:2px 8px;">例會</span>
               <span v-else-if="a.club_only" class="bdg b-n" style="margin-left:6px; font-size:10.5px; padding:2px 8px;">僅本社</span>
             </td>
-            <td>{{ a.clubs?.name ?? '-' }}</td>
-            <td>{{ a.location || '-' }}</td>
-            <td>{{ a.registration_deadline ? formatDateTime(a.registration_deadline) : '-' }}</td>
+            <td data-label="主辦社">{{ a.clubs?.name ?? '-' }}</td>
+            <td data-label="地點">{{ a.location || '-' }}</td>
+            <td data-label="報名截止">{{ a.registration_deadline ? formatDateTime(a.registration_deadline) : '-' }}</td>
             <td style="display:flex; gap:6px;">
               <RouterLink :to="`/activities/${a.id}`" class="btn btn-g btn-sm">查看</RouterLink>
               <button v-if="canEdit(a)" class="btn btn-g btn-sm" @click="openEdit(a)">編輯</button>

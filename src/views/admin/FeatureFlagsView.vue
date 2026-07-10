@@ -66,7 +66,7 @@ onMounted(() => {
     <div v-for="g in groups" :key="g.title" style="margin-bottom:20px;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">{{ g.title }}</h2>
       <div class="tw">
-        <table>
+        <table class="card-table">
           <tbody>
             <tr v-for="key in g.keys" :key="key">
               <td>{{ LABELS[key] }}</td>

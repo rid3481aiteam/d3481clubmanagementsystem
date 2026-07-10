@@ -142,6 +142,58 @@ th { font-weight: 600; color: var(--navy); font-size: 12.5px; text-transform: up
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: rgba(23,69,143,.04); }
 
+/* 手機卡片式表格：table.card-table 在窄螢幕把每一列變成一張卡片，
+   欄位改成上下堆疊的 label:value（label 取自 td 的 data-label），
+   取代原本「整張表左右滑動」的閱讀方式。加了 .zone-row 的列（分區
+   摺疊標題那種橫跨整列的列）維持原本橫式呈現，不套用 label:value。 */
+@media (max-width: 700px) {
+  table.card-table { min-width: 0; }
+  table.card-table thead { display: none; }
+  table.card-table, table.card-table tbody, table.card-table tr, table.card-table td {
+    display: block;
+    width: 100%;
+  }
+  table.card-table tr {
+    padding: 10px 0;
+    border-bottom: 8px solid var(--bg);
+  }
+  table.card-table tr:last-child { border-bottom: none; }
+  table.card-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: none;
+    text-align: right;
+  }
+  table.card-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  /* 內容較長／多行的欄位（例如公告標題+預覽、備註說明）label 放上面、
+     內容放下面整行呈現，避免跟 label 擠在同一行造成溢出或看不全 */
+  table.card-table td.card-stack {
+    display: block;
+    text-align: left;
+  }
+  table.card-table td.card-stack[data-label]::before {
+    display: block;
+    margin-bottom: 4px;
+  }
+  table.card-table tr.zone-row {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  table.card-table tr.zone-row td {
+    display: block;
+    text-align: left;
+  }
+}
+
 /* Form */
 .fi {
   width: 100%;

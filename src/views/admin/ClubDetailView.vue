@@ -207,14 +207,14 @@ watch(() => route.params.id, load)
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
         <span class="bdg b-g" v-for="r in SINGLE_ROLES" :key="r.role">{{ r.label }}：{{ officerName(r.role) }}</span>
       </div>
-      <table v-if="committeeMembers.length">
+      <table v-if="committeeMembers.length" class="card-table">
         <thead class="th">
           <tr><th>委員會</th><th>姓名</th></tr>
         </thead>
         <tbody>
           <tr v-for="m in committeeMembers" :key="m.id">
-            <td>{{ m.committee_name || '-' }}</td>
-            <td>{{ m.name }}</td>
+            <td data-label="委員會">{{ m.committee_name || '-' }}</td>
+            <td data-label="姓名">{{ m.name }}</td>
           </tr>
         </tbody>
       </table>
@@ -223,7 +223,7 @@ watch(() => route.params.id, load)
 
     <h2 class="section-h">潛在社友</h2>
     <div class="tw" style="margin-bottom:24px;">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>姓名</th>
@@ -236,12 +236,12 @@ watch(() => route.params.id, load)
         </thead>
         <tbody>
           <tr v-for="p in prospective.prospects" :key="p.id">
-            <td>{{ p.name }}</td>
-            <td>{{ p.job_title || '-' }}</td>
-            <td>{{ p.company || '-' }}</td>
-            <td>{{ p.ref_name || '-' }}</td>
-            <td>{{ p.follow_up_date || '-' }}</td>
-            <td><span class="bdg" :class="PROSPECT_STATUS_BADGE[p.status]">{{ PROSPECT_STATUS_LABEL[p.status] }}</span></td>
+            <td data-label="姓名">{{ p.name }}</td>
+            <td data-label="職稱">{{ p.job_title || '-' }}</td>
+            <td data-label="公司">{{ p.company || '-' }}</td>
+            <td data-label="推薦人">{{ p.ref_name || '-' }}</td>
+            <td data-label="追蹤日">{{ p.follow_up_date || '-' }}</td>
+            <td data-label="狀態"><span class="bdg" :class="PROSPECT_STATUS_BADGE[p.status]">{{ PROSPECT_STATUS_LABEL[p.status] }}</span></td>
           </tr>
           <tr v-if="!prospective.prospects.length">
             <td colspan="6" style="text-align:center; color:var(--muted);">該社尚無潛在社友資料</td>
@@ -252,7 +252,7 @@ watch(() => route.params.id, load)
 
     <h2 class="section-h">例會管理</h2>
     <div class="tw" style="margin-bottom:24px;">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>日期</th>
@@ -263,10 +263,10 @@ watch(() => route.params.id, load)
         </thead>
         <tbody>
           <tr v-for="m in meetingsStore.meetings" :key="m.id">
-            <td>{{ m.date }}</td>
-            <td>{{ m.title || '-' }}</td>
-            <td>{{ m.speaker_name || '-' }}</td>
-            <td>{{ m.venue || '-' }}</td>
+            <td data-label="日期">{{ m.date }}</td>
+            <td data-label="主題">{{ m.title || '-' }}</td>
+            <td data-label="講者">{{ m.speaker_name || '-' }}</td>
+            <td data-label="地點">{{ m.venue || '-' }}</td>
           </tr>
           <tr v-if="!meetingsStore.meetings.length">
             <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無例會紀錄</td>
@@ -277,7 +277,7 @@ watch(() => route.params.id, load)
 
     <h2 class="section-h">歷月出席月報</h2>
     <div class="tw" style="margin-bottom:24px; overflow-x:auto;">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th class="hdr-purple">月份</th>
@@ -290,23 +290,23 @@ watch(() => route.params.id, load)
         </thead>
         <tbody>
           <tr v-for="r in attendance.monthlyRates" :key="r.month">
-            <td>{{ r.month }}</td>
-            <td>{{ r.meeting_count }}</td>
-            <td>{{ r.expected }} / {{ r.actual }}</td>
-            <td>
+            <td data-label="月份">{{ r.month }}</td>
+            <td data-label="例會場次">{{ r.meeting_count }}</td>
+            <td data-label="應出席 / 實際出席">{{ r.expected }} / {{ r.actual }}</td>
+            <td data-label="出席率">
               <span class="bdg" :class="r.rate !== null && r.rate < 75 ? 'b-r' : 'b-gr'">
                 {{ r.rate !== null ? r.rate + '%' : '-' }}
               </span>
             </td>
             <template v-if="features.isEnabled('B6_membership_report')">
-              <td>
+              <td data-label="當月社友合計">
                 <template v-if="membershipReports.reports.find(m => m.month === r.month)">
                   {{ (membershipReports.reports.find(m => m.month === r.month)!.current_male ?? 0)
                     + (membershipReports.reports.find(m => m.month === r.month)!.current_female ?? 0) }}
                 </template>
                 <template v-else>-</template>
               </td>
-              <td>
+              <td data-label="淨成長">
                 <template v-if="membershipReports.reports.find(m => m.month === r.month)">
                   {{ ((membershipReports.reports.find(m => m.month === r.month)!.current_male ?? 0)
                     + (membershipReports.reports.find(m => m.month === r.month)!.current_female ?? 0))
@@ -327,7 +327,7 @@ watch(() => route.params.id, load)
     <template v-if="auth.isDistrictAdminView">
       <h2 class="section-h">已註冊帳號</h2>
       <div class="tw" style="margin-bottom:24px;">
-        <table>
+        <table class="card-table">
           <thead class="th">
             <tr>
               <th>姓名</th>
@@ -338,9 +338,9 @@ watch(() => route.params.id, load)
           </thead>
           <tbody>
             <tr v-for="a in registeredAccounts" :key="a.id">
-              <td>{{ a.name }}</td>
-              <td>{{ accountRoleLabel(a.role) }}</td>
-              <td>
+              <td data-label="姓名">{{ a.name }}</td>
+              <td data-label="角色">{{ accountRoleLabel(a.role) }}</td>
+              <td data-label="可見範圍">
                 <div class="segmented" role="group" aria-label="可見範圍">
                   <button
                     type="button"
@@ -362,7 +362,7 @@ watch(() => route.params.id, load)
                   >地區管理員</button>
                 </div>
               </td>
-              <td>
+              <td data-label="狀態">
                 <span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">
                   {{ a.is_active ? '啟用中' : '已停用' }}
                 </span>
@@ -378,7 +378,7 @@ watch(() => route.params.id, load)
 
     <h2 class="section-h">社員名單</h2>
     <div class="tw">
-      <table>
+      <table class="card-table">
         <thead class="th">
           <tr>
             <th>英文名稱</th>
@@ -396,17 +396,17 @@ watch(() => route.params.id, load)
         </thead>
         <tbody>
           <tr v-for="m in roster.members" :key="m.id">
-            <td>{{ m.nick_name || '-' }}</td>
-            <td>{{ m.name }}</td>
-            <td>{{ m.club_position || '社友' }}</td>
-            <td>{{ m.classification || '-' }}</td>
-            <td>{{ m.company || '-' }}</td>
-            <td>{{ m.job_title || '-' }}</td>
-            <td>{{ m.personal_phone || m.phone || '-' }}</td>
-            <td>{{ m.company_phone || '-' }}</td>
-            <td>{{ m.email || '-' }}</td>
-            <td>{{ m.join_date || '-' }}</td>
-            <td>
+            <td data-label="英文名稱">{{ m.nick_name || '-' }}</td>
+            <td data-label="中文姓名">{{ m.name }}</td>
+            <td data-label="社內職稱">{{ m.club_position || '社友' }}</td>
+            <td data-label="職業分類">{{ m.classification || '-' }}</td>
+            <td data-label="公司">{{ m.company || '-' }}</td>
+            <td data-label="職稱">{{ m.job_title || '-' }}</td>
+            <td data-label="個人電話">{{ m.personal_phone || m.phone || '-' }}</td>
+            <td data-label="公司電話">{{ m.company_phone || '-' }}</td>
+            <td data-label="Email">{{ m.email || '-' }}</td>
+            <td data-label="入社日期">{{ m.join_date || '-' }}</td>
+            <td data-label="狀態">
               <span class="bdg" :class="memberStatus(m) === 'resigned' ? 'b-g' : memberStatus(m) === 'leave' ? 'b-y' : 'b-gr'">
                 {{ MEMBER_STATUS_LABEL[memberStatus(m)] }}
               </span>
