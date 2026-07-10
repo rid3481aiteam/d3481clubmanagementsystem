@@ -115,12 +115,6 @@ const router = createRouter({
       component: () => import('@/views/club/ServicePlanOverviewView.vue'),
       meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
     },
-    {
-      path: '/club/membership-report',
-      name: 'club-membership-report',
-      component: () => import('@/views/club/MembershipReportView.vue'),
-      meta: { feature: 'B6_membership_report' as FeatureKey },
-    },
     // E 活動
     {
       path: '/activities',
@@ -164,12 +158,6 @@ const router = createRouter({
       path: '/admin/attendance',
       name: 'admin-attendance',
       component: () => import('@/views/admin/AdminAttendanceView.vue'),
-      meta: { districtViewer: true },
-    },
-    {
-      path: '/admin/membership-reports',
-      name: 'admin-membership-reports',
-      component: () => import('@/views/admin/AdminMembershipReportsView.vue'),
       meta: { districtViewer: true },
     },
     {

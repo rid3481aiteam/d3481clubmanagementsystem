@@ -7,6 +7,7 @@ import type {
   AttendanceStatus,
   MemberAttendanceRate,
   ClubMonthlyAttendanceRate,
+  MeetingAttendanceSummary,
 } from '@/types'
 
 export const useAttendanceStore = defineStore('attendance', () => {
@@ -14,6 +15,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
   const details = ref<AttendanceDetail[]>([])
   const rates = ref<MemberAttendanceRate[]>([])
   const monthlyRates = ref<ClubMonthlyAttendanceRate[]>([])
+  const meetingSummaries = ref<MeetingAttendanceSummary[]>([])
   const loading = ref(false)
 
   async function fetchSession(meetingId: string) {
@@ -59,6 +61,101 @@ export const useAttendanceStore = defineStore('attendance', () => {
       .select('*')
       .eq('month', month)
     return (data ?? []) as ClubMonthlyAttendanceRate[]
+  }
+
+  // 該社某月的例會出席清單（社端「出席月報」頁的「本月例會」表格）
+  async function fetchMeetingsForMonth(clubId: string, month: string) {
+    const [y, m] = month.split('-').map(Number)
+    const start = `${month}-01`
+    const nextMonth = new Date(y, m, 1)
+    const end = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-${String(nextMonth.getDate()).padStart(2, '0')}`
+
+    const { data } = await supabase
+      .from('meetings')
+      .select('id, date, title, speaker_name, attendance_sessions(id, total, present, rate, attendance_details(id))')
+      .eq('club_id', clubId)
+      .gte('date', start)
+      .lt('date', end)
+      .order('date')
+
+    meetingSummaries.value = (data ?? []).map((m: any) => {
+      const s = Array.isArray(m.attendance_sessions) ? m.attendance_sessions[0] : m.attendance_sessions
+      return {
+        id: m.id,
+        date: m.date,
+        title: m.title,
+        speaker_name: m.speaker_name,
+        expected: s?.total ?? null,
+        actual: s?.present ?? null,
+        rate: s?.rate ?? null,
+        hasDetail: !!(s?.attendance_details?.length),
+      }
+    })
+  }
+
+  // 快速新增／補登某一天的例會出席人數（不逐人登記），給沒有走「新增例會」
+  // 流程的社在「出席月報」頁直接補資料用。找到當天已有例會就更新彙總數字，
+  // 但如果那場例會已經有逐人出席明細（透過「例會管理」登記過），就拒絕覆蓋，
+  // 請使用者改去例會管理頁編輯，避免誤刪真實的逐人記錄。
+  async function quickAddSession(
+    clubId: string,
+    date: string,
+    expected: number,
+    actual: number,
+    title?: string
+  ) {
+    const { data: existingMeeting } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('date', date)
+      .maybeSingle()
+
+    let meetingId = existingMeeting?.id as string | undefined
+
+    if (!meetingId) {
+      const { data: newMeeting, error: meetingError } = await supabase
+        .from('meetings')
+        .insert({ club_id: clubId, date, title: title || null })
+        .select()
+        .single()
+      if (meetingError) return { error: meetingError }
+      meetingId = newMeeting.id
+    }
+
+    const { data: existingSession } = await supabase
+      .from('attendance_sessions')
+      .select('id')
+      .eq('meeting_id', meetingId)
+      .maybeSingle()
+
+    const absent = Math.max(expected - actual, 0)
+
+    if (existingSession) {
+      const { count } = await supabase
+        .from('attendance_details')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', existingSession.id)
+      if ((count ?? 0) > 0) {
+        return { error: { message: '這一天已有逐人出席記錄，請至「例會管理」編輯詳細出席名單' } }
+      }
+      const { error } = await supabase
+        .from('attendance_sessions')
+        .update({ total: expected, present: actual, absent, leave: 0, exempt: 0 })
+        .eq('id', existingSession.id)
+      return { error }
+    }
+
+    const { error } = await supabase.from('attendance_sessions').insert({
+      meeting_id: meetingId,
+      club_id: clubId,
+      total: expected,
+      present: actual,
+      absent,
+      leave: 0,
+      exempt: 0,
+    })
+    return { error }
   }
 
   async function save(
@@ -113,12 +210,15 @@ export const useAttendanceStore = defineStore('attendance', () => {
     details,
     rates,
     monthlyRates,
+    meetingSummaries,
     loading,
     fetchSession,
     fetchDetails,
     fetchRates,
     fetchMonthlyRates,
     fetchDistrictMonthlyRates,
+    fetchMeetingsForMonth,
+    quickAddSession,
     save,
   }
 })

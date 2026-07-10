@@ -290,9 +290,21 @@ export interface ClubMonthlyAttendanceRate {
   club_id: string
   month: string          // 'YYYY-MM'
   meeting_count: number
-  present: number
-  counted: number
+  expected: number       // 應出席人次加總（每次例會 total 加總）
+  actual: number         // 實際出席人次加總（每次例會 present 加總）
   rate: number | null
+}
+
+// 「出席月報」單場例會出席摘要（本月例會清單用，含快速新增/補登的例會）
+export interface MeetingAttendanceSummary {
+  id: string
+  date: string
+  title: string | null
+  speaker_name: string | null
+  expected: number | null
+  actual: number | null
+  rate: number | null
+  hasDetail: boolean      // 是否有逐人出席明細（true = 透過「例會管理」逐人登記，false = 月報快速新增/補登）
 }
 
 // 各社每月社友增減月報（比照 RI 半年報 Excel 表頭設計）

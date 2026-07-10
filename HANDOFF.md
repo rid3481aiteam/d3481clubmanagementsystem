@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-10（第四十六輪，**新增「社友增減月報」（比照使用者提供的既有 RI 半年報 Excel 表頭）**——使用者提供一份既有的 Google 表單／Excel 匯出檔（`2025-26年度出席率.xlsx`，每月一個分頁，每列一個社，記錄 RI 半年報基準人數／當月人數／淨成長／年齡分布／例會次數／出席率），要求各社管理頁面比照表頭新增填寫表格，地區能看到全區總表，詳見下方待辦）
+> 最後更新：2026-07-10（第四十七輪，**「出席月報」與「社友增減月報」合併成一個頁面，改用應出席/實際出席人數 + 新增例會快速補登**——使用者要求把上兩輪的兩個獨立月報頁面合併、拿掉「計入人次」的呈現方式改用應出席/實際出席，並且要能在月報頁直接補登沒走「新增例會」流程的出席資料，詳見下方待辦）
+
+> 最後更新（上一輪）：2026-07-10（第四十六輪，**新增「社友增減月報」（比照使用者提供的既有 RI 半年報 Excel 表頭）**——使用者提供一份既有的 Google 表單／Excel 匯出檔（`2025-26年度出席率.xlsx`，每月一個分頁，每列一個社，記錄 RI 半年報基準人數／當月人數／淨成長／年齡分布／例會次數／出席率），要求各社管理頁面比照表頭新增填寫表格，地區能看到全區總表，詳見下方待辦）
 
 > 最後更新（上一輪）：2026-07-10（第四十五輪，**新增「出席月報」（各社當月出席率 + 歷月查詢 + 地區月報）**——使用者要求各社儀表板要顯示當月出席率、可查詢各月份出席率，並且要讓地區也能查詢各社各月出席率，詳見下方待辦）
 
@@ -21,6 +23,38 @@
 ---
 
 ## ⚠️ 待辦
+
+**【第四十七輪】出席月報／社友增減月報合併 + 應出席/實際出席 + 快速補登例會** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 上正式站實測**：
+
+背景：使用者要求把前兩輪做的「出席月報」跟「社友增減月報」合併成一個頁面統稱「出席月報」；出席數字不要強調「計入人次」（扣除免計人數的分母），改成使用者比較直覺的「應出席人數（理論上是全體社友）」跟「實際出席人數」；並且要考量有些社沒有走「新增例會」的完整流程，月報頁也要能直接補登某一天的出席人數。
+
+**設計判斷**：
+- 需求 1～3（新增例會可查詢講者資訊、針對該次例會逐人編輯出席、系統自動統計轉入月報）其實都已經是既有功能（`/meetings` 例會管理、`/meetings/:id/attendance` 逐人出席、第四十五輪的 `club_monthly_attendance_rate` view），這輪沒有重做，只是在合併後的頁面把「本月例會清單」列出來、每列可以點進去逐人編輯
+- 需求 4（月報同步給地區）延續第四十五輪的做法，靠 RLS 讓地區即時查得到，這輪沒有改
+- 真正新增的能力是「快速新增／補登例會出席」：在月報頁直接填日期＋應出席＋實際出席，就會自動在 `meetings`／`attendance_sessions` 建一筆（或更新既有的一筆），**不建立逐人明細**（`attendance_details` 留空）。如果那天已經有逐人出席記錄（透過「例會管理」登記過），這個補登功能會擋下來、請使用者改去逐人編輯頁面，避免誤蓋掉真實名單
+- `attendance_sessions.total` 欄位語意本來就等於「應出席人數」（逐人編輯頁面本來就是列出全體在籍社友讓執秘勾選狀態，`total` = 全體人數），這輪只是把顯示語言從「計入人次（扣除免計）」改成「應出席」，`rate` 出席率的計算公式本身沒有變，仍然是官方 present/(total-exempt) 公式，維持跟 `attendance_sessions.rate`／`member_attendance_rate` 一致
+
+實作內容：
+- `041_attendance_monthly_merge.sql`：重新定義 `club_monthly_attendance_rate` view，欄位從 `present`／`counted` 改成 `expected`（應出席人次加總）／`actual`（實際出席人次加總），`rate` 算法不變
+- `src/types/index.ts`：`ClubMonthlyAttendanceRate` 改用 `expected`/`actual`；新增 `MeetingAttendanceSummary` 型別（本月例會清單用）
+- `src/stores/attendance.ts`：新增 `fetchMeetingsForMonth(clubId, month)`（該月例會 + 出席彙總，含是否已有逐人明細）、`quickAddSession(clubId, date, expected, actual, title?)`（找當天例會就更新、找不到就新增，已有逐人明細就拒絕覆蓋）
+- **社端**：[`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue)（`/attendance/monthly`）整頁重寫：統計卡（應出席/實際出席/出席率/例會場次）+ 本月例會清單（可點連結到逐人出席編輯，未逐人登記的例會有「未逐人登記」標籤）+ 快速新增／補登表單 + RI 半年報基準/當月人數/年齡分布（原本 `MembershipReportView.vue` 的內容搬過來，`B6_membership_report` 開關控制是否顯示）+ 歷月月報表格。原本獨立的 [`MembershipReportView.vue`](src/views/club/MembershipReportView.vue) 已刪除，路由 `/club/membership-report` 已移除
+- **地區端**：[`AdminAttendanceView.vue`](src/views/admin/AdminAttendanceView.vue)（`/admin/attendance`）整頁重寫成單一寬表格，欄位＝社名/例會場次/應出席/實際出席/出席率 + （`B6_membership_report` 開關開啟時）RI半年報基準/當月人數/淨成長/年齡分布，雙層表頭、分區可摺疊。原本獨立的 [`AdminMembershipReportsView.vue`](src/views/admin/AdminMembershipReportsView.vue) 已刪除，路由 `/admin/membership-reports` 已移除
+- [`ClubDetailView.vue`](src/views/admin/ClubDetailView.vue)「歷月出席率」表格改名「歷月出席月報」，欄位改用應出席/實際出席，並補上當月社友合計/淨成長兩欄（`B6_membership_report` 開關控制）
+- [`TopMenu.vue`](src/components/layout/TopMenu.vue) 移除兩個獨立的「社友增減月報」選單項目（社端＋地區端都只剩一個「出席月報」）
+- [`FeatureFlagsView.vue`](src/views/admin/FeatureFlagsView.vue) 把 `B6_membership_report` 的說明改成「出席月報－社友增減人數（RI半年報）」，反映它現在是合併頁面裡的一個子區塊而不是獨立頁面
+
+1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/041_attendance_monthly_merge.sql`（會先 `DROP VIEW` 再重建，執行前確認沒有其他地方還在讀舊欄位名 `present`/`counted`——這台環境已經確認前端程式碼都改完了）
+2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
+3. **待實測**（這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅，沒有真的登入測試過）：
+   - migration 跑完後，社端登入 `/attendance/monthly`，確認統計卡顯示「應出席 / 實際出席人次」而不是「計入人次」
+   - 「本月例會清單」應該列出當月透過「例會管理」新增的例會，點「逐人出席」能正常導到 `/meetings/:id/attendance`
+   - 用「快速新增／補登例會出席」填一個沒有例會的日期＋應出席/實際出席人數，儲存後應該立刻出現在「本月例會清單」，並且有「未逐人登記」標籤
+   - 針對同一天再次用快速新增功能修改數字，應該是「更新」不是「新增重複列」
+   - 針對一個已經逐人登記過的例會日期，改用快速新增功能填同一天，應該會被擋下來、顯示錯誤訊息，不會覆蓋掉逐人記錄
+   - 地區登入 `/admin/attendance`，確認欄位是社名/例會場次/應出席/實際出席/出席率（+ 社友增減相關欄位），沒有「計入人次」
+   - 舊的 `/club/membership-report`、`/admin/membership-reports` 網址應該導回首頁（路由已移除，功能開關關掉時 `/attendance/monthly` 內的 RI 半年報區塊也應該不顯示）
+4. 已知限制：快速新增／補登的例會不會出現逐人出席明細，`member_attendance_rate`（個人出席率）不會把這些補登資料算進去，因為那個 view 是從 `attendance_details` 逐人明細算的——這是刻意的設計（補登模式本來就沒有逐人資料），如果之後要看個人出席率，還是要透過「例會管理」逐人登記
 
 **【第四十六輪】社友增減月報（比照 RI 半年報 Excel）** ~~待實作~~ ~~待執行 migration~~ **040 migration 使用者已於 2026-07-10 執行完成 ✅，剩下待上正式站實測**：
 

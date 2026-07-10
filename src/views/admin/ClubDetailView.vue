@@ -8,6 +8,8 @@ import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import { useProspectiveStore } from '@/stores/prospective'
 import { useMeetingsStore } from '@/stores/meetings'
 import { useAttendanceStore } from '@/stores/attendance'
+import { useMembershipReportsStore } from '@/stores/membershipReports'
+import { useFeaturesStore } from '@/stores/features'
 import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus, UserProfile, UserRole, ProspectStatus } from '@/types'
 
 const route = useRoute()
@@ -17,6 +19,8 @@ const officers = useOfficersStore()
 const prospective = useProspectiveStore()
 const meetingsStore = useMeetingsStore()
 const attendance = useAttendanceStore()
+const membershipReports = useMembershipReportsStore()
+const features = useFeaturesStore()
 const club = ref<Club | null>(null)
 const lastMeeting = ref<Meeting | null>(null)
 const avgRate = ref<number | null>(null)
@@ -107,6 +111,7 @@ async function load() {
   await prospective.fetchAll(id)
   await meetingsStore.fetchAll(id)
   await attendance.fetchMonthlyRates(id)
+  await membershipReports.fetchAll(id)
 
   const { data: accounts } = await supabase
     .from('user_profiles')
@@ -270,30 +275,50 @@ watch(() => route.params.id, load)
       </table>
     </div>
 
-    <h2 class="section-h">歷月出席率</h2>
-    <div class="tw" style="margin-bottom:24px;">
+    <h2 class="section-h">歷月出席月報</h2>
+    <div class="tw" style="margin-bottom:24px; overflow-x:auto;">
       <table>
         <thead class="th">
           <tr>
             <th>月份</th>
             <th>例會場次</th>
-            <th>出席 / 計入人次</th>
+            <th>應出席 / 實際出席</th>
             <th>出席率</th>
+            <th v-if="features.isEnabled('B6_membership_report')">當月社友合計</th>
+            <th v-if="features.isEnabled('B6_membership_report')">淨成長</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="r in attendance.monthlyRates" :key="r.month">
             <td>{{ r.month }}</td>
             <td>{{ r.meeting_count }}</td>
-            <td>{{ r.present }} / {{ r.counted }}</td>
+            <td>{{ r.expected }} / {{ r.actual }}</td>
             <td>
               <span class="bdg" :class="r.rate !== null && r.rate < 75 ? 'b-r' : 'b-gr'">
                 {{ r.rate !== null ? r.rate + '%' : '-' }}
               </span>
             </td>
+            <template v-if="features.isEnabled('B6_membership_report')">
+              <td>
+                <template v-if="membershipReports.reports.find(m => m.month === r.month)">
+                  {{ (membershipReports.reports.find(m => m.month === r.month)!.current_male ?? 0)
+                    + (membershipReports.reports.find(m => m.month === r.month)!.current_female ?? 0) }}
+                </template>
+                <template v-else>-</template>
+              </td>
+              <td>
+                <template v-if="membershipReports.reports.find(m => m.month === r.month)">
+                  {{ ((membershipReports.reports.find(m => m.month === r.month)!.current_male ?? 0)
+                    + (membershipReports.reports.find(m => m.month === r.month)!.current_female ?? 0))
+                    - ((membershipReports.reports.find(m => m.month === r.month)!.baseline_male ?? 0)
+                    + (membershipReports.reports.find(m => m.month === r.month)!.baseline_female ?? 0)) }}
+                </template>
+                <template v-else>-</template>
+              </td>
+            </template>
           </tr>
           <tr v-if="!attendance.monthlyRates.length">
-            <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無出席資料</td>
+            <td colspan="6" style="text-align:center; color:var(--muted);">該社尚無出席資料</td>
           </tr>
         </tbody>
       </table>
