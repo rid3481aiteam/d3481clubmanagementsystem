@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-10（第四十五輪，**新增「出席月報」（各社當月出席率 + 歷月查詢 + 地區月報）**——使用者要求各社儀表板要顯示當月出席率、可查詢各月份出席率，並且要讓地區也能查詢各社各月出席率，詳見下方待辦）
+> 最後更新：2026-07-10（第四十六輪，**新增「社友增減月報」（比照使用者提供的既有 RI 半年報 Excel 表頭）**——使用者提供一份既有的 Google 表單／Excel 匯出檔（`2025-26年度出席率.xlsx`，每月一個分頁，每列一個社，記錄 RI 半年報基準人數／當月人數／淨成長／年齡分布／例會次數／出席率），要求各社管理頁面比照表頭新增填寫表格，地區能看到全區總表，詳見下方待辦）
+
+> 最後更新（上一輪）：2026-07-10（第四十五輪，**新增「出席月報」（各社當月出席率 + 歷月查詢 + 地區月報）**——使用者要求各社儀表板要顯示當月出席率、可查詢各月份出席率，並且要讓地區也能查詢各社各月出席率，詳見下方待辦）
 
 > 最後更新（上一輪）：2026-07-07（第四十四輪，**LINE 官方帳號通知 Demo（給和平社展示用）**——使用者想讓和平社實際看到「LINE 通知」這個構想可行，這輪做了最小可動版本：人工核對手機號碼綁定 + 測試訊息發送，安全性留到正式導入前再加強，詳見下方待辦，**需要使用者到 LINE Developers Console 申請頻道 + 用 Supabase CLI 部署 2 支 Edge Function，Claude 無法代勞**）
 
@@ -19,6 +21,32 @@
 ---
 
 ## ⚠️ 待辦
+
+**【第四十六輪】社友增減月報（比照 RI 半年報 Excel）** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 上正式站實測**：
+
+背景：使用者提供一份既有的月報 Excel（Google 表單匯出），從 2025/7 到 2026/6 每個月一個分頁，每列一個社，欄位是：RI 半年報基準 男/女/合計社友人數、當月月底 男/女/合計社友人數、淨成長、當月 40歲以下/41歲以上/合計社友人數、例會次數、出席率。使用者要求各社管理頁面比照這些欄位新增填寫表格，地區要能看到全區的總表。
+
+**兩個關鍵設計決定（先跟使用者確認過）**：
+1. 「例會次數」「出席率」這兩欄**不用社端手動填**，直接讀第四十五輪剛做的 `club_monthly_attendance_rate` view（真實例會/出席紀錄即時算出），避免跟系統實際紀錄兜不起來、也少一道重複輸入
+2. 「RI 半年報基準人數（男/女）」比照 Excel 原本的設計，**每個月報告各自獨立一筆**（不是「年度填一次」），使用者確認過這樣比較符合他們原本的填報習慣
+
+實作內容：
+- `040_club_monthly_membership_reports.sql`：新增表 `club_monthly_membership_reports`（`club_id`／`month`(`'YYYY-MM'`)／`baseline_male`／`baseline_female`／`current_male`／`current_female`／`age_under_40`／`age_41_plus`，`UNIQUE(club_id, month)`），RLS 比照 roster/meetings（本社可編、地區唯讀）；`role_permissions` 種子資料新增 `membership_reports` resource；`feature_flags` 新增 `B6_membership_report`（預設全區開啟）
+- `src/types/index.ts`：新增 `ClubMonthlyMembershipReport` 型別 + `FeatureKey` 加 `B6_membership_report`
+- `src/stores/membershipReports.ts`：新增 store，`fetchAll(clubId)`（單社歷月）／`fetchDistrictMonth(month)`（全區某月）／`upsert(...)`
+- `src/stores/permissions.ts`：`PermResource` 型別加 `membership_reports`
+- **社端**：新增頁面 [`MembershipReportView.vue`](src/views/club/MembershipReportView.vue)（路由 `/club/membership-report`，選單「出席月報」旁新增「社友增減月報」），月份選擇器 + 表單（基準人數/當月人數/年齡分布可編輯，合計/淨成長/例會次數/出席率唯讀自動算）+ 歷月報告表格，`club_member` 角色看得到但欄位鎖唯讀（`has_permission('membership_reports','edit')` 判斷）
+- **地區端**：新增頁面 [`AdminMembershipReportsView.vue`](src/views/admin/AdminMembershipReportsView.vue)（路由 `/admin/membership-reports`，選單「出席月報」旁新增「社友增減月報」），月份選擇器 + 全區總表（欄位順序、雙層表頭比照原本 Excel 版面，分區可摺疊）
+- [`FeatureFlagsView.vue`](src/views/admin/FeatureFlagsView.vue)／[`PermissionMatrixView.vue`](src/views/admin/PermissionMatrixView.vue) 都補上新項目的標籤
+
+1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/040_club_monthly_membership_reports.sql`
+2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
+3. **待實測**（這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅，沒有真的登入測試過）：
+   - migration 跑完後，社端（執秘/社長）登入 `/club/membership-report`，選一個月份，填入基準人數/當月人數/年齡分布，按「儲存本月報告」，確認合計/淨成長會即時算、例會次數/出席率有自動帶入系統數字
+   - 一般社友（`club_member`）登入同一頁，確認欄位是鎖唯讀（灰底不能改），沒有「儲存」按鈕
+   - 地區（唯讀/管理員）登入 `/admin/membership-reports`，切換月份，確認能看到全區各社剛剛填的資料，分區可摺疊
+   - 地區管理員進「功能開關管理」「權限矩陣」，確認多出「社友增減月報」項目，且權限矩陣裡地區管理員是唯讀、各社管理員可編、一般社友唯讀
+4. 已知限制：例會次數/出席率跟社端填的人數資料是「兩個獨立來源」放在同一張表顯示——人數是社端手動填，例會/出席是系統自動算，畫面上會同框但資料來源不同，如果某社完全沒在系統裡登記例會出席，那兩欄會顯示 0/`-`，不代表社端沒開會，只是系統沒紀錄
 
 **【第四十五輪】出席月報（各社當月出席率 + 歷月查詢 + 地區月報）** ~~待實作~~ ~~待執行 migration~~ **039 migration 使用者已於 2026-07-10 執行完成 ✅，剩下待上正式站實測**：
 

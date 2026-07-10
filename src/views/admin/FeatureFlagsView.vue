@@ -16,6 +16,7 @@ const LABELS: Record<FeatureKey, string> = {
   B3_attendance_personal: '個人出席率',
   B4_attendance_detail: '逐人出席明細',
   B5_edm: 'EDM 文案產生器（AI 輔助）',
+  B6_membership_report: '社友增減月報',
   D1_roster: '社友名冊',
   D2_roster_excel: '名冊 Excel 匯入匯出',
   D3_prospective: '潛在社友追蹤',

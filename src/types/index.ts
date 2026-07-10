@@ -202,6 +202,7 @@ export type FeatureKey =
   | 'A1_login' | 'A2_roles' | 'A3_isolation'
   | 'B1_meeting_info' | 'B2_attendance_summary'
   | 'B3_attendance_personal' | 'B4_attendance_detail' | 'B5_edm'
+  | 'B6_membership_report'
   | 'D1_roster' | 'D2_roster_excel' | 'D3_prospective' | 'D4_care'
   | 'H1_directory' | 'H2_directory_search' | 'H3_directory_admin'
   | 'E1_activities'
@@ -293,6 +294,33 @@ export interface ClubMonthlyAttendanceRate {
   counted: number
   rate: number | null
 }
+
+// 各社每月社友增減月報（比照 RI 半年報 Excel 表頭設計）
+export interface ClubMonthlyMembershipReport {
+  id: string
+  club_id: string
+  month: string             // 'YYYY-MM'
+  baseline_male: number | null
+  baseline_female: number | null
+  current_male: number | null
+  current_female: number | null
+  age_under_40: number | null
+  age_41_plus: number | null
+  note: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ClubMonthlyMembershipReportInsert = Omit<
+  ClubMonthlyMembershipReport,
+  'id' | 'created_by' | 'updated_by' | 'created_at' | 'updated_at'
+>
+
+export type ClubMonthlyMembershipReportUpdate = Partial<
+  Omit<ClubMonthlyMembershipReport, 'id' | 'club_id' | 'month' | 'created_by' | 'created_at' | 'updated_at'>
+>
 
 // ── 社友名冊 ─────────────────────────────────────────
 export type RosterClubPosition = 'PP' | 'IPP' | 'P' | 'VP' | 'PE' | 'S' | '社友'

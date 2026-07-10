@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 import type { UserRole } from '@/types'
 
-export type PermResource = 'roster' | 'prospective_members' | 'meetings' | 'attendance' | 'activities'
+export type PermResource = 'roster' | 'prospective_members' | 'meetings' | 'attendance' | 'activities' | 'membership_reports'
 export type PermAction = 'view' | 'edit'
 export type PermMap = Record<string, boolean>
 

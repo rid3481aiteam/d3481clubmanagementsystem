@@ -65,6 +65,9 @@ const navItems = computed<NavItem[]>(() => {
     items.push({ type: 'divider' })
     items.push({ type: 'link', to: '/admin/clubs', icon: '🏢', label: '社團總覽' })
     items.push({ type: 'link', to: '/admin/attendance', icon: '📈', label: '出席月報' })
+    if (features.isEnabled('B6_membership_report')) {
+      items.push({ type: 'link', to: '/admin/membership-reports', icon: '📋', label: '社友增減月報' })
+    }
     items.push({ type: 'link', to: '/admin/announcements', icon: '📣', label: '地區公告' })
     items.push({ type: 'link', to: '/admin/governor-awards', icon: '🏅', label: '總監獎項統整' })
     if (features.isEnabled('E1_activities')) {
@@ -101,6 +104,9 @@ const navItems = computed<NavItem[]>(() => {
     }
     if (features.isEnabled('B2_attendance_summary')) {
       items.push({ type: 'link', to: '/attendance/monthly', icon: '📈', label: '出席月報' })
+    }
+    if (features.isEnabled('B6_membership_report')) {
+      items.push({ type: 'link', to: '/club/membership-report', icon: '📋', label: '社友增減月報' })
     }
     items.push({ type: 'link', to: '/club/officers', icon: '🎖️', label: '社的年度成員' })
     items.push({
