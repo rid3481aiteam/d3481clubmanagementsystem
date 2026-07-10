@@ -24,7 +24,7 @@
 
 ## ⚠️ 待辦
 
-**【第四十七輪】出席月報／社友增減月報合併 + 應出席/實際出席 + 快速補登例會** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 上正式站實測**：
+**【第四十七輪】出席月報／社友增減月報合併 + 應出席/實際出席 + 快速補登例會** ~~待實作~~ ~~待執行 migration~~ **041 migration 使用者已於 2026-07-10 執行完成 ✅，剩下待上正式站實測**：
 
 背景：使用者要求把前兩輪做的「出席月報」跟「社友增減月報」合併成一個頁面統稱「出席月報」；出席數字不要強調「計入人次」（扣除免計人數的分母），改成使用者比較直覺的「應出席人數（理論上是全體社友）」跟「實際出席人數」；並且要考量有些社沒有走「新增例會」的完整流程，月報頁也要能直接補登某一天的出席人數。
 
@@ -44,7 +44,7 @@
 - [`TopMenu.vue`](src/components/layout/TopMenu.vue) 移除兩個獨立的「社友增減月報」選單項目（社端＋地區端都只剩一個「出席月報」）
 - [`FeatureFlagsView.vue`](src/views/admin/FeatureFlagsView.vue) 把 `B6_membership_report` 的說明改成「出席月報－社友增減人數（RI半年報）」，反映它現在是合併頁面裡的一個子區塊而不是獨立頁面
 
-1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/041_attendance_monthly_merge.sql`（會先 `DROP VIEW` 再重建，執行前確認沒有其他地方還在讀舊欄位名 `present`/`counted`——這台環境已經確認前端程式碼都改完了）
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/041_attendance_monthly_merge.sql`~~ **使用者已執行完成 ✅**
 2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
 3. **待實測**（這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅，沒有真的登入測試過）：
    - migration 跑完後，社端登入 `/attendance/monthly`，確認統計卡顯示「應出席 / 實際出席人次」而不是「計入人次」
