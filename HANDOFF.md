@@ -40,11 +40,11 @@
 
 ## ⚠️ 待辦
 
-**【第五十五輪】地區行事曆 — 待使用者完成部署設定**：
+**【第五十五輪】地區行事曆 — 待使用者完成部署設定**：**使用者已在 Supabase SQL Editor 執行 `046_district_calendar.sql` 完成 ✅**（`district_calendar_events`／`district_calendar_sync_log` 兩張表已建立），以下步驟待辦：
 
 1. **申請 Google API Key**：console.cloud.google.com 建立/選專案 → 啟用「Google Drive API」→ 建立 API 金鑰（建議限制成只能用 Drive API）
 2. **Supabase Dashboard → Edge Functions → Secrets 設定 3 組**：`GOOGLE_DRIVE_API_KEY`（上面申請的）、`GOOGLE_DRIVE_FOLDER_ID`（`1b4cSz5xl--t9cfYiWi66LPWJX7uTRHYK`，地區辦公室提供的行事曆資料夾，權限「知道連結的人可查看」）、`CRON_SECRET`（自訂一組長亂數字串，防止別人亂呼叫這支 function）
-3. **SQL Editor 執行 `046_district_calendar.sql`**
+3. ~~SQL Editor 執行 `046_district_calendar.sql`~~ 已完成 ✅
 4. **部署 Edge Function**：`supabase functions deploy sync-district-calendar --no-verify-jwt`
 5. **設定每日排程**（SQL Editor 執行一次，內含 CRON_SECRET 明碼，不進 git）：
    ```sql
