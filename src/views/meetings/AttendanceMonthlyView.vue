@@ -134,13 +134,9 @@ watch(selectedMonth, async () => {
           <div class="bar-fill" :style="{ width: selectedRate.rate + '%' }"></div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card c-gold">
         <div class="stat-label">例會場次</div>
         <div class="stat-value">{{ selectedRate?.meeting_count ?? 0 }}</div>
-      </div>
-      <div class="stat-card c-gold">
-        <div class="stat-label">應出席 / 實際出席人次</div>
-        <div class="stat-value">{{ selectedRate?.expected ?? 0 }} / {{ selectedRate?.actual ?? 0 }}</div>
       </div>
     </div>
 
