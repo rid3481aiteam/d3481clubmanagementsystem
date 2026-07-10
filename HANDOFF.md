@@ -20,7 +20,7 @@
 
 ## ⚠️ 待辦
 
-**【第四十五輪】出席月報（各社當月出席率 + 歷月查詢 + 地區月報）** ~~待實作~~ **程式碼已完成，待使用者跑 migration + 上正式站實測**：
+**【第四十五輪】出席月報（各社當月出席率 + 歷月查詢 + 地區月報）** ~~待實作~~ ~~待執行 migration~~ **039 migration 使用者已於 2026-07-10 執行完成 ✅，剩下待上正式站實測**：
 
 背景：使用者要求「各社儀表板要有當月的出席率統計，還可以查詢各月份的出席率，並且此出席率每月要自動同步到地區，地區可以查詢各月各社的出席率」。
 
@@ -35,9 +35,9 @@
 - **社端**：[`DashboardView.vue`](src/views/DashboardView.vue) 儀表板新增「本月出席率」卡片（原本的「平均出席率」卡片改標「本年度平均出席率」做區隔，計算邏輯沒動）+ 「查看歷月出席率」連結；新增頁面 [`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue)（路由 `/attendance/monthly`，選單「例會管理」旁新增「出席月報」），月份選擇器（`<input type="month">`）+ 該月統計卡 + 歷月出席率表格
 - **地區端**：Dashboard 的「各社出席率」表格標題加註「（本扶輪年度）」+ 「查看各月出席率」連結；新增頁面 [`AdminAttendanceView.vue`](src/views/admin/AdminAttendanceView.vue)（路由 `/admin/attendance`，選單「社團總覽」旁新增「出席月報」），月份選擇器 + 全區各社出席率表格（比照 Dashboard 既有的分區摺疊 UI）；[`ClubDetailView.vue`](src/views/admin/ClubDetailView.vue)（社團詳情頁）新增「歷月出席率」表格，方便地區單獨查某一社的月趨勢
 
-1. **待使用者執行**：在 Supabase SQL Editor 執行 `supabase/migrations/039_monthly_attendance_rate.sql`
+1. ~~在 Supabase SQL Editor 執行 `supabase/migrations/039_monthly_attendance_rate.sql`~~ **使用者已執行完成 ✅**
 2. 部署新版前端到 Cloudflare Pages（push 上去應該就會自動觸發）——**待確認**
-3. **待實測**（本機這輪有真實 `.env.local`，但 migration 還沒在正式站執行、也沒有真實帳密登入，這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅）：
+3. **待實測**（本機這輪有真實 `.env.local`，但沒有真實帳密登入，這輪只做了 `npx vue-tsc --noEmit` + `npm run build` 靜態驗證，皆通過 ✅）：
    - migration 跑完後，社端登入儀表板，確認「本月出席率」卡片有數字（該社本月要有例會 + 已記錄出席才會顯示，沒有的話是「-」）
    - 社端點「查看歷月出席率」，進 `/attendance/monthly`，切換月份選擇器應該能看到不同月份的統計 + 下方歷月表格
    - 地區（唯讀/管理員）登入儀表板，點「查看各月出席率」，進 `/admin/attendance`，切換月份應該能看到全區各社當月出席率，分區可摺疊
