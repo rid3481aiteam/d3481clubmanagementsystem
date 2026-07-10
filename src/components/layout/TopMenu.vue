@@ -71,6 +71,9 @@ const navItems = computed<NavItem[]>(() => {
     items.push({ type: 'link', to: '/admin/attendance', icon: '📈', label: '出席月報' })
     items.push({ type: 'link', to: '/admin/announcements', icon: '📣', label: '地區公告' })
     items.push({ type: 'link', to: '/admin/governor-awards', icon: '🏅', label: '總監獎項統整' })
+    if (features.isEnabled('H1_directory')) {
+      items.push({ type: 'link', to: '/directory', icon: '📖', label: '地區通訊錄' })
+    }
     if (features.isEnabled('E1_activities')) {
       items.push({ type: 'link', to: '/activities', icon: '🎉', label: '社友活動' })
     }
