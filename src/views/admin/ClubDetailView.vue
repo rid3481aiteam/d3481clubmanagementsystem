@@ -280,12 +280,12 @@ watch(() => route.params.id, load)
       <table>
         <thead class="th">
           <tr>
-            <th>月份</th>
-            <th>例會場次</th>
-            <th>應出席 / 實際出席</th>
-            <th>出席率</th>
-            <th v-if="features.isEnabled('B6_membership_report')">當月社友合計</th>
-            <th v-if="features.isEnabled('B6_membership_report')">淨成長</th>
+            <th class="hdr-purple">月份</th>
+            <th class="hdr-purple">例會場次</th>
+            <th class="hdr-purple">應出席 / 實際出席</th>
+            <th class="hdr-purple">出席率</th>
+            <th v-if="features.isEnabled('B6_membership_report')" class="hdr-purple">當月社友合計</th>
+            <th v-if="features.isEnabled('B6_membership_report')" class="hdr-yellow">淨成長</th>
           </tr>
         </thead>
         <tbody>
@@ -433,4 +433,10 @@ watch(() => route.params.id, load)
 .stat { font-size: 24px; font-weight: 700; color: var(--navy); }
 .unit { font-size: 12px; font-weight: 400; color: var(--muted); }
 .section-h { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+
+/* 比照使用者提供的 RI 半年報 Excel 表頭配色 */
+.hdr-purple { background: #5B3F86; color: #fff; }
+.hdr-navy   { background: #060FBA; color: #fff; }
+.hdr-yellow { background: #FFFF00; color: #000; }
+.hdr-green  { background: #08BE26; color: #fff; }
 </style>

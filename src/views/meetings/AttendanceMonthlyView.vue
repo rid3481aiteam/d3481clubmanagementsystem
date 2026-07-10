@@ -151,9 +151,9 @@ watch(selectedMonth, async () => {
           <tr>
             <th>日期</th>
             <th>主題 / 講者</th>
-            <th>應出席</th>
-            <th>實際出席</th>
-            <th>出席率</th>
+            <th class="hdr-purple">應出席</th>
+            <th class="hdr-purple">實際出席</th>
+            <th class="hdr-purple">出席率</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -211,7 +211,7 @@ watch(selectedMonth, async () => {
 
     <template v-if="features.isEnabled('B6_membership_report')">
       <div class="tw" style="padding:20px; margin-bottom:24px;">
-        <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:14px;">RI 半年報基準人數</h2>
+        <h2 class="section-bar hdr-navy">RI 半年報基準人數</h2>
         <div class="form-grid">
           <label>
             <span>男社友人數</span>
@@ -227,7 +227,7 @@ watch(selectedMonth, async () => {
           </label>
         </div>
 
-        <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin:20px 0 14px;">{{ selectedMonth }} 月底人數</h2>
+        <h2 class="section-bar hdr-purple" style="margin-top:20px;">{{ selectedMonth }} 月底人數</h2>
         <div class="form-grid">
           <label>
             <span>男社友人數</span>
@@ -243,11 +243,11 @@ watch(selectedMonth, async () => {
           </label>
           <label>
             <span>淨成長</span>
-            <input type="number" class="fi" :value="netGrowth" disabled style="font-weight:700;" />
+            <input type="number" class="fi hdr-yellow" :value="netGrowth" disabled style="font-weight:700;" />
           </label>
         </div>
 
-        <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin:20px 0 14px;">{{ selectedMonth }} 年齡分布</h2>
+        <h2 class="section-bar hdr-green" style="margin-top:20px;">{{ selectedMonth }} 年齡分布</h2>
         <div class="form-grid">
           <label>
             <span>40歲以下人數</span>
@@ -274,12 +274,12 @@ watch(selectedMonth, async () => {
       <table>
         <thead class="th">
           <tr>
-            <th>月份</th>
-            <th>例會場次</th>
-            <th>應出席 / 實際出席</th>
-            <th>出席率</th>
-            <th v-if="features.isEnabled('B6_membership_report')">當月社友合計</th>
-            <th v-if="features.isEnabled('B6_membership_report')">淨成長</th>
+            <th class="hdr-purple">月份</th>
+            <th class="hdr-purple">例會場次</th>
+            <th class="hdr-purple">應出席 / 實際出席</th>
+            <th class="hdr-purple">出席率</th>
+            <th v-if="features.isEnabled('B6_membership_report')" class="hdr-purple">當月社友合計</th>
+            <th v-if="features.isEnabled('B6_membership_report')" class="hdr-yellow">淨成長</th>
           </tr>
         </thead>
         <tbody>
@@ -330,5 +330,19 @@ watch(selectedMonth, async () => {
   font-size: 12px;
   color: var(--muted);
   font-weight: 600;
+}
+
+/* 比照使用者提供的 RI 半年報 Excel 表頭配色 */
+.hdr-purple { background: #5B3F86; color: #fff; }
+.hdr-navy   { background: #060FBA; color: #fff; }
+.hdr-yellow { background: #FFFF00; color: #000; }
+.hdr-green  { background: #08BE26; color: #fff; }
+
+.section-bar {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  margin-bottom: 14px;
 }
 </style>

@@ -122,23 +122,23 @@ watch(selectedMonth, loadMonth)
       <table>
         <thead class="th">
           <tr>
-            <th rowspan="2" style="vertical-align:middle;">社名</th>
-            <th rowspan="2" style="vertical-align:middle;">例會場次</th>
-            <th rowspan="2" style="vertical-align:middle;">應出席</th>
-            <th rowspan="2" style="vertical-align:middle;">實際出席</th>
-            <th rowspan="2" style="vertical-align:middle;">出席率</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">社名</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">例會場次</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">應出席</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">實際出席</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">出席率</th>
             <template v-if="features.isEnabled('B6_membership_report')">
-              <th colspan="3">RI 半年報基準人數</th>
-              <th colspan="3">{{ selectedMonth }} 月底人數</th>
-              <th rowspan="2" style="vertical-align:middle;">淨成長</th>
-              <th colspan="3">{{ selectedMonth }} 年齡分布</th>
+              <th class="hdr-navy" colspan="3">RI 半年報基準人數</th>
+              <th class="hdr-purple" colspan="3">{{ selectedMonth }} 月底人數</th>
+              <th class="hdr-yellow" rowspan="2" style="vertical-align:middle;">淨成長</th>
+              <th class="hdr-green" colspan="3">{{ selectedMonth }} 年齡分布</th>
             </template>
           </tr>
           <tr>
             <template v-if="features.isEnabled('B6_membership_report')">
-              <th>男</th><th>女</th><th>合計</th>
-              <th>男</th><th>女</th><th>合計</th>
-              <th>40歲以下</th><th>41歲以上</th><th>合計</th>
+              <th class="hdr-navy">男</th><th class="hdr-navy">女</th><th class="hdr-navy">合計</th>
+              <th class="hdr-purple">男</th><th class="hdr-purple">女</th><th class="hdr-purple">合計</th>
+              <th class="hdr-green">40歲以下</th><th class="hdr-green">41歲以上</th><th class="hdr-green">合計</th>
             </template>
           </tr>
         </thead>
@@ -201,4 +201,10 @@ watch(selectedMonth, loadMonth)
   width: 14px;
   color: var(--muted);
 }
+
+/* 比照使用者提供的 RI 半年報 Excel 表頭配色 */
+.hdr-purple { background: #5B3F86; color: #fff; }
+.hdr-navy   { background: #060FBA; color: #fff; }
+.hdr-yellow { background: #FFFF00; color: #000; }
+.hdr-green  { background: #08BE26; color: #fff; }
 </style>
