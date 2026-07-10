@@ -66,19 +66,48 @@ Deno.serve(async (req) => {
     clubName = club?.name ?? null
   }
 
+  // 每社每日上限 2 次（僅限 scope='club'，地區不受限）：用台北時區的「今天」計算區間，
+  // 只算成功產生過的次數，失敗/被擋掉的請求不計入。
+  if (scope === 'club') {
+    const now = new Date()
+    const taipeiNow = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    const startTaipeiUtcMs = Date.UTC(
+      taipeiNow.getUTCFullYear(),
+      taipeiNow.getUTCMonth(),
+      taipeiNow.getUTCDate(),
+    ) - 8 * 60 * 60 * 1000
+    const dayStart = new Date(startTaipeiUtcMs).toISOString()
+    const dayEnd = new Date(startTaipeiUtcMs + 24 * 60 * 60 * 1000).toISOString()
+
+    const { count, error: countError } = await callerClient
+      .from('edm_generations')
+      .select('id', { count: 'exact', head: true })
+      .eq('club_id', callerProfile.club_id)
+      .gte('created_at', dayStart)
+      .lt('created_at', dayEnd)
+
+    if (countError) {
+      console.error('edm_generations count error', countError)
+      return errorResponse('查詢今日使用次數失敗，請稍後再試', 502)
+    }
+    if ((count ?? 0) >= 2) {
+      return errorResponse('本社今日 EDM 產生次數已達上限（每日 2 次），請明天再試', 429)
+    }
+  }
+
   const audienceLabel = scope === 'district' ? '國際扶輪3481地區全體社友' : `${clubName ?? '本社'}社友`
   const toneLabel = (typeof tone === 'string' && tone.trim()) || '正式且溫暖'
   const keyPointsText = (typeof key_points === 'string' && key_points.trim()) || '（無補充重點，請依主題合理發揮）'
 
-  const prompt = `你是國際扶輪3481地區的公關文案助手，請根據以下資訊撰寫一封 EDM（電子報/通知信）文案，對象是${audienceLabel}，語氣${toneLabel}。
+  const prompt = `你是國際扶輪3481地區的社群小編，請根據以下資訊撰寫一則 Facebook 貼文行銷文案，對象是${audienceLabel}，語氣${toneLabel}。
 
 主題：${topic}
 重點內容：
 ${keyPointsText}
 
 請輸出 JSON，包含：
-- title：一句吸引人的信件標題
-- body：信件正文，繁體中文，適合直接複製貼上或轉成 PDF 使用，開頭可有簡短問候語，結尾可有簡短署名（例如「國際扶輪3481地區」或「${clubName ?? '本社'}」），不要使用 Markdown 語法。`
+- title：一句吸引人的開頭金句，可留空字串（貼文不一定需要獨立標題）
+- body：貼文正文，繁體中文，控制在 100～150 字以內，適合直接貼到 Facebook 使用，可適度使用表情符號增加親和力，結尾可附 1～3 個相關 hashtag，不要使用 Markdown 語法。`
 
   const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -89,7 +118,7 @@ ${keyPointsText}
     },
     body: JSON.stringify({
       model: 'claude-opus-4-8',
-      max_tokens: 2048,
+      max_tokens: 600,
       output_config: {
         format: {
           type: 'json_schema',
@@ -131,6 +160,13 @@ ${keyPointsText}
     parsed = JSON.parse(textBlock.text)
   } catch {
     return errorResponse('AI 回傳格式錯誤，請重試', 502)
+  }
+
+  if (scope === 'club') {
+    const { error: logError } = await callerClient
+      .from('edm_generations')
+      .insert({ club_id: callerProfile.club_id, user_id: user.id, scope })
+    if (logError) console.error('edm_generations insert error', logError)
   }
 
   return new Response(JSON.stringify(parsed), {
