@@ -71,7 +71,10 @@ body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg)
 }
 
 @media (max-width: 900px) {
-  .main { padding: 16px; }
+  .main {
+    padding: 16px;
+    padding-top: calc(var(--topnav-h) + var(--topmenu-h) + 16px);
+  }
 }
 
 /* Splash loading */
