@@ -129,6 +129,13 @@ const router = createRouter({
       component: () => import('@/views/club/IouView.vue'),
       meta: { feature: 'G1_iou' as FeatureKey },
     },
+    // I 獎助金
+    {
+      path: '/club/gg',
+      name: 'club-gg',
+      component: () => import('@/views/club/GgView.vue'),
+      meta: { feature: 'I1_gg' as FeatureKey },
+    },
     // E 活動
     {
       path: '/activities',

@@ -27,6 +27,7 @@ const LABELS: Record<FeatureKey, string> = {
   E1_activities: '社友活動報名',
   F1_district_calendar: '地區行事曆',
   G1_iou: 'IOU 捐獻收據追蹤',
+  I1_gg: 'GG案盤點（全球獎助金）',
 }
 
 const LOCKED: FeatureKey[] = ['A1_login', 'A2_roles', 'A3_isolation']
@@ -43,6 +44,7 @@ const groups = [
   { title: '活動', keys: keysByPrefix('E') },
   { title: '行事曆', keys: keysByPrefix('F') },
   { title: '捐獻', keys: keysByPrefix('G') },
+  { title: '獎助金', keys: keysByPrefix('I') },
 ]
 
 function flagFor(key: FeatureKey) {

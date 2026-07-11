@@ -210,6 +210,7 @@ export type FeatureKey =
   | 'E1_activities'
   | 'F1_district_calendar'
   | 'G1_iou'
+  | 'I1_gg'
 
 export interface FeatureFlag {
   id: string
@@ -485,6 +486,29 @@ export interface IouReceipt {
 export type IouReceiptInsert = Omit<IouReceipt, 'id' | 'created_by' | 'created_at' | 'updated_at'>
 export type IouReceiptUpdate = Partial<
   Pick<IouReceipt, 'donor_name' | 'item' | 'amount' | 'donation_date' | 'receipt_payee' | 'status' | 'note'>
+>
+
+// ── GG案（全球獎助金盤點）───────────────────────────
+export type GgStatus = '規劃中' | '申請中' | '進行中' | '已完成' | '取消'
+
+export interface GgCase {
+  id: string
+  club_id: string
+  name: string
+  partner: string | null
+  amount: string | null
+  start_date: string | null
+  end_date: string | null
+  status: GgStatus
+  description: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type GgCaseInsert = Omit<GgCase, 'id' | 'created_by' | 'created_at' | 'updated_at'>
+export type GgCaseUpdate = Partial<
+  Pick<GgCase, 'name' | 'partner' | 'amount' | 'start_date' | 'end_date' | 'status' | 'description'>
 >
 
 // ── 社友活動報名 ─────────────────────────────────────

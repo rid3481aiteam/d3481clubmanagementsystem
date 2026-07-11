@@ -131,6 +131,9 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('G1_iou')) {
       items.push({ type: 'link', to: '/club/iou', icon: '💰', label: 'IOU' })
     }
+    if (features.isEnabled('I1_gg')) {
+      items.push({ type: 'link', to: '/club/gg', icon: '🌐', label: 'GG案' })
+    }
     if (features.isEnabled('E1_activities')) {
       items.push({ type: 'link', to: '/activities', icon: '🎉', label: '社友活動' })
     }

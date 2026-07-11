@@ -13,6 +13,7 @@ const DEFAULT_FLAGS: FeatureMap = {
   E1_activities: true,
   F1_district_calendar: true,
   G1_iou: false,
+  I1_gg: false,
 }
 
 export const useFeaturesStore = defineStore('features', () => {
