@@ -44,6 +44,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const monthlyRate = ref<number | null>(null)
   const memberCount = ref(0)
   const lowAttendance = ref<MemberAttendanceRate[]>([])
+  const needsCare = ref<MemberAttendanceRate[]>([])
   const followUps = ref<ProspectiveMember[]>([])
   const districtClubStats = ref<DistrictClubStat[]>([])
   const loading = ref(false)
@@ -134,6 +135,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     avgRate.value = null
     memberCount.value = 0
     lowAttendance.value = []
+    needsCare.value = []
     followUps.value = []
     loading.value = false
   }
@@ -194,6 +196,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const { data: lowRates } = await rateQuery.limit(10)
     lowAttendance.value = lowRates ?? []
 
+    // 需關懷社友（比照 vivian 檔案儀表板：出席率 <80% 前 6 名）
+    let careQuery = supabase.from('member_attendance_rate').select('*').lt('rate', 80).order('rate')
+    if (clubId) careQuery = careQuery.eq('club_id', clubId)
+    const { data: careRows } = await careQuery.limit(6)
+    needsCare.value = careRows ?? []
+
     let prospectQuery = supabase
       .from('prospective_members')
       .select('*')
@@ -222,6 +230,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     monthlyRate,
     memberCount,
     lowAttendance,
+    needsCare,
     followUps,
     districtClubStats,
     loading,

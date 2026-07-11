@@ -27,6 +27,13 @@ const careTarget = ref<MemberAttendanceRate | null>(null)
 const careForm = ref({ care_type: '其他' as CareType, care_date: '', note: '' })
 const careError = ref('')
 
+// 比照 vivian 檔案：出席率 <60% 標紅「需關懷」，60~79% 標黃「注意」
+function careLevel(m: MemberAttendanceRate) {
+  return m.rate !== null && m.rate < 60
+    ? { label: '🚨 需關懷', badge: 'b-r' }
+    : { label: '⚠️ 注意', badge: 'b-y' }
+}
+
 function openCare(m: MemberAttendanceRate) {
   careTarget.value = m
   careForm.value = { care_type: '其他', care_date: new Date().toISOString().slice(0, 10), note: `出席率偏低（${m.rate}%），已聯繫關懷` }
@@ -282,7 +289,8 @@ function toggleZone(zone: string) {
         <RouterLink to="/attendance/monthly" class="btn btn-g btn-sm">查看歷月出席率 →</RouterLink>
       </div>
 
-      <div v-if="auth.clubId" style="margin-bottom:24px;">
+      <div v-if="auth.clubId" class="two-col" style="margin-bottom:24px;">
+      <div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
           <h2 style="font-size:14px; font-weight:700; color:var(--navy);">⏰ 待辦提醒</h2>
           <button v-if="canManageTodos" class="btn btn-gold btn-sm" @click="openAddTodo">+ 新增任務</button>
@@ -309,6 +317,28 @@ function toggleZone(zone: string) {
             目前沒有待辦任務
           </div>
         </div>
+      </div>
+
+      <div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <h2 style="font-size:14px; font-weight:700; color:var(--navy);">🤝 需關懷社友</h2>
+          <span v-if="dashboard.needsCare.length" style="font-size:11px; color:var(--muted);">{{ dashboard.needsCare.length }}人</span>
+        </div>
+        <div class="tw">
+          <div v-if="dashboard.needsCare.length" class="care-list">
+            <div v-for="m in dashboard.needsCare" :key="m.member_id" class="care-item">
+              <div class="care-body">
+                <span class="care-name">{{ m.member_name }}</span>
+                <span class="bdg care-badge" :class="careLevel(m).badge">{{ careLevel(m).label }} {{ m.rate }}%</span>
+              </div>
+              <button v-if="canManageTodos" class="btn btn-g btn-sm" @click="openCare(m)">✏️ 記錄</button>
+            </div>
+          </div>
+          <div v-else style="padding:18px; text-align:center; color:var(--green);">
+            ✅ 全體出席狀況良好
+          </div>
+        </div>
+      </div>
       </div>
 
       <div v-if="auth.clubId" style="margin-bottom:24px;">
@@ -356,19 +386,15 @@ function toggleZone(zone: string) {
               <tr>
                 <th>姓名</th>
                 <th>出席率</th>
-                <th v-if="canManageTodos"></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="r in dashboard.lowAttendance" :key="r.member_id">
                 <td data-label="姓名">{{ r.member_name }}</td>
                 <td data-label="出席率"><span class="bdg b-r">{{ r.rate }}%</span></td>
-                <td v-if="canManageTodos">
-                  <button class="btn btn-g btn-sm" @click="openCare(r)">✏️ 記錄關懷</button>
-                </td>
               </tr>
               <tr v-if="!dashboard.lowAttendance.length">
-                <td :colspan="canManageTodos ? 3 : 2" style="text-align:center; color:var(--muted);">目前無低出席率社友</td>
+                <td colspan="2" style="text-align:center; color:var(--muted);">目前無低出席率社友</td>
               </tr>
             </tbody>
           </table>
@@ -538,6 +564,41 @@ function toggleZone(zone: string) {
 .stat-card.clickable:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+.care-list {
+  display: grid;
+}
+
+.care-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.care-item:last-child {
+  border-bottom: none;
+}
+
+.care-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.care-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.care-badge {
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .two-col {
