@@ -19,6 +19,32 @@ const features = useFeaturesStore()
 const permissions = usePermissionsStore()
 const canManage = computed(() => permissions.can('roster', 'edit'))
 
+const AVATAR_PALETTE = [
+  { bg: 'rgba(23,69,143,.12)', fg: 'var(--navy)' },
+  { bg: 'rgba(184,137,42,.16)', fg: '#8a5800' },
+  { bg: 'rgba(42,107,72,.14)', fg: 'var(--green)' },
+  { bg: 'rgba(47,143,206,.14)', fg: '#1f6690' },
+  { bg: 'rgba(176,48,48,.12)', fg: 'var(--red)' },
+]
+
+function avatarLetter(m: Pick<RosterMember, 'name' | 'nick_name'>) {
+  return (m.nick_name || m.name || '?').trim().charAt(0).toUpperCase()
+}
+
+function avatarStyle(m: Pick<RosterMember, 'name' | 'nick_name'>) {
+  const letter = avatarLetter(m)
+  const palette = AVATAR_PALETTE[letter.charCodeAt(0) % AVATAR_PALETTE.length]
+  return { background: palette.bg, color: palette.fg }
+}
+
+const expandedIds = ref<Set<string>>(new Set())
+function toggleExpand(id: string) {
+  const next = new Set(expandedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedIds.value = next
+}
+
 const CLASSIFICATIONS = [
   '農林漁牧業',
   '礦業及土石採取業',
@@ -107,6 +133,13 @@ const filtered = computed(() => {
       .some(v => v?.toLowerCase().includes(kw))
   }).slice().sort(compareRosterMembers)
 })
+
+const officers = computed(() =>
+  roster.members
+    .filter(m => (m.club_position ?? '社友') !== '社友' && memberStatus(m) !== 'resigned')
+    .slice()
+    .sort(compareRosterMembers),
+)
 
 function compareRosterMembers(
   a: Pick<RosterMember, 'name' | 'nick_name'>,
@@ -431,18 +464,18 @@ onMounted(() => {
       </div>
     </div>
 
-    <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+    <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">
       <input v-model="keyword" class="fi" style="max-width:240px;" placeholder="搜尋英文名/中文名/公司/電話/Email" />
-      <select v-model="statusFilter" class="fi" style="max-width:120px;">
-        <option value="normal">正常</option>
-        <option value="leave">請假</option>
-        <option value="resigned">退社</option>
-        <option value="all">全部</option>
-      </select>
+      <div class="segmented">
+        <button type="button" class="seg-btn" :class="{ active: statusFilter === 'normal' }" @click="statusFilter = 'normal'">正常</button>
+        <button type="button" class="seg-btn" :class="{ active: statusFilter === 'leave' }" @click="statusFilter = 'leave'">請假</button>
+        <button type="button" class="seg-btn" :class="{ active: statusFilter === 'resigned' }" @click="statusFilter = 'resigned'">退社</button>
+        <button type="button" class="seg-btn" :class="{ active: statusFilter === 'all' }" @click="statusFilter = 'all'">全部</button>
+      </div>
     </div>
 
-    <div class="tw">
-      <table class="roster-table card-table" :class="{ editing: bulkEditing }">
+    <div v-if="bulkEditing" class="tw">
+      <table class="roster-table card-table editing">
         <thead class="th">
           <tr>
             <th class="col-index">項次</th>
@@ -459,7 +492,7 @@ onMounted(() => {
             <th>狀態</th>
           </tr>
         </thead>
-        <tbody v-if="bulkEditing">
+        <tbody>
           <tr
             v-for="(m, index) in filteredDraftRows"
             :key="m.id"
@@ -500,31 +533,63 @@ onMounted(() => {
             <td colspan="12" style="text-align:center; color:var(--muted);">查無資料</td>
           </tr>
         </tbody>
-        <tbody v-else>
-          <tr v-for="(m, index) in filtered" :key="m.id">
-            <td data-label="項次">{{ index + 1 }}</td>
-            <td data-label="英文名稱">{{ m.nick_name || '-' }}</td>
-            <td data-label="中文姓名">{{ m.name }}</td>
-            <td data-label="社內職稱">{{ m.club_position || '社友' }}</td>
-            <td data-label="職業分類">{{ m.classification || '-' }}</td>
-            <td data-label="公司">{{ m.company || '-' }}</td>
-            <td data-label="職稱">{{ m.job_title || '-' }}</td>
-            <td data-label="個人電話">{{ m.personal_phone || m.phone || '-' }}</td>
-            <td data-label="公司電話">{{ m.company_phone || '-' }}</td>
-            <td data-label="Email">{{ m.email || '-' }}</td>
-            <td data-label="入社日期">{{ m.join_date || '-' }}</td>
-            <td data-label="狀態">
-              <span class="bdg" :class="memberStatus(m) === 'resigned' ? 'b-g' : memberStatus(m) === 'leave' ? 'b-y' : 'b-gr'">
-                {{ MEMBER_STATUS_LABEL[memberStatus(m)] }}
-              </span>
-            </td>
-          </tr>
-          <tr v-if="!filtered.length">
-            <td colspan="12" style="text-align:center; color:var(--muted);">查無資料</td>
-          </tr>
-        </tbody>
       </table>
     </div>
+
+    <template v-else>
+      <div v-if="officers.length" class="officer-strip">
+        <span class="officer-strip-label">本屆幹部</span>
+        <button
+          v-for="m in officers"
+          :key="m.id"
+          type="button"
+          class="officer-chip"
+          @click="toggleExpand(m.id)"
+        >
+          <span class="officer-avatar" :style="avatarStyle(m)">{{ avatarLetter(m) }}</span>
+          <span class="officer-chip-name">{{ m.nick_name || m.name }}</span>
+          <span class="officer-chip-pos">{{ m.club_position }}</span>
+        </button>
+      </div>
+
+      <div class="roster-list">
+        <template v-for="m in filtered" :key="m.id">
+          <div class="roster-row" @click="toggleExpand(m.id)">
+            <span class="roster-avatar" :style="avatarStyle(m)">{{ avatarLetter(m) }}</span>
+            <div class="roster-main">
+              <p class="roster-name">
+                {{ m.nick_name || m.name }}
+                <span class="roster-name-sub">{{ m.name }}</span>
+              </p>
+              <p class="roster-sub">{{ [m.company, m.job_title].filter(Boolean).join(' · ') || '-' }}</p>
+            </div>
+            <span class="bdg b-n roster-pos">{{ m.club_position || '社友' }}</span>
+            <span
+              class="bdg roster-status"
+              :class="memberStatus(m) === 'resigned' ? 'b-g' : memberStatus(m) === 'leave' ? 'b-y' : 'b-gr'"
+            >
+              {{ MEMBER_STATUS_LABEL[memberStatus(m)] }}
+            </span>
+            <a
+              v-if="m.personal_phone || m.phone"
+              class="roster-phone"
+              :href="'tel:' + (m.personal_phone || m.phone)"
+              title="撥打電話"
+              @click.stop
+            >📞</a>
+            <span class="roster-chevron" :class="{ open: expandedIds.has(m.id) }">›</span>
+          </div>
+          <div v-if="expandedIds.has(m.id)" class="roster-detail">
+            <div><span class="dl">職業分類</span>{{ m.classification || '-' }}</div>
+            <div><span class="dl">個人電話</span>{{ m.personal_phone || m.phone || '-' }}</div>
+            <div><span class="dl">公司電話</span>{{ m.company_phone || '-' }}</div>
+            <div><span class="dl">Email</span>{{ m.email || '-' }}</div>
+            <div><span class="dl">入社日期</span>{{ m.join_date || '-' }}</div>
+          </div>
+        </template>
+        <p v-if="!filtered.length" class="roster-empty">查無資料</p>
+      </div>
+    </template>
 
     <div v-if="showModal" class="mo" @click.self="showModal = false">
       <div class="mb">
@@ -666,6 +731,187 @@ onMounted(() => {
   min-width: 96px;
   padding: 6px 8px;
   font-size: 12px;
+}
+
+.officer-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.officer-strip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.officer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 5px 12px 5px 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.officer-chip:hover {
+  background: var(--bg);
+}
+
+.officer-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.officer-chip-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.officer-chip-pos {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.roster-list {
+  background: var(--card);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.roster-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.roster-list > .roster-row:first-child {
+  border-top: none;
+}
+
+.roster-row:hover {
+  background: rgba(23, 69, 143, .04);
+}
+
+.roster-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.roster-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.roster-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.roster-name-sub {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 13px;
+  margin-left: 6px;
+}
+
+.roster-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roster-pos,
+.roster-status {
+  flex-shrink: 0;
+}
+
+.roster-phone {
+  flex-shrink: 0;
+  font-size: 15px;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.roster-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 16px;
+  transition: transform .15s;
+}
+
+.roster-chevron.open {
+  transform: rotate(90deg);
+  color: var(--navy);
+}
+
+.roster-detail {
+  padding: 4px 16px 14px 62px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px 16px;
+  font-size: 12.5px;
+}
+
+.roster-detail .dl {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.roster-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 700px) {
+  .roster-row {
+    flex-wrap: wrap;
+  }
+
+  .roster-sub {
+    max-width: 100%;
+  }
+
+  .roster-detail {
+    padding-left: 16px;
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .required-input {
