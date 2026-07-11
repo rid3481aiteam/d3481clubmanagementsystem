@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMemberCareStore } from '@/stores/memberCare'
 import { useRosterStore } from '@/stores/roster'
-import type { MemberCare, CareType } from '@/types'
+import type { MemberCare, CareType, RosterMember } from '@/types'
 
 const auth = useAuthStore()
 const care = useMemberCareStore()
@@ -20,8 +20,14 @@ const TYPE_BADGE: Record<CareType, string> = {
   其他: 'b-g',
 }
 
+// 比照全站既有慣例（AttendanceView/OfficersView）：有英文名時顯示「英文名（中文名）」
+function memberLabel(m: Pick<RosterMember, 'name' | 'nick_name'>) {
+  const en = m.nick_name?.trim()
+  return en ? `${en}（${m.name}）` : m.name
+}
+
 const memberName = computed(() => {
-  const map = new Map(roster.members.map(m => [m.id, m.name]))
+  const map = new Map(roster.members.map(m => [m.id, memberLabel(m)]))
   return (id: string) => map.get(id) || '（社友已移除）'
 })
 
@@ -153,7 +159,7 @@ onMounted(() => {
             <label class="fl">社友 *</label>
             <select v-model="form.member_id" class="fi">
               <option value="" disabled>請選擇</option>
-              <option v-for="m in activeMembers" :key="m.id" :value="m.id">{{ m.name }}</option>
+              <option v-for="m in activeMembers" :key="m.id" :value="m.id">{{ memberLabel(m) }}</option>
             </select>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
