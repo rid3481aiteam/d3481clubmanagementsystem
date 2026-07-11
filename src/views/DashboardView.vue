@@ -6,8 +6,9 @@ import { useAnnouncementsStore } from '@/stores/announcements'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useGovernorAwardsStore } from '@/stores/governorAwards'
 import { useClubTodosStore } from '@/stores/clubTodos'
+import { useMemberCareStore } from '@/stores/memberCare'
 import { GOVERNOR_AWARD_YEAR_TERM, getAwardLevel } from '@/data/governorAwardCriteria'
-import type { ClubTodo, TodoLevel } from '@/types'
+import type { ClubTodo, TodoLevel, CareType, MemberAttendanceRate } from '@/types'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -15,8 +16,39 @@ const announcements = useAnnouncementsStore()
 const dashboard = useDashboardStore()
 const awards = useGovernorAwardsStore()
 const todos = useClubTodosStore()
+const care = useMemberCareStore()
 
 const canManageTodos = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
+
+const CARE_TYPES: CareType[] = ['生日', '生病', '喜事', '喪事', '其他']
+
+const showCareModal = ref(false)
+const careTarget = ref<MemberAttendanceRate | null>(null)
+const careForm = ref({ care_type: '其他' as CareType, care_date: '', note: '' })
+const careError = ref('')
+
+function openCare(m: MemberAttendanceRate) {
+  careTarget.value = m
+  careForm.value = { care_type: '其他', care_date: new Date().toISOString().slice(0, 10), note: `出席率偏低（${m.rate}%），已聯繫關懷` }
+  careError.value = ''
+  showCareModal.value = true
+}
+
+async function saveCare() {
+  if (!careTarget.value || !auth.clubId) return
+  const { error } = await care.insert({
+    club_id: auth.clubId,
+    member_id: careTarget.value.member_id,
+    care_type: careForm.value.care_type,
+    care_date: careForm.value.care_date,
+    note: careForm.value.note.trim() || null,
+  })
+  if (error) {
+    careError.value = error.message
+    return
+  }
+  showCareModal.value = false
+}
 
 const LEVEL_ICON: Record<TodoLevel, string> = { navy: '🔵', gold: '🟡', red: '🔴' }
 const LEVEL_BADGE: Record<TodoLevel, string> = { navy: 'b-n', gold: 'b-y', red: 'b-r' }
@@ -324,15 +356,19 @@ function toggleZone(zone: string) {
               <tr>
                 <th>姓名</th>
                 <th>出席率</th>
+                <th v-if="canManageTodos"></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="r in dashboard.lowAttendance" :key="r.member_id">
                 <td data-label="姓名">{{ r.member_name }}</td>
                 <td data-label="出席率"><span class="bdg b-r">{{ r.rate }}%</span></td>
+                <td v-if="canManageTodos">
+                  <button class="btn btn-g btn-sm" @click="openCare(r)">✏️ 記錄關懷</button>
+                </td>
               </tr>
               <tr v-if="!dashboard.lowAttendance.length">
-                <td colspan="2" style="text-align:center; color:var(--muted);">目前無低出席率社友</td>
+                <td :colspan="canManageTodos ? 3 : 2" style="text-align:center; color:var(--muted);">目前無低出席率社友</td>
               </tr>
             </tbody>
           </table>
@@ -399,6 +435,38 @@ function toggleZone(zone: string) {
           <button v-if="editingTodo" class="btn btn-red" @click="deleteTodo">🗑 刪除</button>
           <button class="btn btn-g" @click="showTodoModal = false">取消</button>
           <button class="btn btn-gold" @click="saveTodo">💾 儲存</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showCareModal" class="mo" @click.self="showCareModal = false">
+      <div class="mb">
+        <div class="mb-h">
+          <h3>✏️ 記錄關懷：{{ careTarget?.member_name }}</h3>
+          <button class="mb-close" @click="showCareModal = false">×</button>
+        </div>
+        <div class="mb-body">
+          <p v-if="careError" style="color:var(--red); font-size:12px; margin-bottom:10px;">{{ careError }}</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label class="fl">類型</label>
+              <select v-model="careForm.care_type" class="fi">
+                <option v-for="t in CARE_TYPES" :key="t" :value="t">{{ t }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">日期</label>
+              <input v-model="careForm.care_date" type="date" class="fi" />
+            </div>
+          </div>
+          <div>
+            <label class="fl">備註</label>
+            <input v-model="careForm.note" class="fi" />
+          </div>
+        </div>
+        <div class="mb-foot">
+          <button class="btn btn-g" @click="showCareModal = false">取消</button>
+          <button class="btn btn-gold" @click="saveCare">💾 儲存</button>
         </div>
       </div>
     </div>

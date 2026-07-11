@@ -125,6 +125,9 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('D3_prospective') && auth.role !== 'club_member') {
       items.push({ type: 'link', to: '/roster/prospective', icon: '🔍', label: '潛在社友' })
     }
+    if (features.isEnabled('D4_care')) {
+      items.push({ type: 'link', to: '/club/care', icon: '🤝', label: '社友關懷' })
+    }
     if (features.isEnabled('E1_activities')) {
       items.push({ type: 'link', to: '/activities', icon: '🎉', label: '社友活動' })
     }

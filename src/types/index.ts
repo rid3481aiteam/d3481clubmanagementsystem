@@ -460,6 +460,7 @@ export interface MemberCare {
 }
 
 export type MemberCareInsert = Omit<MemberCare, 'id' | 'created_at'>
+export type MemberCareUpdate = Partial<Pick<MemberCare, 'member_id' | 'care_type' | 'care_date' | 'note'>>
 
 // ── 社友活動報名 ─────────────────────────────────────
 export type ActivityStatus = 'draft' | 'open' | 'closed' | 'cancelled'

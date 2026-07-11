@@ -87,6 +87,12 @@ const router = createRouter({
       meta: { feature: 'D3_prospective' as FeatureKey },
     },
     {
+      path: '/club/care',
+      name: 'club-care',
+      component: () => import('@/views/club/MemberCareView.vue'),
+      meta: { feature: 'D4_care' as FeatureKey },
+    },
+    {
       path: '/club/officers',
       name: 'club-officers',
       component: () => import('@/views/club/OfficersView.vue'),
