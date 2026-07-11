@@ -5,19 +5,30 @@ import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useFeaturesStore } from '@/stores/features'
 import { usePermissionsStore } from '@/stores/permissions'
+import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import type {
   RosterMember,
   RosterMemberInsert,
   RosterExcelRow,
   RosterClubPosition,
   RosterMemberStatus,
+  ClubOfficerRole,
 } from '@/types'
 
 const auth = useAuthStore()
 const roster = useRosterStore()
 const features = useFeaturesStore()
 const permissions = usePermissionsStore()
+const officersStore = useOfficersStore()
 const canManage = computed(() => permissions.can('roster', 'edit'))
+
+const OFFICER_ROLE_LABEL: Partial<Record<ClubOfficerRole, string>> = {
+  president: '社長',
+  president_elect: '社長當選人',
+  vice_president: '副社長',
+  secretary: '秘書',
+}
+const OFFICER_ROLE_ORDER: ClubOfficerRole[] = ['president', 'president_elect', 'vice_president', 'secretary']
 
 const AVATAR_PALETTE = [
   { bg: 'rgba(23,69,143,.12)', fg: 'var(--navy)' },
@@ -134,11 +145,23 @@ const filtered = computed(() => {
   }).slice().sort(compareRosterMembers)
 })
 
+function findMemberByOfficerName(value: string) {
+  return roster.members.find(m => m.name === value || m.nick_name === value)
+}
+
 const officers = computed(() =>
-  roster.members
-    .filter(m => (m.club_position ?? '社友') !== '社友' && memberStatus(m) !== 'resigned')
-    .slice()
-    .sort(compareRosterMembers),
+  OFFICER_ROLE_ORDER.flatMap(role => {
+    const o = officersStore.list.find(item => item.role === role && item.name.trim())
+    if (!o) return []
+    const member = findMemberByOfficerName(o.name)
+    return [{
+      key: o.id,
+      memberId: member?.id ?? null,
+      roleLabel: OFFICER_ROLE_LABEL[role] ?? role,
+      name: member?.name ?? o.name,
+      nick_name: member?.nick_name ?? null,
+    }]
+  }),
 )
 
 function compareRosterMembers(
@@ -437,6 +460,7 @@ function handleExport() {
 
 onMounted(() => {
   roster.fetchAll(auth.clubId)
+  if (auth.clubId) officersStore.fetchAll(auth.clubId, currentYearTerm())
 })
 </script>
 
@@ -541,14 +565,15 @@ onMounted(() => {
         <span class="officer-strip-label">本屆幹部</span>
         <button
           v-for="m in officers"
-          :key="m.id"
+          :key="m.key"
           type="button"
           class="officer-chip"
-          @click="toggleExpand(m.id)"
+          :disabled="!m.memberId"
+          @click="m.memberId && toggleExpand(m.memberId)"
         >
           <span class="officer-avatar" :style="avatarStyle(m)">{{ avatarLetter(m) }}</span>
           <span class="officer-chip-name">{{ m.nick_name || m.name }}</span>
-          <span class="officer-chip-pos">{{ m.club_position }}</span>
+          <span class="officer-chip-pos">{{ m.roleLabel }}</span>
         </button>
       </div>
 
@@ -762,6 +787,11 @@ onMounted(() => {
 
 .officer-chip:hover {
   background: var(--bg);
+}
+
+.officer-chip:disabled {
+  cursor: default;
+  opacity: .7;
 }
 
 .officer-avatar {
