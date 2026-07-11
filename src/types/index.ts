@@ -209,6 +209,7 @@ export type FeatureKey =
   | 'H1_directory' | 'H2_directory_search' | 'H3_directory_admin'
   | 'E1_activities'
   | 'F1_district_calendar'
+  | 'G1_iou'
 
 export interface FeatureFlag {
   id: string
@@ -461,6 +462,30 @@ export interface MemberCare {
 
 export type MemberCareInsert = Omit<MemberCare, 'id' | 'created_at'>
 export type MemberCareUpdate = Partial<Pick<MemberCare, 'member_id' | 'care_type' | 'care_date' | 'note'>>
+
+// ── IOU（捐獻收據追蹤）───────────────────────────────
+export type IouItem = '社務捐獻' | '活動贊助' | '服務計畫捐獻' | '慈善捐款' | '獎助學金' | '設備物資' | '其他'
+export type IouStatus = '待開立' | '已開立'
+
+export interface IouReceipt {
+  id: string
+  club_id: string
+  donor_name: string
+  item: IouItem
+  amount: number
+  donation_date: string
+  receipt_payee: string | null
+  status: IouStatus
+  note: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type IouReceiptInsert = Omit<IouReceipt, 'id' | 'created_by' | 'created_at' | 'updated_at'>
+export type IouReceiptUpdate = Partial<
+  Pick<IouReceipt, 'donor_name' | 'item' | 'amount' | 'donation_date' | 'receipt_payee' | 'status' | 'note'>
+>
 
 // ── 社友活動報名 ─────────────────────────────────────
 export type ActivityStatus = 'draft' | 'open' | 'closed' | 'cancelled'

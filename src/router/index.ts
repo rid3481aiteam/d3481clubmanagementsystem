@@ -122,6 +122,13 @@ const router = createRouter({
       component: () => import('@/views/club/ClubHistoryView.vue'),
       meta: { roles: ['club_admin', 'club_secretary', 'club_member'] },
     },
+    // G 捐獻
+    {
+      path: '/club/iou',
+      name: 'club-iou',
+      component: () => import('@/views/club/IouView.vue'),
+      meta: { feature: 'G1_iou' as FeatureKey },
+    },
     // E 活動
     {
       path: '/activities',

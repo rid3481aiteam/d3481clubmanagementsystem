@@ -12,6 +12,7 @@ const DEFAULT_FLAGS: FeatureMap = {
   H1_directory: true, H2_directory_search: true, H3_directory_admin: true,
   E1_activities: true,
   F1_district_calendar: true,
+  G1_iou: false,
 }
 
 export const useFeaturesStore = defineStore('features', () => {
