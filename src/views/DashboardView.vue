@@ -289,6 +289,42 @@ function toggleZone(zone: string) {
         <RouterLink to="/attendance/monthly" class="btn btn-g btn-sm">查看歷月出席率 →</RouterLink>
       </div>
 
+      <div v-if="auth.clubId" style="margin-bottom:24px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">地區公告欄</h2>
+      <div class="tw">
+        <div v-if="announcements.districtAnnouncements.length" class="announcement-list">
+          <article v-for="item in announcements.districtAnnouncements" :key="item.id" class="announcement-item">
+            <div>
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.body }}</p>
+            </div>
+            <time>{{ formatDate(item.published_at) }}</time>
+          </article>
+        </div>
+        <div v-else style="padding:18px; text-align:center; color:var(--muted);">
+          目前沒有地區公告
+        </div>
+      </div>
+      </div>
+
+      <div v-if="auth.clubId" style="margin-bottom:24px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社內公告欄</h2>
+      <div class="tw">
+        <div v-if="announcements.clubAnnouncements.length" class="announcement-list">
+          <article v-for="item in announcements.clubAnnouncements" :key="item.id" class="announcement-item">
+            <div>
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.body }}</p>
+            </div>
+            <time>{{ formatDate(item.published_at) }}</time>
+          </article>
+        </div>
+        <div v-else style="padding:18px; text-align:center; color:var(--muted);">
+          目前沒有社內公告
+        </div>
+      </div>
+      </div>
+
       <div v-if="auth.clubId" class="two-col" style="margin-bottom:24px;">
       <div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
@@ -341,66 +377,6 @@ function toggleZone(zone: string) {
       </div>
       </div>
 
-      <div v-if="auth.clubId" style="margin-bottom:24px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">地區公告欄</h2>
-      <div class="tw">
-        <div v-if="announcements.districtAnnouncements.length" class="announcement-list">
-          <article v-for="item in announcements.districtAnnouncements" :key="item.id" class="announcement-item">
-            <div>
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.body }}</p>
-            </div>
-            <time>{{ formatDate(item.published_at) }}</time>
-          </article>
-        </div>
-        <div v-else style="padding:18px; text-align:center; color:var(--muted);">
-          目前沒有地區公告
-        </div>
-      </div>
-      </div>
-
-      <div v-if="auth.clubId" style="margin-bottom:24px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">社內公告欄</h2>
-      <div class="tw">
-        <div v-if="announcements.clubAnnouncements.length" class="announcement-list">
-          <article v-for="item in announcements.clubAnnouncements" :key="item.id" class="announcement-item">
-            <div>
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.body }}</p>
-            </div>
-            <time>{{ formatDate(item.published_at) }}</time>
-          </article>
-        </div>
-        <div v-else style="padding:18px; text-align:center; color:var(--muted);">
-          目前沒有社內公告
-        </div>
-      </div>
-      </div>
-
-      <div class="two-col">
-      <div>
-        <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">低出席率警示（&lt;75%）</h2>
-        <div class="tw">
-          <table class="card-table">
-            <thead class="th">
-              <tr>
-                <th>姓名</th>
-                <th>出席率</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in dashboard.lowAttendance" :key="r.member_id">
-                <td data-label="姓名">{{ r.member_name }}</td>
-                <td data-label="出席率"><span class="bdg b-r">{{ r.rate }}%</span></td>
-              </tr>
-              <tr v-if="!dashboard.lowAttendance.length">
-                <td colspan="2" style="text-align:center; color:var(--muted);">目前無低出席率社友</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       <div>
         <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">待追蹤潛在社友</h2>
         <div class="tw">
@@ -422,7 +398,6 @@ function toggleZone(zone: string) {
             </tbody>
           </table>
         </div>
-      </div>
       </div>
     </template>
 

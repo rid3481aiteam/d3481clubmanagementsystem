@@ -43,7 +43,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const avgRate = ref<number | null>(null)
   const monthlyRate = ref<number | null>(null)
   const memberCount = ref(0)
-  const lowAttendance = ref<MemberAttendanceRate[]>([])
   const needsCare = ref<MemberAttendanceRate[]>([])
   const followUps = ref<ProspectiveMember[]>([])
   const districtClubStats = ref<DistrictClubStat[]>([])
@@ -134,7 +133,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     avgRate.value = null
     memberCount.value = 0
-    lowAttendance.value = []
     needsCare.value = []
     followUps.value = []
     loading.value = false
@@ -191,15 +189,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const { count } = await rosterQuery
     memberCount.value = count ?? 0
 
-    let rateQuery = supabase.from('member_attendance_rate').select('*').lt('rate', 75).order('rate')
-    if (clubId) rateQuery = rateQuery.eq('club_id', clubId)
-    const { data: lowRates } = await rateQuery.limit(10)
-    lowAttendance.value = lowRates ?? []
-
-    // 需關懷社友（比照 vivian 檔案儀表板：出席率 <80% 前 6 名）
+    // 需關懷社友（出席率 <80% 前 10 名，涵蓋原本另外顯示的「低出席率警示（<75%）」）
     let careQuery = supabase.from('member_attendance_rate').select('*').lt('rate', 80).order('rate')
     if (clubId) careQuery = careQuery.eq('club_id', clubId)
-    const { data: careRows } = await careQuery.limit(6)
+    const { data: careRows } = await careQuery.limit(10)
     needsCare.value = careRows ?? []
 
     let prospectQuery = supabase
@@ -229,7 +222,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     avgRate,
     monthlyRate,
     memberCount,
-    lowAttendance,
     needsCare,
     followUps,
     districtClubStats,
