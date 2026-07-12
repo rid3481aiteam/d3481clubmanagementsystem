@@ -268,13 +268,6 @@ function toggleZone(zone: string) {
           <div class="bar-fill" :style="{ width: dashboard.monthlyRate + '%' }"></div>
         </div>
       </div>
-      <div class="stat-card clickable" @click="router.push('/attendance/monthly')">
-        <div class="stat-label">本年度平均出席率</div>
-        <div class="stat-value">{{ dashboard.avgRate !== null ? dashboard.avgRate + '%' : '-' }}</div>
-        <div v-if="dashboard.avgRate !== null" class="bar-track" style="margin-top:10px;">
-          <div class="bar-fill" :style="{ width: dashboard.avgRate + '%' }"></div>
-        </div>
-      </div>
       <div class="stat-card c-gold clickable" @click="router.push('/roster')">
         <div class="stat-label">社友人數</div>
         <div class="stat-value">{{ dashboard.memberCount }}</div>
@@ -287,6 +280,27 @@ function toggleZone(zone: string) {
 
       <div v-if="auth.clubId" style="margin-bottom:16px;">
         <RouterLink to="/attendance/monthly" class="btn btn-g btn-sm">查看歷月出席率 →</RouterLink>
+      </div>
+
+      <div v-if="auth.clubId" style="margin-bottom:24px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <h2 style="font-size:14px; font-weight:700; color:var(--navy);">🤝 需關懷社友</h2>
+          <span v-if="dashboard.needsCare.length" style="font-size:11px; color:var(--muted);">{{ dashboard.needsCare.length }}人</span>
+        </div>
+        <div class="tw">
+          <div v-if="dashboard.needsCare.length" class="care-list">
+            <div v-for="m in dashboard.needsCare" :key="m.member_id" class="care-item">
+              <div class="care-body">
+                <span class="care-name">{{ m.member_name }}</span>
+                <span class="bdg care-badge" :class="careLevel(m).badge">{{ careLevel(m).label }} {{ m.rate }}%</span>
+              </div>
+              <button v-if="canManageTodos" class="btn btn-g btn-sm" @click="openCare(m)">✏️ 記錄</button>
+            </div>
+          </div>
+          <div v-else style="padding:18px; text-align:center; color:var(--green);">
+            ✅ 全體出席狀況良好
+          </div>
+        </div>
       </div>
 
       <div v-if="auth.clubId" style="margin-bottom:24px;">
@@ -325,8 +339,7 @@ function toggleZone(zone: string) {
       </div>
       </div>
 
-      <div v-if="auth.clubId" class="two-col" style="margin-bottom:24px;">
-      <div>
+      <div v-if="auth.clubId" style="margin-bottom:24px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
           <h2 style="font-size:14px; font-weight:700; color:var(--navy);">⏰ 待辦提醒</h2>
           <button v-if="canManageTodos" class="btn btn-gold btn-sm" @click="openAddTodo">+ 新增任務</button>
@@ -353,28 +366,6 @@ function toggleZone(zone: string) {
             目前沒有待辦任務
           </div>
         </div>
-      </div>
-
-      <div>
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-          <h2 style="font-size:14px; font-weight:700; color:var(--navy);">🤝 需關懷社友</h2>
-          <span v-if="dashboard.needsCare.length" style="font-size:11px; color:var(--muted);">{{ dashboard.needsCare.length }}人</span>
-        </div>
-        <div class="tw">
-          <div v-if="dashboard.needsCare.length" class="care-list">
-            <div v-for="m in dashboard.needsCare" :key="m.member_id" class="care-item">
-              <div class="care-body">
-                <span class="care-name">{{ m.member_name }}</span>
-                <span class="bdg care-badge" :class="careLevel(m).badge">{{ careLevel(m).label }} {{ m.rate }}%</span>
-              </div>
-              <button v-if="canManageTodos" class="btn btn-g btn-sm" @click="openCare(m)">✏️ 記錄</button>
-            </div>
-          </div>
-          <div v-else style="padding:18px; text-align:center; color:var(--green);">
-            ✅ 全體出席狀況良好
-          </div>
-        </div>
-      </div>
       </div>
 
       <div>
@@ -576,12 +567,6 @@ function toggleZone(zone: string) {
   white-space: nowrap;
 }
 
-.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
 .zone-row {
   cursor: pointer;
   background: var(--gold-p);
@@ -634,9 +619,6 @@ function toggleZone(zone: string) {
 
 @media (max-width: 700px) {
   .announcement-item {
-    grid-template-columns: 1fr;
-  }
-  .two-col {
     grid-template-columns: 1fr;
   }
 }
