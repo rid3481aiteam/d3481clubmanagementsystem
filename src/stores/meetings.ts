@@ -33,5 +33,10 @@ export const useMeetingsStore = defineStore('meetings', () => {
     return { error }
   }
 
-  return { meetings, current, loading, fetchAll, fetchOne, insert, update }
+  async function remove(id: string) {
+    const { error } = await supabase.from('meetings').delete().eq('id', id)
+    return { error }
+  }
+
+  return { meetings, current, loading, fetchAll, fetchOne, insert, update, remove }
 })

@@ -76,6 +76,16 @@ async function loadAll() {
   rsvpActivityByMeeting.value = await activitiesStore.fetchByMeetingIds(meetings.meetings.map(m => m.id))
 }
 
+async function remove(m: Meeting) {
+  if (!confirm(`確定刪除「${m.date}」這場例會？相關的出席記錄與預計出席報名也會一併刪除，無法復原。`)) return
+  const { error } = await meetings.remove(m.id)
+  if (error) {
+    alert('刪除失敗：' + error.message)
+    return
+  }
+  await loadAll()
+}
+
 onMounted(loadAll)
 </script>
 
@@ -109,6 +119,7 @@ onMounted(loadAll)
               <button v-if="canManage" class="btn btn-g btn-sm" @click="openEdit(m)">編輯</button>
               <RouterLink :to="`/meetings/${m.id}/attendance`" class="btn btn-g btn-sm">出席記錄</RouterLink>
               <RouterLink v-if="rsvpActivityByMeeting[m.id]" :to="`/activities/${rsvpActivityByMeeting[m.id]}`" class="btn btn-g btn-sm">預計出席</RouterLink>
+              <button v-if="canManage" class="btn btn-red btn-sm" @click="remove(m)">刪除</button>
             </td>
           </tr>
           <tr v-if="!meetings.meetings.length">
