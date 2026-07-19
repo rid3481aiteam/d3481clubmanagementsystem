@@ -33,6 +33,7 @@
         {{ auth.profile?.name ?? auth.user?.email }}
       </span>
       <span class="bdg" :class="roleBadgeClass">{{ roleLabel }}</span>
+      <AppLauncher />
       <button class="btn btn-g btn-sm" @click="handleSignOut">登出</button>
     </div>
   </header>
@@ -43,6 +44,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import RotaryWheelIcon from '@/components/RotaryWheelIcon.vue'
+import AppLauncher from '@/components/layout/AppLauncher.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
