@@ -50,8 +50,9 @@ onMounted(async () => {
       return
     }
 
+    // verifyOtp 用 token_hash 驗證時只能帶 token_hash/type，多帶 email 會被
+    // Supabase 判定成「兩種驗證模式混用」而回 400（validation_failed）。
     const { error } = await supabase.auth.verifyOtp({
-      email: result.email,
       token_hash: result.token_hash,
       type: 'email',
     })
