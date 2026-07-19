@@ -149,6 +149,16 @@ export const useAuthStore = defineStore('auth', () => {
     crossClubGrants.value = []
     clubNamesById.value = {}
     viewScope.value = 'district'
+
+    // 只登出 D3481 自己的 session，RotarySSO 那邊的登入狀態還在，下次點「用扶輪
+    // 帳號登入」會直接沿用同一個帳號、無法切換。這裡一併導到 RotarySSO 的登出
+    // 端點把它自己的 session 也結束掉，登出後才會真的回到帳密輸入畫面。
+    // 注意：不是標準 OIDC 的 post_logout_redirect_uri，RotarySSO 用的參數是
+    // callbackUrl（跟它登入頁內部導頁用的參數一致，經 RotarySSO 技術團隊確認）。
+    const params = new URLSearchParams({
+      callbackUrl: `${window.location.origin}/login`,
+    })
+    window.location.href = `https://rotarysso.vercel.app/oauth/logout?${params.toString()}`
   }
 
   async function updateName(name: string) {
