@@ -19,9 +19,15 @@ const router = createRouter({
       meta: { bare: true, public: true },
     },
     {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/RegisterView.vue'),
+      path: '/auth/sso/callback',
+      name: 'sso-callback',
+      component: () => import('@/views/SsoCallbackView.vue'),
+      meta: { bare: true, public: true },
+    },
+    {
+      path: '/pending-approval',
+      name: 'pending-approval',
+      component: () => import('@/views/PendingApprovalView.vue'),
       meta: { bare: true, public: true },
     },
     {
@@ -246,6 +252,9 @@ router.beforeEach(async (to) => {
   if (auth.loading) await auth.init()
 
   if (!to.meta.public && !auth.isLoggedIn) return { name: 'login' }
+
+  // SSO 首登、還沒被地區管理員指派社別的帳號：擋下所有頁面只能看待審核提示
+  if (auth.isPendingApproval && to.name !== 'pending-approval') return { name: 'pending-approval' }
 
   // 地區（唯讀）或地區管理員都能進的路由
   if (to.meta.districtViewer && !auth.isDistrictViewer) return { name: 'dashboard' }

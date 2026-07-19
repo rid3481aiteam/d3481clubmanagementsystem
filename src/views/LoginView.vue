@@ -9,46 +9,15 @@
         </div>
       </div>
 
-      <p v-if="noticeMsg" class="login-notice">{{ noticeMsg }}</p>
+      <p v-if="errorMsg" class="login-error">{{ errorMsg }}</p>
 
-      <form class="login-form" @submit.prevent="handleLogin">
-        <div class="form-group">
-          <label class="fl">帳號（Email 或手機號碼）</label>
-          <input
-            v-model="identifier"
-            type="text"
-            class="fi"
-            placeholder="your@email.com 或 0912345678"
-            autocomplete="username"
-            required
-          />
-        </div>
-        <div class="form-group">
-          <label class="fl">密碼</label>
-          <input
-            v-model="password"
-            type="password"
-            class="fi"
-            placeholder="••••••••"
-            autocomplete="current-password"
-            required
-          />
-        </div>
-
-        <p v-if="errorMsg" class="login-error">{{ errorMsg }}</p>
-
-        <button type="submit" class="btn btn-p login-btn" :disabled="loading">
-          <span v-if="loading" class="btn-spinner"></span>
-          {{ loading ? '登入中…' : '登入' }}
-        </button>
-      </form>
+      <button type="button" class="btn btn-p login-btn" :disabled="loading" @click="loginWithRotarySso">
+        <span v-if="loading" class="btn-spinner"></span>
+        {{ loading ? '導向扶輪 SSO 登入…' : '用扶輪帳號登入' }}
+      </button>
 
       <p class="login-hint">
-        <router-link to="/forgot-password" class="login-link">忘記密碼？</router-link>
-      </p>
-      <p class="login-hint">
-        還沒有帳號？
-        <router-link to="/register" class="login-link">註冊新帳號</router-link>
+        使用扶輪生態系共用帳號（RotarySSO）登入，首次登入需經地區管理員指派社別。
       </p>
     </div>
     <div class="login-bg-stripe"></div>
@@ -56,44 +25,38 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { ref } from 'vue'
 import RotaryWheelIcon from '@/components/RotaryWheelIcon.vue'
 
-const auth = useAuthStore()
-const router = useRouter()
-const route = useRoute()
+const ROTARYSSO_ISSUER = 'https://rotarysso.vercel.app'
 
-const identifier = ref('')
-const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 
-const noticeMsg = computed(() => {
-  if (route.query.registered) return '註冊成功！請至信箱收信並點擊驗證連結，驗證完成後請在下方輸入帳號密碼登入。'
-  if (route.query.verified) return '信箱已驗證成功，請輸入帳號密碼登入。'
-  if (route.query.reset) return '密碼已重設成功，請用新密碼登入。'
-  return ''
-})
-
-async function handleLogin() {
+function loginWithRotarySso() {
   loading.value = true
   errorMsg.value = ''
-  const { error } = await auth.signIn(identifier.value, password.value)
-  loading.value = false
 
-  if (error) {
-    errorMsg.value = '帳號或密碼錯誤，請再試一次。'
+  const clientId = import.meta.env.VITE_ROTARYSSO_CLIENT_ID as string | undefined
+  if (!clientId) {
+    errorMsg.value = '尚未設定 RotarySSO 用戶端，請聯絡系統管理員。'
+    loading.value = false
     return
   }
 
-  // Role-based redirect
-  if (auth.isDistrictAdmin) {
-    router.push('/admin/clubs')
-  } else {
-    router.push('/roster')
-  }
+  const state = crypto.randomUUID()
+  sessionStorage.setItem('rotarysso_state', state)
+
+  const redirectUri = `${window.location.origin}/auth/sso/callback`
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: 'openid profile rotary',
+    state,
+  })
+
+  window.location.href = `${ROTARYSSO_ISSUER}/oauth/authorize?${params.toString()}`
 }
 </script>
 
@@ -158,30 +121,13 @@ async function handleLogin() {
   margin-top: 2px;
 }
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-group { display: flex; flex-direction: column; }
-
 .login-error {
   font-size: 12px;
   color: var(--red);
   background: rgba(176,48,48,.08);
   border-radius: var(--r);
   padding: 8px 12px;
-}
-
-.login-notice {
-  font-size: 12px;
-  color: var(--green);
-  background: rgba(42,107,72,.08);
-  border-radius: var(--r);
-  padding: 8px 12px;
   margin-bottom: 16px;
-  line-height: 1.5;
 }
 
 .login-btn {
@@ -189,7 +135,6 @@ async function handleLogin() {
   justify-content: center;
   padding: 11px;
   font-size: 14px;
-  margin-top: 4px;
 }
 
 .login-btn:disabled { opacity: .6; cursor: not-allowed; }
@@ -209,12 +154,7 @@ async function handleLogin() {
   text-align: center;
   font-size: 11px;
   color: var(--muted);
-  margin-top: 12px;
-}
-
-.login-link {
-  color: var(--navy);
-  font-weight: 600;
-  text-decoration: underline;
+  margin-top: 16px;
+  line-height: 1.5;
 }
 </style>

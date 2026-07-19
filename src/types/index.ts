@@ -21,6 +21,10 @@ export interface UserProfile {
   district_role: 'view' | 'admin' | null
   is_active: boolean
   phone: string | null
+  sso_sub: string | null
+  sso_account_type: string | null
+  sso_rotary_club: string | null
+  sso_rotary_district: string | null
   created_at: string
   updated_at: string
 }

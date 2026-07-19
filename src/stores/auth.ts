@@ -67,6 +67,12 @@ export const useAuthStore = defineStore('auth', () => {
   // 目前是不是「地區視角 + 有編輯權限」，畫面上的編輯/新增/刪除按鈕要用這個判斷，不能只看 isDistrictView
   const isDistrictAdminView = computed(() => isDistrictView.value && isDistrictAdmin.value)
 
+  // SSO 首次登入、還沒被地區管理員指派社別的帳號：club_id 是 NULL 且不是地區管理員，
+  // 全站畫面都應該擋下來只顯示「待審核」提示（router guard 用這個判斷）。
+  const isPendingApproval = computed(() =>
+    isLoggedIn.value && !profile.value?.club_id && !isDistrictAdmin.value
+  )
+
   function setViewScope(scope: 'district' | 'club') {
     if (scope === 'club' && !clubId.value) return
     viewScope.value = scope
@@ -135,23 +141,6 @@ export const useAuthStore = defineStore('auth', () => {
     await permissions.load(role.value)
   }
 
-  // 社長／執秘用 email 登入；一般社員用手機號碼登入（後台建立帳號時
-  // 合成的內部信箱是 <手機號碼>@member.d3481.local，見 create-member-account）。
-  function resolveLoginEmail(identifier: string) {
-    const trimmed = identifier.trim()
-    if (trimmed.includes('@')) return trimmed
-    const phone = trimmed.replace(/\D/g, '')
-    return `${phone}@member.d3481.local`
-  }
-
-  async function signIn(identifier: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: resolveLoginEmail(identifier),
-      password,
-    })
-    return { error }
-  }
-
   async function signOut() {
     await supabase.auth.signOut()
     user.value = null
@@ -173,6 +162,7 @@ export const useAuthStore = defineStore('auth', () => {
     user, profile, clubName, loading, isLoggedIn, isDistrictAdmin, isDistrictViewer, clubId, homeClubId, role,
     accessibleClubs, canSwitchClub, switchActiveClub,
     viewScope, canSwitchView, isDistrictView, isDistrictAdminView, setViewScope,
-    init, signIn, signOut, updateName,
+    isPendingApproval,
+    init, signOut, updateName,
   }
 })

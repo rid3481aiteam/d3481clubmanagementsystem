@@ -30,11 +30,13 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = false
   }
 
+  // 「待審核」涵蓋兩種人：自助註冊填了 requested_title/requested_role 等管理員
+  // 升級角色的人，以及 RotarySSO 首次登入、club_id 還是 NULL 等管理員指派社別的人。
   async function fetchPending() {
     const { data } = await supabase
       .from('user_profiles')
       .select('*')
-      .not('requested_role', 'is', null)
+      .or('requested_role.not.is.null,club_id.is.null')
     pending.value = data ?? []
   }
 
@@ -46,6 +48,19 @@ export const useAccountsStore = defineStore('accounts', () => {
     if (!error) {
       pending.value = pending.value.filter(u => u.id !== id)
       await Promise.all([fetchManaged(), fetchMembers()])
+    }
+    return { error }
+  }
+
+  // 指派 RotarySSO 待審帳號所屬的社（club_id 從 NULL 變成實際的社）。
+  // protect_user_profile_privileged_fields trigger 已經放行地區管理員改 club_id，不用另開 Edge Function。
+  async function assignClub(id: string, clubId: string) {
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ club_id: clubId })
+      .eq('id', id)
+    if (!error) {
+      await Promise.all([fetchPending(), fetchManaged(), fetchMembers()])
     }
     return { error }
   }
@@ -180,7 +195,7 @@ export const useAccountsStore = defineStore('accounts', () => {
 
   return {
     managed, pending, members, collaborators, loading,
-    fetchManaged, fetchPending, approveRole, dismissPending,
+    fetchManaged, fetchPending, approveRole, assignClub, dismissPending,
     fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictRole, deleteAccount,
     fetchClubCollaborators, updateCollaboratorRole, revokeCollaborator,

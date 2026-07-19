@@ -75,7 +75,22 @@ function pendingTitleLabel(p: UserProfile) {
   return p.requested_role ? roleLabel(p.requested_role) : '-'
 }
 
+// club_id 是 NULL 有兩種意思：clubName() 原本把它當「3481地區辦公室」（地區管理員
+// 自己的 home club 就是 NULL），但在待審核清單裡 NULL 是「RotarySSO 首登、還沒
+// 指派社別」，不能沿用同一個字樣，會誤導管理員以為已經歸屬地區辦公室。
+function pendingClubLabel(p: UserProfile) {
+  return p.club_id ? clubName(p.club_id) : '尚未指派'
+}
+
 const pendingChoice = ref<Record<string, UserRole>>({})
+const pendingClubChoice = ref<Record<string, string>>({})
+
+async function assignPendingClub(p: UserProfile) {
+  const targetClubId = pendingClubChoice.value[p.id]
+  if (!targetClubId) return
+  const { error } = await accounts.assignClub(p.id, targetClubId)
+  if (error) alert(error.message)
+}
 
 function pendingRoleChoice(p: UserProfile) {
   const choice = pendingChoice.value[p.id] ?? p.requested_role ?? 'club_member'
@@ -340,15 +355,33 @@ onMounted(async () => {
               <th>姓名</th>
               <th>社團</th>
               <th>申請職稱</th>
+              <th>扶輪 SSO 自稱社別</th>
+              <th>扶輪地區</th>
+              <th>扶輪身分別</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="p in accounts.pending" :key="p.id">
               <td data-label="姓名">{{ p.name }}</td>
-              <td data-label="社團">{{ clubName(p.club_id) }}</td>
+              <td data-label="社團">{{ pendingClubLabel(p) }}</td>
               <td data-label="申請職稱">{{ pendingTitleLabel(p) }}</td>
-              <td style="display:flex; gap:6px;">
+              <td data-label="扶輪 SSO 自稱社別">{{ p.sso_rotary_club ?? '-' }}</td>
+              <td data-label="扶輪地區">{{ p.sso_rotary_district ?? '-' }}</td>
+              <td data-label="扶輪身分別">{{ p.sso_account_type ?? '-' }}</td>
+              <td style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <template v-if="isDistrictAdminView && !p.club_id">
+                  <select
+                    class="fi"
+                    :value="pendingClubChoice[p.id] ?? ''"
+                    style="min-width:160px; padding:6px 8px;"
+                    @change="pendingClubChoice[p.id] = ($event.target as HTMLSelectElement).value"
+                  >
+                    <option value="" disabled>指派社別</option>
+                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                  <button class="btn btn-gold btn-sm" :disabled="!pendingClubChoice[p.id]" @click="assignPendingClub(p)">指派社別</button>
+                </template>
                 <select
                   class="fi"
                   :value="pendingRoleChoice(p)"
@@ -358,11 +391,11 @@ onMounted(async () => {
                   <option value="club_secretary">各社管理員</option>
                   <option value="club_member">一般社友</option>
                 </select>
-                <button class="btn btn-gold btn-sm" @click="applyPendingRole(p)">套用</button>
+                <button class="btn btn-gold btn-sm" @click="applyPendingRole(p)">套用角色</button>
               </td>
             </tr>
             <tr v-if="!accounts.pending.length">
-              <td colspan="4" style="text-align:center; color:var(--muted);">尚無待審核註冊</td>
+              <td colspan="7" style="text-align:center; color:var(--muted);">尚無待審核註冊</td>
             </tr>
           </tbody>
         </table>
