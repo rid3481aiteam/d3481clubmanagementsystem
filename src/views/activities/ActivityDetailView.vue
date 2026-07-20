@@ -45,6 +45,12 @@ const registeredCount = computed(
 const declinedCount = computed(
   () => activitiesStore.registrations.filter(r => r.status === 'declined').length
 )
+// 含來賓的預估總出席人數：已報名的社友本人 + 各自攜帶的來賓人數
+const totalAttendeeCount = computed(() =>
+  activitiesStore.registrations
+    .filter(r => r.status === 'registered')
+    .reduce((sum, r) => sum + 1 + (r.form_data.guests?.length ?? 0), 0)
+)
 
 // 之前回覆過（不含已取消）才顯示「更新回覆」，否則顯示「送出」
 const hasExistingResponse = computed(
@@ -114,7 +120,7 @@ async function submit() {
     return
   }
   toast.show(responseStatus.value === 'registered' ? '已送出報名' : '已記錄為不克參加')
-  if (isOrganizer.value) await activitiesStore.fetchRegistrationsForActivity(activity.value.id)
+  await activitiesStore.fetchRegistrationsForActivity(activity.value.id)
 }
 
 async function load() {
@@ -126,8 +132,10 @@ async function load() {
       responseStatus.value = mine.status as 'registered' | 'declined'
       regForm.value = normalizeFormData(mine.form_data)
     }
+    // 報名狀況（誰報名/統計人數）給所有登入社友看，不只主辦社；RLS 本來就只會
+    // 回傳看得到的列（自己、同社社友、或本社主辦時的全部），不用額外前端過濾
+    await activitiesStore.fetchRegistrationsForActivity(id)
   }
-  if (isOrganizer.value) await activitiesStore.fetchRegistrationsForActivity(id)
 }
 
 onMounted(load)
@@ -157,7 +165,8 @@ onMounted(load)
           <a v-if="activity.address" :href="`https://maps.google.com/?q=${encodeURIComponent(activity.address)}`" target="_blank" rel="noopener" style="margin-left:6px; font-size:12.5px; color:var(--navy);">在地圖上開啟</a>
         </div>
         <div><span class="fl">報名截止</span>{{ activity.registration_deadline ? formatDateTime(activity.registration_deadline) : '不限' }}</div>
-        <div><span class="fl">名額</span>{{ activity.capacity ?? '不限' }}<span v-if="isOrganizer">（已報名 {{ registeredCount }} 人 / 不克參加 {{ declinedCount }} 人）</span></div>
+        <div><span class="fl">名額</span>{{ activity.capacity ?? '不限' }}</div>
+        <div><span class="fl">報名狀況</span>已報名 {{ registeredCount }} 人・不克參加 {{ declinedCount }} 人・預估出席（含來賓）{{ totalAttendeeCount }} 人</div>
       </div>
     </div>
 
@@ -223,20 +232,21 @@ onMounted(load)
       </template>
     </div>
 
-    <!-- 主辦社查看報名清單 -->
-    <div class="tw" style="padding:20px;" v-if="isOrganizer">
+    <!-- 報名狀況：主辦社看得到全部，一般社友看得到自己＋同社社友的回覆
+         （RLS 本來就只回傳看得到的列，這裡不用再另外過濾） -->
+    <div class="tw" style="padding:20px;" v-if="auth.clubId">
       <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:12px;">
-        報名清單（已報名 {{ registeredCount }} 人 / 不克參加 {{ declinedCount }} 人）
+        {{ isOrganizer ? '報名清單' : '報名狀況' }}（已報名 {{ registeredCount }} 人 / 不克參加 {{ declinedCount }} 人）
       </h2>
       <table class="card-table">
         <thead class="th">
           <tr>
             <th>社團</th>
             <th>姓名</th>
-            <th>電話</th>
+            <th v-if="isOrganizer">電話</th>
             <th>來賓</th>
-            <th>備註</th>
-            <th>報名時間</th>
+            <th v-if="isOrganizer">備註</th>
+            <th v-if="isOrganizer">報名時間</th>
             <th>狀態</th>
           </tr>
         </thead>
@@ -244,19 +254,20 @@ onMounted(load)
           <tr v-for="r in activitiesStore.registrations" :key="r.id">
             <td data-label="社團">{{ r.clubs?.name ?? '-' }}</td>
             <td data-label="姓名">{{ r.form_data.name }}</td>
-            <td data-label="電話">{{ r.form_data.phone || '-' }}</td>
-            <td data-label="來賓" class="card-stack">
+            <td v-if="isOrganizer" data-label="電話">{{ r.form_data.phone || '-' }}</td>
+            <td v-if="isOrganizer" data-label="來賓" class="card-stack">
               <span v-if="!r.form_data.guests?.length">-</span>
               <div v-else v-for="(g, i) in r.form_data.guests" :key="i">{{ g.name || '(未填姓名)' }}{{ g.company ? `・${g.company}` : '' }}</div>
             </td>
-            <td data-label="備註">{{ r.form_data.note || '-' }}</td>
-            <td data-label="報名時間">{{ formatDateTime(r.created_at) }}</td>
+            <td v-else data-label="來賓">{{ r.form_data.guests?.length ? `${r.form_data.guests.length} 位` : '-' }}</td>
+            <td v-if="isOrganizer" data-label="備註">{{ r.form_data.note || '-' }}</td>
+            <td v-if="isOrganizer" data-label="報名時間">{{ formatDateTime(r.created_at) }}</td>
             <td data-label="狀態">
               <span class="bdg" :class="REG_STATUS_BADGE[r.status]">{{ REG_STATUS_LABELS[r.status] }}</span>
             </td>
           </tr>
           <tr v-if="!activitiesStore.registrations.length">
-            <td colspan="7" style="text-align:center; color:var(--muted);">尚無人回覆</td>
+            <td :colspan="isOrganizer ? 7 : 4" style="text-align:center; color:var(--muted);">尚無人回覆</td>
           </tr>
         </tbody>
       </table>
