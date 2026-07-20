@@ -7,6 +7,7 @@
         <main class="main">
           <RouterView />
         </main>
+        <OnboardingTour />
       </template>
       <template v-else>
         <RouterView />
@@ -24,6 +25,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import TopNav from '@/components/layout/TopNav.vue'
 import TopMenu from '@/components/layout/TopMenu.vue'
+import OnboardingTour from '@/components/onboarding/OnboardingTour.vue'
 
 const auth = useAuthStore()
 const route = useRoute()

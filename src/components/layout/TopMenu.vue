@@ -15,7 +15,7 @@
           </button>
         </div>
 
-        <RouterLink v-else :to="item.to" class="tnav">
+        <RouterLink v-else :to="item.to" class="tnav" :data-tour="tourId(item.to)">
           <span class="tnav-ic">{{ item.icon }}</span>{{ item.label }}
         </RouterLink>
       </template>
@@ -160,6 +160,16 @@ const navItems = computed<NavItem[]>(() => {
 
   return items
 })
+
+// 給 OnboardingTour 用來定位高亮的目標，只有導覽會用到的三個入口才需要 id
+const TOUR_IDS: Record<string, string> = {
+  '/': 'nav-dashboard',
+  '/meetings': 'nav-meetings',
+  '/roster': 'nav-roster',
+}
+function tourId(to: string): string | undefined {
+  return TOUR_IDS[to]
+}
 
 const dropdownOpen = ref<string | null>(null)
 const dropdownPos = ref({ top: 0, left: 0 })

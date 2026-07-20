@@ -25,6 +25,7 @@ export interface UserProfile {
   sso_account_type: string | null
   sso_rotary_club: string | null
   sso_rotary_district: string | null
+  onboarding_completed_at: string | null
   created_at: string
   updated_at: string
 }

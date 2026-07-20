@@ -73,6 +73,14 @@ export const useAuthStore = defineStore('auth', () => {
     isLoggedIn.value && !profile.value?.club_id && !isDistrictAdmin.value
   )
 
+  // 首次登入導覽：只給看得到「儀表板／例會管理／社友名冊」這組社端選單的人看
+  // （地區視角另有自己的畫面，導覽內容對不上，這裡先不做），待審核帳號還進
+  // 不了任何頁面也排除。onboarding_completed_at 是 null 代表還沒看過或略過。
+  const needsOnboarding = computed(() =>
+    isLoggedIn.value && !isPendingApproval.value && !isDistrictView.value &&
+    !!profile.value && !profile.value.onboarding_completed_at
+  )
+
   function setViewScope(scope: 'district' | 'club') {
     if (scope === 'club' && !clubId.value) return
     viewScope.value = scope
@@ -168,11 +176,18 @@ export const useAuthStore = defineStore('auth', () => {
     return { error }
   }
 
+  async function completeOnboarding() {
+    if (!user.value) return
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('user_profiles').update({ onboarding_completed_at: now }).eq('id', user.value.id)
+    if (!error && profile.value) profile.value = { ...profile.value, onboarding_completed_at: now }
+  }
+
   return {
     user, profile, clubName, loading, isLoggedIn, isDistrictAdmin, isDistrictViewer, clubId, homeClubId, role,
     accessibleClubs, canSwitchClub, switchActiveClub,
     viewScope, canSwitchView, isDistrictView, isDistrictAdminView, setViewScope,
-    isPendingApproval,
-    init, signOut, updateName,
+    isPendingApproval, needsOnboarding,
+    init, signOut, updateName, completeOnboarding,
   }
 })
