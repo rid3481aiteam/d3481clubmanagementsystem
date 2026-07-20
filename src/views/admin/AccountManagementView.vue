@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useInvitesStore } from '@/stores/invites'
 import { useAccountsStore } from '@/stores/accounts'
@@ -215,14 +215,26 @@ async function removeCollaborator(c: { user_id: string; club_id: string }, name:
   if (error) alert(error.message)
 }
 
-onMounted(async () => {
-  await club.fetchAll()
-  await invites.fetchLog()
+// 查詢範圍要跟著目前視角走：地區管理員即使 RLS 放行看全地區，
+// 切到自己社的視角時這裡也只能查自己社，不能只靠畫面過濾
+// （不然瀏覽器還是會收到其他社的帳號資料）
+async function loadAccounts() {
+  accounts.setScope(isDistrictAdminView.value ? null : auth.clubId)
   await accounts.fetchManaged()
   if (canManagePending.value) await accounts.fetchPending()
   await accounts.fetchMembers()
   if (!isDistrictAdminView.value) await accounts.fetchClubCollaborators()
+}
+
+onMounted(async () => {
+  await club.fetchAll()
+  await invites.fetchLog()
+  await loadAccounts()
 })
+
+// 使用者在同一頁用頂部「地區介面／本社」切換視角時（不會重新整理頁面），
+// 要跟著重新設定範圍並重新查詢，不然會沿用上一個視角撈到的舊資料
+watch(isDistrictAdminView, loadAccounts)
 </script>
 
 <template>

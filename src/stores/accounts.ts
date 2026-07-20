@@ -20,23 +20,37 @@ export const useAccountsStore = defineStore('accounts', () => {
   const collaborators = ref<UserClubRole[]>([])
   const loading = ref(false)
 
+  // 目前查詢範圍：null = 地區視角（不限社別）；有值 = 社端視角，只查該社。
+  // 一定要在 query 這層就限定範圍，不能只靠畫面上過濾——地區管理員的 RLS
+  // 本來就放行看全地區的 user_profiles，就算切到自己社的視角，
+  // 不加這層限制的話瀏覽器還是會收到其他社的帳號資料。
+  const scopeClubId = ref<string | null>(null)
+
+  function setScope(clubId: string | null) {
+    scopeClubId.value = clubId
+  }
+
   async function fetchManaged() {
     loading.value = true
-    const { data } = await supabase
+    let query = supabase
       .from('user_profiles')
       .select('*')
       .in('role', ['club_admin', 'club_secretary'])
+    if (scopeClubId.value) query = query.eq('club_id', scopeClubId.value)
+    const { data } = await query
     managed.value = data ?? []
     loading.value = false
   }
 
   // 「待審核」涵蓋兩種人：自助註冊填了 requested_title/requested_role 等管理員
   // 升級角色的人，以及 RotarySSO 首次登入、club_id 還是 NULL 等管理員指派社別的人。
+  // 社端視角只可能碰到前者（後者一定要地區管理員才能指派社別，見 assignClub）。
   async function fetchPending() {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .or('requested_role.not.is.null,club_id.is.null')
+    let query = supabase.from('user_profiles').select('*')
+    query = scopeClubId.value
+      ? query.eq('club_id', scopeClubId.value).not('requested_role', 'is', null)
+      : query.or('requested_role.not.is.null,club_id.is.null')
+    const { data } = await query
     pending.value = data ?? []
   }
 
@@ -76,11 +90,13 @@ export const useAccountsStore = defineStore('accounts', () => {
 
   async function fetchMembers() {
     loading.value = true
-    const { data } = await supabase
+    let query = supabase
       .from('user_profiles')
       .select('*')
       .eq('role', 'club_member')
       .order('name')
+    if (scopeClubId.value) query = query.eq('club_id', scopeClubId.value)
+    const { data } = await query
     members.value = data ?? []
     loading.value = false
   }
@@ -195,6 +211,7 @@ export const useAccountsStore = defineStore('accounts', () => {
 
   return {
     managed, pending, members, collaborators, loading,
+    setScope,
     fetchManaged, fetchPending, approveRole, assignClub, dismissPending,
     fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictRole, deleteAccount,
