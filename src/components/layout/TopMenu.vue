@@ -90,6 +90,7 @@ const navItems = computed<NavItem[]>(() => {
           { to: '/club/invite', icon: '👤', label: '邀請 / 管理地區帳號' },
           { to: '/admin/features', icon: '⚙️', label: '功能開關' },
           { to: '/admin/permissions', icon: '🔐', label: '權限矩陣' },
+          { to: '/admin/bug-reports', icon: '🐞', label: '錯誤回報' },
         ],
       })
     }

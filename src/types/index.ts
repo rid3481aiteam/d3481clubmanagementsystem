@@ -588,6 +588,30 @@ export interface ActivityRegistrationWithClub extends ActivityRegistration {
   clubs: { name: string } | null
 }
 
+// ── 錯誤回報（見 055_bug_reports.sql）──────────────────
+export type BugReportSource = 'user' | 'auto'
+export type BugReportStatus = 'open' | 'resolved'
+
+export interface BugReport {
+  id: string
+  reporter_id: string | null
+  club_id: string | null
+  source: BugReportSource
+  description: string | null
+  error_message: string | null
+  error_stack: string | null
+  page_path: string
+  user_agent: string | null
+  status: BugReportStatus
+  created_at: string
+  resolved_at: string | null
+}
+
+export interface BugReportWithReporter extends BugReport {
+  reporter: { name: string } | null
+  clubs: { name: string } | null
+}
+
 // ── LINE 通知（Demo，見 038_line_notifications.sql）─────
 export type NotificationChannelStatus = 'connected' | 'pending_manual_setup'
 

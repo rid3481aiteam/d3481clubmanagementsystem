@@ -214,6 +214,12 @@ const router = createRouter({
       meta: { role: 'district_admin' },
     },
     {
+      path: '/admin/bug-reports',
+      name: 'admin-bug-reports',
+      component: () => import('@/views/admin/BugReportsView.vue'),
+      meta: { role: 'district_admin' },
+    },
+    {
       path: '/club/edm',
       name: 'club-edm',
       component: () => import('@/views/edm/EdmGeneratorView.vue'),
