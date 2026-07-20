@@ -107,6 +107,16 @@ function formatDateTime(iso: string) {
   })
 }
 
+// 地區視角、或本社就是主辦社時，看得到這場活動全部報名紀錄（含跨社報名者）；
+// 其餘情況只查得到自己所屬社的報名紀錄——地區管理員的 RLS 放行看全地區，
+// 切到社端視角看別社主辦的活動時，這裡要在查詢這層擋掉其他社的報名明細，
+// 不能只靠畫面過濾
+function registrationScope(): string | null {
+  if (auth.isDistrictAdminView) return null
+  if (activity.value?.organizing_club_id === auth.clubId) return null
+  return auth.clubId
+}
+
 async function submit() {
   if (!auth.user || !auth.clubId || !activity.value || !responseStatus.value) return
   saving.value = true
@@ -120,7 +130,7 @@ async function submit() {
     return
   }
   toast.show(responseStatus.value === 'registered' ? '已送出報名' : '已記錄為不克參加')
-  await activitiesStore.fetchRegistrationsForActivity(activity.value.id)
+  await activitiesStore.fetchRegistrationsForActivity(activity.value.id, registrationScope())
 }
 
 async function load() {
@@ -132,9 +142,8 @@ async function load() {
       responseStatus.value = mine.status as 'registered' | 'declined'
       regForm.value = normalizeFormData(mine.form_data)
     }
-    // 報名狀況（誰報名/統計人數）給所有登入社友看，不只主辦社；RLS 本來就只會
-    // 回傳看得到的列（自己、同社社友、或本社主辦時的全部），不用額外前端過濾
-    await activitiesStore.fetchRegistrationsForActivity(id)
+    // 報名狀況（誰報名/統計人數）給所有登入社友看，不只主辦社
+    await activitiesStore.fetchRegistrationsForActivity(id, registrationScope())
   }
 }
 

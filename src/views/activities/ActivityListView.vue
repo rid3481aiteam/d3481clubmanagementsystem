@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useActivitiesStore } from '@/stores/activities'
 import { useMeetingsStore } from '@/stores/meetings'
@@ -161,7 +161,7 @@ async function save() {
   }
   showModal.value = false
   toast.show(isEditing.value ? '已更新' : '已新增')
-  await activitiesStore.fetchAll()
+  await loadActivities()
 }
 
 async function removeMeeting(a: Activity) {
@@ -170,7 +170,7 @@ async function removeMeeting(a: Activity) {
   const { error } = await meetingsStore.remove(a.meeting_id)
   if (error) { toast.show('刪除失敗：' + error.message, 'err'); return }
   toast.show('已刪除')
-  await activitiesStore.fetchAll()
+  await loadActivities()
 }
 
 function formatDateTime(iso: string) {
@@ -184,9 +184,16 @@ function canEdit(a: Activity) {
   return canManage.value && a.organizing_club_id === auth.clubId
 }
 
-onMounted(() => {
-  activitiesStore.fetchAll()
-})
+// 地區視角看全地區（含各社例會，供地區管理員總覽）；社端視角只查跟本社
+// 有關的活動，即使查詢的人是地區管理員也一樣——不能只靠畫面過濾，見
+// stores/activities.ts fetchAll() 的說明
+function loadActivities() {
+  return activitiesStore.fetchAll(auth.isDistrictAdminView ? null : auth.clubId)
+}
+
+onMounted(loadActivities)
+// 使用者在同一頁切換「地區介面／本社」視角時（不會重新整理頁面）要跟著重查
+watch(() => auth.isDistrictAdminView, loadActivities)
 </script>
 
 <template>

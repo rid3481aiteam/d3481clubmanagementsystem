@@ -18,12 +18,17 @@ export const useInvitesStore = defineStore('invites', () => {
   const log = ref<InviteLogEntry[]>([])
   const loading = ref(false)
 
-  async function fetchLog() {
+  // clubId 有值時只查該社（社端視角用，即使查詢的人是地區管理員、RLS 放行看
+  // 全地區 invite_log，這裡也要在查詢這層限定範圍，避免其他社的邀請紀錄
+  // 被傳到瀏覽器）；不帶或傳 null 才是地區管理員在地區視角看全地區紀錄
+  async function fetchLog(clubId?: string | null) {
     loading.value = true
-    const { data } = await supabase
+    let query = supabase
       .from('invite_log')
       .select('*')
       .order('invited_at', { ascending: false })
+    if (clubId) query = query.eq('club_id', clubId)
+    const { data } = await query
     log.value = data ?? []
     loading.value = false
   }

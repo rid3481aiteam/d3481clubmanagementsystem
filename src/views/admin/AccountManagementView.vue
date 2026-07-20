@@ -219,16 +219,17 @@ async function removeCollaborator(c: { user_id: string; club_id: string }, name:
 // 切到自己社的視角時這裡也只能查自己社，不能只靠畫面過濾
 // （不然瀏覽器還是會收到其他社的帳號資料）
 async function loadAccounts() {
-  accounts.setScope(isDistrictAdminView.value ? null : auth.clubId)
+  const scopeClubId = isDistrictAdminView.value ? null : auth.clubId
+  accounts.setScope(scopeClubId)
   await accounts.fetchManaged()
   if (canManagePending.value) await accounts.fetchPending()
   await accounts.fetchMembers()
+  await invites.fetchLog(scopeClubId)
   if (!isDistrictAdminView.value) await accounts.fetchClubCollaborators()
 }
 
 onMounted(async () => {
   await club.fetchAll()
-  await invites.fetchLog()
   await loadAccounts()
 })
 
