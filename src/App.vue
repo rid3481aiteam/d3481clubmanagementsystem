@@ -197,6 +197,16 @@ tr:hover td { background: rgba(23,69,143,.04); }
     display: block;
     text-align: left;
   }
+  /* 操作欄（編輯／刪除等按鈕列，td 沒有 data-label、用 inline style 排成一列）
+     加上換行，避免同一列塞太多顆按鈕時擠壓或超出卡片寬度 */
+  table.card-table td:not([data-label]) {
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+    row-gap: 8px;
+  }
+  table.card-table td:not([data-label]) .btn {
+    min-height: 38px;
+  }
 }
 
 /* Form */
@@ -205,7 +215,7 @@ tr:hover td { background: rgba(23,69,143,.04); }
   padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: var(--r);
-  font-size: 15px;
+  font-size: 16px;
   background: var(--card);
   color: var(--text);
   transition: border-color .15s;
@@ -328,7 +338,7 @@ tr:hover td { background: rgba(23,69,143,.04); }
 .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gold), var(--navy)); }
 
 /* Toast */
-.toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+.toast-wrap { position: fixed; bottom: 24px; right: 24px; left: 24px; z-index: 200; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .toast {
   padding: 12px 18px;
   border-radius: var(--r);
@@ -337,10 +347,16 @@ tr:hover td { background: rgba(23,69,143,.04); }
   color: #fff;
   box-shadow: 0 4px 16px rgba(0,0,0,.2);
   animation: slide-in .2s ease;
+  max-width: 100%;
 }
 .toast-ok  { background: var(--green); }
 .toast-err { background: var(--red); }
 @keyframes slide-in { from { transform: translateX(60px); opacity: 0; } }
+
+@media (max-width: 480px) {
+  .toast-wrap { left: 16px; right: 16px; bottom: 16px; align-items: stretch; }
+  .toast { text-align: center; }
+}
 
 /* Print (used by EDM 產生器「下載 PDF」) */
 @media print {

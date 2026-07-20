@@ -72,12 +72,12 @@ const groupedRows = computed(() => {
     .map(([zone, list]) => ({ zone, list }))
 })
 
-const collapsedZones = ref(new Set<string>())
+const expandedZones = ref(new Set<string>())
 function toggleZone(zone: string) {
-  const s = new Set(collapsedZones.value)
+  const s = new Set(expandedZones.value)
   if (s.has(zone)) s.delete(zone)
   else s.add(zone)
-  collapsedZones.value = s
+  expandedZones.value = s
 }
 
 async function loadClubs() {
@@ -178,12 +178,12 @@ watch(selectedMonth, loadMonth)
         <tbody v-for="g in groupedRows" :key="g.zone">
           <tr class="zone-row" @click="toggleZone(g.zone)">
             <td :colspan="features.isEnabled('B6_membership_report') ? 15 : 5">
-              <span class="zone-chevron">{{ collapsedZones.has(g.zone) ? '▸' : '▾' }}</span>
+              <span class="zone-chevron">{{ expandedZones.has(g.zone) ? '▾' : '▸' }}</span>
               <strong>{{ g.zone }}</strong>
               <span style="color:var(--muted); font-weight:400;">（{{ g.list.length }} 社）</span>
             </td>
           </tr>
-          <template v-if="!collapsedZones.has(g.zone)">
+          <template v-if="expandedZones.has(g.zone)">
             <tr v-for="r in g.list" :key="r.clubId">
               <td data-label="社名">{{ r.clubName }}</td>
               <td data-label="例會場次">{{ r.rate?.meeting_count ?? 0 }}</td>
@@ -227,7 +227,8 @@ watch(selectedMonth, loadMonth)
 .zone-row td {
   font-size: 13px;
   color: var(--navy);
-  padding: 8px 14px;
+  padding: 14px 14px;
+  min-height: 44px;
 }
 .zone-chevron {
   display: inline-block;

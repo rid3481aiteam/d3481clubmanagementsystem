@@ -174,12 +174,12 @@ const groupedDistrictStats = computed(() => {
     .map(([zone, clubs]) => ({ zone, clubs }))
 })
 
-const collapsedZones = ref(new Set<string>())
+const expandedZones = ref(new Set<string>())
 function toggleZone(zone: string) {
-  const s = new Set(collapsedZones.value)
+  const s = new Set(expandedZones.value)
   if (s.has(zone)) s.delete(zone)
   else s.add(zone)
-  collapsedZones.value = s
+  expandedZones.value = s
 }
 </script>
 
@@ -222,12 +222,12 @@ function toggleZone(zone: string) {
             <tbody v-for="g in groupedDistrictStats" :key="g.zone">
               <tr class="zone-row" @click="toggleZone(g.zone)">
                 <td colspan="4">
-                  <span class="zone-chevron">{{ collapsedZones.has(g.zone) ? '▸' : '▾' }}</span>
+                  <span class="zone-chevron">{{ expandedZones.has(g.zone) ? '▾' : '▸' }}</span>
                   <strong>{{ g.zone }}</strong>
                   <span style="color:var(--muted); font-weight:400;">（{{ g.clubs.length }} 社）</span>
                 </td>
               </tr>
-              <template v-if="!collapsedZones.has(g.zone)">
+              <template v-if="expandedZones.has(g.zone)">
                 <tr v-for="row in g.clubs" :key="row.clubId">
                   <td data-label="社名">{{ row.clubName }}</td>
                   <td data-label="出席率">
@@ -577,7 +577,8 @@ function toggleZone(zone: string) {
 .zone-row td {
   font-size: 13px;
   color: var(--navy);
-  padding: 8px 14px;
+  padding: 14px 14px;
+  min-height: 44px;
 }
 .zone-chevron {
   display: inline-block;
