@@ -16,6 +16,7 @@
     <div v-else class="splash">
       <div class="splash-spinner"></div>
     </div>
+    <ToastHost />
   </div>
 </template>
 
@@ -26,6 +27,7 @@ import { useAuthStore } from '@/stores/auth'
 import TopNav from '@/components/layout/TopNav.vue'
 import TopMenu from '@/components/layout/TopMenu.vue'
 import OnboardingTour from '@/components/onboarding/OnboardingTour.vue'
+import ToastHost from '@/components/common/ToastHost.vue'
 
 const auth = useAuthStore()
 const route = useRoute()

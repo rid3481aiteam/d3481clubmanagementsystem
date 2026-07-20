@@ -4,12 +4,14 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useActivitiesStore } from '@/stores/activities'
 import { usePermissionsStore } from '@/stores/permissions'
+import { useToastStore } from '@/stores/toast'
 import type { ActivityGuest, ActivityRegistrationFormData, ActivityStatus } from '@/types'
 
 const route = useRoute()
 const auth = useAuthStore()
 const activitiesStore = useActivitiesStore()
 const permissions = usePermissionsStore()
+const toast = useToastStore()
 
 const canManage = computed(() => permissions.can('activities', 'edit'))
 const activity = computed(() => activitiesStore.current)
@@ -101,20 +103,17 @@ function formatDateTime(iso: string) {
 
 async function submit() {
   if (!auth.user || !auth.clubId || !activity.value || !responseStatus.value) return
-  if (responseStatus.value === 'registered' && !regForm.value.name.trim()) {
-    alert('請填寫姓名')
-    return
-  }
   saving.value = true
   const { error } = await activitiesStore.submitResponse(
     activity.value.id, auth.clubId, auth.user.id, responseStatus.value,
-    { ...regForm.value, name: regForm.value.name.trim() }
+    regForm.value
   )
   saving.value = false
   if (error) {
-    alert('送出失敗：' + error.message)
+    toast.show('送出失敗：' + error.message, 'err')
     return
   }
+  toast.show(responseStatus.value === 'registered' ? '已送出報名' : '已記錄為不克參加')
   if (isOrganizer.value) await activitiesStore.fetchRegistrationsForActivity(activity.value.id)
 }
 
@@ -184,15 +183,6 @@ onMounted(load)
         </div>
 
         <div v-if="responseStatus === 'registered'" style="display:flex; flex-direction:column; gap:14px; margin-top:16px;">
-          <div>
-            <label class="fl">姓名 *</label>
-            <input v-model="regForm.name" class="fi" />
-          </div>
-          <div>
-            <label class="fl">電話</label>
-            <input v-model="regForm.phone" class="fi" />
-          </div>
-
           <div>
             <div class="fl" style="margin-bottom:6px;">攜帶來賓？</div>
             <div class="segmented">
