@@ -9,6 +9,7 @@
           <button
             type="button"
             class="tnav"
+            :data-tour="tourId(item.label)"
             @click.stop="toggleDropdown(item.label, $event)"
           >
             <span class="tnav-ic">{{ item.icon }}</span>{{ item.label }}<span class="tnav-chev">▾</span>
@@ -110,7 +111,19 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('B2_attendance_summary')) {
       items.push({ type: 'link', to: '/attendance/monthly', icon: '📈', label: '出席月報' })
     }
-    items.push({ type: 'link', to: '/club/officers', icon: '🎖️', label: '社的年度成員' })
+    const memberItems: { to: string; icon: string; label: string }[] = [
+      { to: '/club/officers', icon: '🎖️', label: '社的年度成員' },
+    ]
+    if (features.isEnabled('D1_roster')) {
+      memberItems.push({ to: '/roster', icon: '📋', label: '社友名冊' })
+    }
+    if (features.isEnabled('D3_prospective') && auth.role !== 'club_member') {
+      memberItems.push({ to: '/roster/prospective', icon: '🔍', label: '潛在社友' })
+    }
+    if (features.isEnabled('D4_care')) {
+      memberItems.push({ to: '/club/care', icon: '🤝', label: '社友關懷' })
+    }
+    items.push({ type: 'dropdown', icon: '🧑‍🤝‍🧑', label: '社的成員', items: memberItems })
     items.push({
       type: 'dropdown',
       icon: '📜',
@@ -120,15 +133,6 @@ const navItems = computed<NavItem[]>(() => {
         { to: '/club/sister-clubs', icon: '🤝', label: '友好社' },
       ],
     })
-    if (features.isEnabled('D1_roster')) {
-      items.push({ type: 'link', to: '/roster', icon: '📋', label: '社友名冊' })
-    }
-    if (features.isEnabled('D3_prospective') && auth.role !== 'club_member') {
-      items.push({ type: 'link', to: '/roster/prospective', icon: '🔍', label: '潛在社友' })
-    }
-    if (features.isEnabled('D4_care')) {
-      items.push({ type: 'link', to: '/club/care', icon: '🤝', label: '社友關懷' })
-    }
     if (features.isEnabled('G1_iou')) {
       items.push({ type: 'link', to: '/club/iou', icon: '💰', label: 'IOU' })
     }
@@ -145,25 +149,31 @@ const navItems = computed<NavItem[]>(() => {
 
   if (isClubManager) {
     items.push({ type: 'divider' })
+    const advancedItems: { to: string; icon: string; label: string }[] = [
+      { to: '/club/invite', icon: '👤', label: '邀請 / 管理本社帳號' },
+    ]
+    if (features.isEnabled('J1_line_notify')) {
+      advancedItems.push({ to: '/club/line-notify', icon: '💬', label: 'LINE 通知設定（測試中）' })
+    }
     items.push({
       type: 'dropdown',
       icon: '⚙️',
       label: '進階設定',
-      items: [
-        { to: '/club/invite', icon: '👤', label: '邀請 / 管理本社帳號' },
-        { to: '/club/line-notify', icon: '💬', label: 'LINE 通知設定（測試中）' },
-      ],
+      items: advancedItems,
     })
   }
 
   return items
 })
 
-// 給 OnboardingTour 用來定位高亮的目標，只有導覽會用到的三個入口才需要 id
+// 給 OnboardingTour 用來定位高亮的目標，只有導覽會用到的三個入口才需要 id。
+// 「社友名冊」併進「社的成員」下拉選單後不再是獨立的頂層連結，改用
+// dropdown 的 label 當 key（跟 to 路徑不會撞在一起，路徑一定以 / 開頭）
 const TOUR_IDS: Record<string, string> = {
   '/': 'nav-dashboard',
   '/activities': 'nav-activities',
   '/roster': 'nav-roster',
+  '社的成員': 'nav-roster',
 }
 function tourId(to: string): string | undefined {
   return TOUR_IDS[to]

@@ -48,7 +48,7 @@ const steps = computed<TourStep[]>(() => {
     mid.push({
       route: '/roster', target: 'nav-roster',
       title: '📋 社友名冊',
-      body: '查詢全社社友的通訊錄，電話、Email 等聯絡方式一目了然，不用再翻紙本名冊。',
+      body: '點開「社的成員」選單裡的「社友名冊」，查詢全社社友的通訊錄，電話、Email 等聯絡方式一目了然，不用再翻紙本名冊。',
     })
   }
   return [WELCOME, ...mid, FINISH]

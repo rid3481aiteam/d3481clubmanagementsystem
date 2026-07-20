@@ -216,6 +216,7 @@ export type FeatureKey =
   | 'F1_district_calendar'
   | 'G1_iou'
   | 'I1_gg'
+  | 'J1_line_notify'
 
 export interface FeatureFlag {
   id: string
