@@ -70,11 +70,12 @@ export const useActivitiesStore = defineStore('activities', () => {
     return myRegistration.value
   }
 
-  // 報名／改報名內容：已有紀錄（含已取消）就更新，沒有就新增
-  async function register(
+  // 送出／改回覆內容（報名或不克參加）：已有紀錄（含已取消）就更新，沒有就新增
+  async function submitResponse(
     activityId: string,
     clubId: string,
     userId: string,
+    status: 'registered' | 'declined',
     formData: ActivityRegistrationFormData
   ) {
     const { data: existing } = await supabase
@@ -87,25 +88,16 @@ export const useActivitiesStore = defineStore('activities', () => {
     const { error } = existing
       ? await supabase
           .from('activity_registrations')
-          .update({ status: 'registered', form_data: formData })
+          .update({ status, form_data: formData })
           .eq('id', existing.id)
       : await supabase.from('activity_registrations').insert({
           activity_id: activityId,
           club_id: clubId,
           registrant_id: userId,
           form_data: formData,
-          status: 'registered',
+          status,
         })
 
-    if (!error) await fetchMyRegistration(activityId, userId)
-    return { error }
-  }
-
-  async function cancelRegistration(registrationId: string, activityId: string, userId: string) {
-    const { error } = await supabase
-      .from('activity_registrations')
-      .update({ status: 'cancelled' })
-      .eq('id', registrationId)
     if (!error) await fetchMyRegistration(activityId, userId)
     return { error }
   }
@@ -129,8 +121,7 @@ export const useActivitiesStore = defineStore('activities', () => {
     update,
     fetchRegistrationsForActivity,
     fetchMyRegistration,
-    register,
-    cancelRegistration,
+    submitResponse,
     fetchByMeetingIds,
   }
 })

@@ -550,12 +550,18 @@ export interface ActivityWithClub extends Activity {
   clubs: { name: string } | null
 }
 
-export type RegistrationStatus = 'registered' | 'cancelled'
+export type RegistrationStatus = 'registered' | 'cancelled' | 'declined'
+
+export interface ActivityGuest {
+  name: string
+  company: string
+}
 
 export interface ActivityRegistrationFormData {
   name: string
   phone: string
-  guest_count: number
+  has_guest: boolean
+  guests: ActivityGuest[]
   note: string
 }
 

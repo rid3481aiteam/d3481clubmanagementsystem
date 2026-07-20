@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useActivitiesStore } from '@/stores/activities'
 import { usePermissionsStore } from '@/stores/permissions'
-import type { ActivityRegistrationFormData, ActivityStatus } from '@/types'
+import type { ActivityGuest, ActivityRegistrationFormData, ActivityStatus } from '@/types'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -20,6 +20,12 @@ const STATUS_LABELS: Record<ActivityStatus, string> = {
 const STATUS_BADGE: Record<ActivityStatus, string> = {
   draft: 'b-g', open: 'b-gr', closed: 'b-y', cancelled: 'b-r',
 }
+const REG_STATUS_LABELS: Record<string, string> = {
+  registered: '已報名', declined: '不克參加', cancelled: '已取消',
+}
+const REG_STATUS_BADGE: Record<string, string> = {
+  registered: 'b-gr', declined: 'b-r', cancelled: 'b-g',
+}
 
 const isOrganizer = computed(() =>
   canManage.value && !!activity.value && activity.value.organizing_club_id === auth.clubId
@@ -34,14 +40,57 @@ const canRegister = computed(() => activity.value?.status === 'open' && !isPastD
 const registeredCount = computed(
   () => activitiesStore.registrations.filter(r => r.status === 'registered').length
 )
+const declinedCount = computed(
+  () => activitiesStore.registrations.filter(r => r.status === 'declined').length
+)
 
-const isRegistered = computed(() => activitiesStore.myRegistration?.status === 'registered')
+// 之前回覆過（不含已取消）才顯示「更新回覆」，否則顯示「送出」
+const hasExistingResponse = computed(
+  () => !!activitiesStore.myRegistration && activitiesStore.myRegistration.status !== 'cancelled'
+)
 
+const MAX_GUESTS = 4
+const responseStatus = ref<'registered' | 'declined' | null>(null)
 const regForm = ref<ActivityRegistrationFormData>(emptyRegForm())
 const saving = ref(false)
 
 function emptyRegForm(): ActivityRegistrationFormData {
-  return { name: auth.profile?.name ?? '', phone: auth.profile?.phone ?? '', guest_count: 1, note: '' }
+  return { name: auth.profile?.name ?? '', phone: auth.profile?.phone ?? '', has_guest: false, guests: [], note: '' }
+}
+
+function emptyGuest(): ActivityGuest {
+  return { name: '', company: '' }
+}
+
+// 舊資料相容：改版前的報名沒有 has_guest/guests，只有數字型 guest_count，
+// 沒辦法回推當時的來賓姓名，一律視為未攜帶來賓，讓使用者重新填寫
+function normalizeFormData(data: Partial<ActivityRegistrationFormData> | null | undefined): ActivityRegistrationFormData {
+  return {
+    name: data?.name ?? auth.profile?.name ?? '',
+    phone: data?.phone ?? '',
+    has_guest: !!data?.has_guest,
+    guests: Array.isArray(data?.guests) ? data.guests : [],
+    note: data?.note ?? '',
+  }
+}
+
+function pickStatus(status: 'registered' | 'declined') {
+  responseStatus.value = status
+}
+
+function setHasGuest(value: boolean) {
+  regForm.value.has_guest = value
+  if (!value) {
+    regForm.value.guests = []
+  } else if (!regForm.value.guests.length) {
+    regForm.value.guests = [emptyGuest()]
+  }
+}
+
+function setGuestCount(count: number) {
+  const guests = regForm.value.guests.slice(0, count)
+  while (guests.length < count) guests.push(emptyGuest())
+  regForm.value.guests = guests
 }
 
 function formatDateTime(iso: string) {
@@ -50,35 +99,20 @@ function formatDateTime(iso: string) {
   })
 }
 
-async function submitRegistration() {
-  if (!auth.user || !auth.clubId || !activity.value) return
-  if (!regForm.value.name.trim()) {
+async function submit() {
+  if (!auth.user || !auth.clubId || !activity.value || !responseStatus.value) return
+  if (responseStatus.value === 'registered' && !regForm.value.name.trim()) {
     alert('請填寫姓名')
     return
   }
   saving.value = true
-  const { error } = await activitiesStore.register(activity.value.id, auth.clubId, auth.user.id, {
-    ...regForm.value,
-    name: regForm.value.name.trim(),
-  })
+  const { error } = await activitiesStore.submitResponse(
+    activity.value.id, auth.clubId, auth.user.id, responseStatus.value,
+    { ...regForm.value, name: regForm.value.name.trim() }
+  )
   saving.value = false
   if (error) {
-    alert('報名失敗：' + error.message)
-    return
-  }
-  if (isOrganizer.value) await activitiesStore.fetchRegistrationsForActivity(activity.value.id)
-}
-
-async function cancelMyRegistration() {
-  if (!auth.user || !activity.value || !activitiesStore.myRegistration) return
-  if (!confirm('確定要取消報名嗎？')) return
-  const { error } = await activitiesStore.cancelRegistration(
-    activitiesStore.myRegistration.id,
-    activity.value.id,
-    auth.user.id
-  )
-  if (error) {
-    alert('取消失敗：' + error.message)
+    alert('送出失敗：' + error.message)
     return
   }
   if (isOrganizer.value) await activitiesStore.fetchRegistrationsForActivity(activity.value.id)
@@ -89,7 +123,10 @@ async function load() {
   await activitiesStore.fetchOne(id)
   if (auth.user) {
     const mine = await activitiesStore.fetchMyRegistration(id, auth.user.id)
-    if (mine) regForm.value = { ...mine.form_data }
+    if (mine && mine.status !== 'cancelled') {
+      responseStatus.value = mine.status as 'registered' | 'declined'
+      regForm.value = normalizeFormData(mine.form_data)
+    }
   }
   if (isOrganizer.value) await activitiesStore.fetchRegistrationsForActivity(id)
 }
@@ -105,7 +142,7 @@ onMounted(load)
     </div>
 
     <div class="tw" style="padding:20px; margin-bottom:20px;">
-      <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px;">
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
         <span class="bdg" :class="STATUS_BADGE[activity.status]">{{ STATUS_LABELS[activity.status] }}</span>
         <span style="color:var(--muted); font-size:13px;">主辦社：{{ activity.clubs?.name ?? '-' }}</span>
         <span v-if="activity.meeting_id" class="bdg b-n">例會預計出席</span>
@@ -121,54 +158,85 @@ onMounted(load)
           <a v-if="activity.address" :href="`https://maps.google.com/?q=${encodeURIComponent(activity.address)}`" target="_blank" rel="noopener" style="margin-left:6px; font-size:12.5px; color:var(--navy);">在地圖上開啟</a>
         </div>
         <div><span class="fl">報名截止</span>{{ activity.registration_deadline ? formatDateTime(activity.registration_deadline) : '不限' }}</div>
-        <div><span class="fl">名額</span>{{ activity.capacity ?? '不限' }}<span v-if="isOrganizer">（已報名 {{ registeredCount }} 人）</span></div>
+        <div><span class="fl">名額</span>{{ activity.capacity ?? '不限' }}<span v-if="isOrganizer">（已報名 {{ registeredCount }} 人 / 不克參加 {{ declinedCount }} 人）</span></div>
       </div>
     </div>
 
-    <!-- 報名區：一般社友自行報名/取消 -->
+    <!-- 報名區：一般社友自行填寫報名／不克參加 -->
     <div class="tw" style="padding:20px; margin-bottom:20px;" v-if="auth.clubId">
-      <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:12px;">
-        {{ isRegistered ? '我的報名' : '報名' }}
-      </h2>
+      <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:12px;">本次是否出席？</h2>
 
-      <div v-if="isRegistered" style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-        <span class="bdg b-gr">已報名</span>
-        <button class="btn btn-red btn-sm" @click="cancelMyRegistration">取消報名</button>
+      <div v-if="!canRegister" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--muted);">
+        <span>{{ activity.status === 'cancelled' ? '活動已取消' : activity.status === 'closed' ? '活動已截止報名' : isPastDeadline ? '已超過報名截止時間' : '目前無法報名' }}</span>
+        <span v-if="hasExistingResponse" class="bdg" :class="REG_STATUS_BADGE[activitiesStore.myRegistration!.status]">
+          您的回覆：{{ REG_STATUS_LABELS[activitiesStore.myRegistration!.status] }}
+        </span>
       </div>
 
-      <div v-if="!canRegister && !isRegistered" style="color:var(--muted);">
-        {{ activity.status === 'cancelled' ? '活動已取消' : activity.status === 'closed' ? '活動已截止報名' : isPastDeadline ? '已超過報名截止時間' : '目前無法報名' }}
-      </div>
-
-      <div v-else style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px;">
-        <div>
-          <label class="fl">姓名 *</label>
-          <input v-model="regForm.name" class="fi" :disabled="!canRegister" />
-        </div>
-        <div>
-          <label class="fl">電話</label>
-          <input v-model="regForm.phone" class="fi" :disabled="!canRegister" />
-        </div>
-        <div>
-          <label class="fl">出席人數（含本人）</label>
-          <input v-model.number="regForm.guest_count" type="number" min="1" class="fi" :disabled="!canRegister" />
-        </div>
-        <div style="grid-column:1/-1;">
-          <label class="fl">備註</label>
-          <input v-model="regForm.note" class="fi" :disabled="!canRegister" />
-        </div>
-        <div style="grid-column:1/-1;">
-          <button v-if="canRegister" class="btn btn-gold" :disabled="saving" @click="submitRegistration">
-            {{ isRegistered ? '更新報名資料' : '確認報名' }}
+      <template v-else>
+        <div class="rsvp-picker">
+          <button type="button" class="rsvp-choice attend" :class="{ active: responseStatus === 'registered' }" @click="pickStatus('registered')">
+            <span class="rsvp-icon">✓</span>報名
+          </button>
+          <button type="button" class="rsvp-choice decline" :class="{ active: responseStatus === 'declined' }" @click="pickStatus('declined')">
+            <span class="rsvp-icon">✕</span>不克參加
           </button>
         </div>
-      </div>
+
+        <div v-if="responseStatus === 'registered'" style="display:flex; flex-direction:column; gap:14px; margin-top:16px;">
+          <div>
+            <label class="fl">姓名 *</label>
+            <input v-model="regForm.name" class="fi" />
+          </div>
+          <div>
+            <label class="fl">電話</label>
+            <input v-model="regForm.phone" class="fi" />
+          </div>
+
+          <div>
+            <div class="fl" style="margin-bottom:6px;">攜帶來賓？</div>
+            <div class="segmented">
+              <button type="button" class="seg-btn" :class="{ active: !regForm.has_guest }" @click="setHasGuest(false)">否</button>
+              <button type="button" class="seg-btn" :class="{ active: regForm.has_guest }" @click="setHasGuest(true)">是</button>
+            </div>
+          </div>
+
+          <template v-if="regForm.has_guest">
+            <div>
+              <label class="fl">來賓人數</label>
+              <select class="fi" :value="regForm.guests.length" @change="setGuestCount(Number(($event.target as HTMLSelectElement).value))">
+                <option v-for="n in MAX_GUESTS" :key="n" :value="n">{{ n }} 位</option>
+              </select>
+            </div>
+            <div v-for="(guest, i) in regForm.guests" :key="i" class="guest-card">
+              <div class="guest-title">來賓 {{ i + 1 }}</div>
+              <label class="fl">姓名</label>
+              <input v-model="guest.name" class="fi" style="margin-bottom:8px;" />
+              <label class="fl">公司 / 抬頭</label>
+              <input v-model="guest.company" class="fi" />
+            </div>
+          </template>
+
+          <div>
+            <label class="fl">備註</label>
+            <input v-model="regForm.note" class="fi" />
+          </div>
+        </div>
+
+        <div v-else-if="responseStatus === 'declined'" class="decline-note">
+          將記錄為「不克參加」，主辦社統計出席人數時會排除您。之後仍可改為報名。
+        </div>
+
+        <button v-if="responseStatus" class="btn btn-gold" style="margin-top:16px; width:100%; justify-content:center;" :disabled="saving" @click="submit">
+          {{ hasExistingResponse ? '更新回覆' : '送出' }}
+        </button>
+      </template>
     </div>
 
     <!-- 主辦社查看報名清單 -->
     <div class="tw" style="padding:20px;" v-if="isOrganizer">
       <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:12px;">
-        報名清單（{{ registeredCount }} 人）
+        報名清單（已報名 {{ registeredCount }} 人 / 不克參加 {{ declinedCount }} 人）
       </h2>
       <table class="card-table">
         <thead class="th">
@@ -176,7 +244,7 @@ onMounted(load)
             <th>社團</th>
             <th>姓名</th>
             <th>電話</th>
-            <th>人數</th>
+            <th>來賓</th>
             <th>備註</th>
             <th>報名時間</th>
             <th>狀態</th>
@@ -187,20 +255,68 @@ onMounted(load)
             <td data-label="社團">{{ r.clubs?.name ?? '-' }}</td>
             <td data-label="姓名">{{ r.form_data.name }}</td>
             <td data-label="電話">{{ r.form_data.phone || '-' }}</td>
-            <td data-label="人數">{{ r.form_data.guest_count ?? 1 }}</td>
+            <td data-label="來賓" class="card-stack">
+              <span v-if="!r.form_data.guests?.length">-</span>
+              <div v-else v-for="(g, i) in r.form_data.guests" :key="i">{{ g.name || '(未填姓名)' }}{{ g.company ? `・${g.company}` : '' }}</div>
+            </td>
             <td data-label="備註">{{ r.form_data.note || '-' }}</td>
             <td data-label="報名時間">{{ formatDateTime(r.created_at) }}</td>
             <td data-label="狀態">
-              <span class="bdg" :class="r.status === 'registered' ? 'b-gr' : 'b-g'">
-                {{ r.status === 'registered' ? '已報名' : '已取消' }}
-              </span>
+              <span class="bdg" :class="REG_STATUS_BADGE[r.status]">{{ REG_STATUS_LABELS[r.status] }}</span>
             </td>
           </tr>
           <tr v-if="!activitiesStore.registrations.length">
-            <td colspan="7" style="text-align:center; color:var(--muted);">尚無人報名</td>
+            <td colspan="7" style="text-align:center; color:var(--muted);">尚無人回覆</td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 </template>
+
+<style scoped>
+.rsvp-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.rsvp-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 8px;
+  min-height: 44px;
+  border-radius: var(--r);
+  border: 2px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rsvp-icon { font-size: 20px; }
+.rsvp-choice.attend.active { border-color: var(--green); background: rgba(42,107,72,.08); color: var(--green); }
+.rsvp-choice.decline.active { border-color: var(--red); background: rgba(176,48,48,.08); color: var(--red); }
+
+.decline-note {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--gold-p);
+  border-radius: var(--r);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.guest-card {
+  background: var(--bg);
+  border-radius: var(--r);
+  padding: 12px 14px;
+}
+.guest-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 8px;
+}
+</style>
