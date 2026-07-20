@@ -53,13 +53,7 @@ const router = createRouter({
       name: 'dashboard',
       component: () => import('@/views/DashboardView.vue'),
     },
-    // B 例會
-    {
-      path: '/meetings',
-      name: 'meetings',
-      component: () => import('@/views/meetings/MeetingListView.vue'),
-      meta: { feature: 'B1_meeting_info' as FeatureKey },
-    },
+    // B 例會（例會管理已併入 /activities 統一的「活動」列表，這裡只留出席登記頁）
     {
       path: '/meetings/:id/attendance',
       name: 'attendance',
@@ -147,7 +141,8 @@ const router = createRouter({
       path: '/activities',
       name: 'activities',
       component: () => import('@/views/activities/ActivityListView.vue'),
-      meta: { feature: 'E1_activities' as FeatureKey },
+      // 例會管理併入這個列表後，只開 B1（沒開 E1）的社也要能進來
+      meta: { feature: ['E1_activities', 'B1_meeting_info'] as FeatureKey[] },
     },
     {
       path: '/activities/:id',
@@ -275,8 +270,9 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.feature) {
-    const key = to.meta.feature as FeatureKey
-    if (!features.isEnabled(key)) return { name: 'dashboard' }
+    const keys = to.meta.feature as FeatureKey | FeatureKey[]
+    const list = Array.isArray(keys) ? keys : [keys]
+    if (!list.some(k => features.isEnabled(k))) return { name: 'dashboard' }
   }
 })
 

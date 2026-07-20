@@ -37,11 +37,11 @@ const steps = computed<TourStep[]>(() => {
       body: '登入後的第一站。這裡整理了目前需要你協助處理的事項（待辦提醒、需要關懷的社友），以及本社現況的統整資訊，隨時掌握社務動態。',
     },
   ]
-  if (features.isEnabled('B1_meeting_info')) {
+  if (features.isEnabled('B1_meeting_info') || features.isEnabled('E1_activities')) {
     mid.push({
-      route: '/meetings', target: 'nav-meetings',
-      title: '📅 例會管理',
-      body: '查看本月與未來的例會時間、地點與講者資訊；點選「預計出席」即可完成報名，其他社外活動則在旁邊的「社友活動」查看與報名。',
+      route: '/activities', target: 'nav-activities',
+      title: '📅 活動',
+      body: '例會與社友活動都在這裡，可依類別（例會／社內活動／友社活動／地區活動／其他）篩選，點進去查看時間地點、完成「報名」或「不克參加」回覆。',
     })
   }
   if (features.isEnabled('D1_roster')) {

@@ -74,8 +74,8 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('H1_directory')) {
       items.push({ type: 'link', to: '/directory', icon: '📖', label: '地區通訊錄' })
     }
-    if (features.isEnabled('E1_activities')) {
-      items.push({ type: 'link', to: '/activities', icon: '🎉', label: '社友活動' })
+    if (features.isEnabled('E1_activities') || features.isEnabled('B1_meeting_info')) {
+      items.push({ type: 'link', to: '/activities', icon: '📅', label: '活動' })
     }
     if (features.isEnabled('B5_edm')) {
       items.push({ type: 'link', to: '/admin/edm', icon: '📧', label: 'EDM 產生器' })
@@ -103,8 +103,8 @@ const navItems = computed<NavItem[]>(() => {
       items.push({ type: 'link', to: '/club/announcements', icon: '📣', label: '社內公告' })
       items.push({ type: 'link', to: '/club/governor-award', icon: '🏅', label: '總監獎項申請' })
     }
-    if (features.isEnabled('B1_meeting_info')) {
-      items.push({ type: 'link', to: '/meetings', icon: '📅', label: '例會管理' })
+    if (features.isEnabled('E1_activities') || features.isEnabled('B1_meeting_info')) {
+      items.push({ type: 'link', to: '/activities', icon: '📅', label: '活動' })
     }
     if (features.isEnabled('B2_attendance_summary')) {
       items.push({ type: 'link', to: '/attendance/monthly', icon: '📈', label: '出席月報' })
@@ -134,9 +134,6 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('I1_gg')) {
       items.push({ type: 'link', to: '/club/gg', icon: '🌐', label: 'GG案' })
     }
-    if (features.isEnabled('E1_activities')) {
-      items.push({ type: 'link', to: '/activities', icon: '🎉', label: '社友活動' })
-    }
     if (isClubManager && features.isEnabled('B5_edm')) {
       items.push({ type: 'link', to: '/club/edm', icon: '📧', label: 'EDM 產生器' })
     }
@@ -164,7 +161,7 @@ const navItems = computed<NavItem[]>(() => {
 // 給 OnboardingTour 用來定位高亮的目標，只有導覽會用到的三個入口才需要 id
 const TOUR_IDS: Record<string, string> = {
   '/': 'nav-dashboard',
-  '/meetings': 'nav-meetings',
+  '/activities': 'nav-activities',
   '/roster': 'nav-roster',
 }
 function tourId(to: string): string | undefined {

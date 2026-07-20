@@ -21,7 +21,7 @@ export const useActivitiesStore = defineStore('activities', () => {
     const { data } = await supabase
       .from('activities')
       .select('*, clubs(name)')
-      .order('start_at', { ascending: true })
+      .order('start_at', { ascending: false })
     activities.value = (data as ActivityWithClub[] | null) ?? []
     loading.value = false
   }

@@ -190,7 +190,7 @@ watch(selectedMonth, async () => {
     <div v-if="canEditAttendance" class="tw" style="padding:16px 20px; margin-bottom:24px;">
       <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:10px;">快速新增／補登例會出席</h2>
       <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">
-        沒有透過「例會管理」逐人登記時，可以在這裡直接補一筆當天的應出席／實際出席人數。如果該天已經逐人登記過，請改到「例會管理」編輯。
+        沒有透過「活動」頁的出席記錄逐人登記時，可以在這裡直接補一筆當天的應出席／實際出席人數。如果該天已經逐人登記過，請改到「活動」頁該例會的出席記錄編輯。
       </p>
       <div class="form-grid">
         <label>

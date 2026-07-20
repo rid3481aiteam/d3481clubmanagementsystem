@@ -257,7 +257,7 @@ function toggleZone(zone: string) {
 
     <template v-else>
       <div class="stat-grid" style="margin-bottom:24px;">
-      <div class="stat-card clickable" @click="router.push('/meetings')">
+      <div class="stat-card clickable" @click="router.push('/activities')">
         <div class="stat-label">本月例會數</div>
         <div class="stat-value">{{ dashboard.meetingCount }}</div>
       </div>

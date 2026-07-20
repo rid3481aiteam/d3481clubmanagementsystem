@@ -24,7 +24,7 @@ const LABELS: Record<FeatureKey, string> = {
   H1_directory: '地區通訊錄',
   H2_directory_search: '通訊錄搜尋',
   H3_directory_admin: '通訊錄管理入口',
-  E1_activities: '社友活動報名',
+  E1_activities: '活動列表（含例會，報名/不克參加）',
   F1_district_calendar: '地區行事曆',
   G1_iou: 'IOU 捐獻收據追蹤',
   I1_gg: 'GG案盤點（全球獎助金）',

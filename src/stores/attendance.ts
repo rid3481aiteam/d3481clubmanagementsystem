@@ -95,8 +95,8 @@ export const useAttendanceStore = defineStore('attendance', () => {
 
   // 快速新增／補登某一天的例會出席人數（不逐人登記），給沒有走「新增例會」
   // 流程的社在「出席月報」頁直接補資料用。找到當天已有例會就更新彙總數字，
-  // 但如果那場例會已經有逐人出席明細（透過「例會管理」登記過），就拒絕覆蓋，
-  // 請使用者改去例會管理頁編輯，避免誤刪真實的逐人記錄。
+  // 但如果那場例會已經有逐人出席明細（透過「活動」頁的出席記錄登記過），
+  // 就拒絕覆蓋，請使用者改去該例會的出席記錄頁編輯，避免誤刪真實的逐人記錄。
   async function quickAddSession(
     clubId: string,
     date: string,
@@ -137,7 +137,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
         .select('id', { count: 'exact', head: true })
         .eq('session_id', existingSession.id)
       if ((count ?? 0) > 0) {
-        return { error: { message: '這一天已有逐人出席記錄，請至「例會管理」編輯詳細出席名單' } }
+        return { error: { message: '這一天已有逐人出席記錄，請至「活動」頁該例會的出席記錄編輯詳細出席名單' } }
       }
       const { error } = await supabase
         .from('attendance_sessions')

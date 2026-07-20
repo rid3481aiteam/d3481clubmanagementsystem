@@ -516,8 +516,9 @@ export type GgCaseUpdate = Partial<
   Pick<GgCase, 'name' | 'partner' | 'amount' | 'start_date' | 'end_date' | 'status' | 'description'>
 >
 
-// ── 社友活動報名 ─────────────────────────────────────
+// ── 例會與社友活動（合併成單一「活動」列表）─────────────
 export type ActivityStatus = 'draft' | 'open' | 'closed' | 'cancelled'
+export type ActivityCategory = '例會' | '社內活動' | '友社活動' | '地區活動' | '其他'
 
 export interface Activity {
   id: string
@@ -533,6 +534,12 @@ export interface Activity {
   // 手動活動的招募範圍：true = 僅本社社友能看到/報名，false = 全地區公開可跨社報名。
   // 例會衍生的活動（meeting_id 不為 null）不受這個欄位影響，一律限本社。
   club_only: boolean
+  // 例會衍生的活動 category 固定是「例會」（DB CHECK constraint 綁死跟 meeting_id
+  // 是否有值一致），不可從表單手動改；其餘四類給手動新增的活動選
+  category: ActivityCategory
+  // 顯示用的主辦單位覆寫文字，留空則顯示 organizing_club_id 對應的社名。
+  // 用於友社活動／地區活動這類實際主辦單位不是 organizing_club_id 本身的情境
+  host_name: string | null
   // 非 null = 由例會自動同步產生（見 036_meeting_activity_sync.sql 的 trigger），
   // 只有主辦社看得到，標題/地點/時間由例會端同步、這裡不可手動改
   meeting_id: string | null
