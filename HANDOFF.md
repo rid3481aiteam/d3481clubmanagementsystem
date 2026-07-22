@@ -1,6 +1,6 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-22（第八十九輪，**新增例會後可自動發信通知社友（K1_meeting_email_notify）＋這輪發現 Claude 對正式 Supabase 專案的 CLI 部署權限不見了**。功能面：延續第39輪規劃決策（原本要各社自己申請 Gmail App 密碼），使用者這次選擇改用**集中式交易型郵件服務（Resend）**——設定簡單很多，不用每社各自申請。發信對象是本社名冊裡狀態正常、且有登記 Email 的社友（不限已報名者），跟活動報名系統無關。新增 [`notify-meeting-created`](supabase/functions/notify-meeting-created/index.ts) Edge Function：驗證呼叫者是本社 `club_admin`/`club_secretary`，撈本社例會詳情＋社友 email 清單，組信件內容用 Resend batch API（每批最多 100 封）分批送出。`meetings` store 的 `insert()` 補回傳新建列的 `id`；[`ActivityListView.vue`](src/views/activities/ActivityListView.vue) 新增例會（不是編輯）且 `K1_meeting_email_notify` 開啟時才呼叫，toast 顯示發送結果。比照 `J1_line_notify` 的做法，[`057_meeting_email_notify.sql`](supabase/migrations/057_meeting_email_notify.sql) 新增這個 flag，**預設關閉**。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過，本機這輪沒有真實 `.env.local`，無法真的登入測試。**重要環境變化**：這輪一開始想沿用之前 session 能直接用 `supabase` CLI 部署 Edge Function/查 DB 的做法，結果 `supabase link --project-ref xdwqrgthsxyzclnjlmvy`（正式站實際在用的專案，用抓正式站 bundle 裡的 supabase host 反查確認過沒有搞錯 ref）直接回傳「帳號沒有權限存取這個端點」——這台機器登入的 Supabase CLI 帳號，已經不再是這個專案的成員了（`supabase projects list` 也確認看不到這個 ref 了，只看得到另一個組織底下兩個不相關、都是 INACTIVE 狀態的 `Eric Rotary`／`3481Rotary`，這兩個八成是別人建的類似名稱專案，不是本專案）。**這代表這輪沒辦法像前幾輪一樣自己部署 migration/Edge Function**，待辦清單裡的步驟都要使用者自己動手（或者找回一個對這個專案有權限的 Supabase 帳號登入這台機器的 CLI）。
+> 最後更新：2026-07-22（第九十輪，**新增例會後可自動發信通知社友（K1_meeting_email_notify），改用各社自己的 Gmail 帳號寄信**。第八十九輪一開始做的是集中式交易型郵件服務（Resend），但 Resend 要驗證自己的寄件網域才能寄給非帳號擁有者，使用者問「為什麼不能用 gmail.com」發現這個限制後，改回第39輪原本的規劃：**比照現有 LINE 通知模式，每社自己的 Gmail 帳號 + 應用程式密碼**（原因：全地區共用一組 Gmail 帳號寄信量太大會撞到 Gmail 每日寄信上限）。發信對象是本社名冊裡狀態正常、且有登記 Email 的社友（不限已報名者），跟活動報名系統無關。[`club_notification_channels`](supabase/migrations/058_club_email_notifications.sql) 表新增 `email_from`/`email_app_password` 兩欄（跟 LINE 設定共用同一張表，但刻意不共用 `status` 欄位，避免兩種通知管道互相干擾對方的「已連接」狀態顯示）。重寫 [`notify-meeting-created`](supabase/functions/notify-meeting-created/index.ts) Edge Function：驗證呼叫者是本社 `club_admin`/`club_secretary`，改用 `denomailer` 套件透過 Gmail SMTP（`smtp.gmail.com:465`）逐一寄送給本社社友，帳密讀自呼叫者所屬社的 `club_notification_channels` 列。新增 [`send-test-email`](supabase/functions/send-test-email/index.ts) Edge Function 讓使用者測試自己的 Gmail 帳密是否正確。新增 [`emailNotify.ts`](src/stores/emailNotify.ts) store ＋ [`EmailNotifyView.vue`](src/views/club/EmailNotifyView.vue) 設定頁（路由 `/club/email-notify`，選單「進階設定」下），讓每社執秘/社長自行輸入 Gmail 帳號＋應用程式密碼並測試發送。`meetings` store 的 `insert()` 補回傳新建列的 `id`；[`ActivityListView.vue`](src/views/activities/ActivityListView.vue) 新增例會（不是編輯）且 `K1_meeting_email_notify` 開啟時才呼叫，toast 顯示發送結果。[`057_meeting_email_notify.sql`](supabase/migrations/057_meeting_email_notify.sql) 新增這個 flag，**預設關閉**。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過，本機這輪沒有真實 `.env.local`，無法真的登入測試。**環境問題仍未解決**：這台機器登入的 Supabase CLI 帳號還是不是這個專案（`xdwqrgthsxyzclnjlmvy`，用正式站 bundle 反查確認過沒搞錯 ref）的成員，`supabase link`/`supabase projects list` 都看不到這個專案（第八十九輪就發現了），**這代表這輪一樣沒辦法自己部署 migration/Edge Function**，待辦清單裡的步驟都要使用者自己動手（或者找回一個對這個專案有權限的 Supabase 帳號登入這台機器的 CLI）。
 
 > 最後更新（上一輪）：2026-07-20（第八十八輪，**「活動」頁補上使用教學（原「例會管理」）**——延續上一輪社友名冊試點，使用者指定下一頁是「例會管理」，但這個頁面已經在第八十輪～八十五輪的並行 session 裡被刪除（`MeetingListView.vue` 移除，例會功能併入 [`ActivityListView.vue`](src/views/activities/ActivityListView.vue)、變成活動的一個類別），選單標籤也已改叫「活動」，跟使用者說的頁名對不上——這輪直接在「活動」頁套用，沒有另外詢問確認（合理判斷使用者要的還是同一批功能，只是名稱跟著上游改版變了）。比照社友名冊做法在標題旁加 `PageHelp`，內容 4 條：例會跟其他類別活動的差異（都在同一頁管理，靠類別/時間/狀態篩選）、新增「例會」類別會自動建出席記錄與報名活動不用另外設定、點進活動可看報名狀況並自己按報名/不克參加、例會的「刪除」會連動清掉出席記錄跟報名活動且無法復原的提醒。本機瀏覽器驗證過面板正確開關顯示。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**待辦：確認下一個要補使用教學的頁面**。
 
@@ -106,17 +106,21 @@
 
 ## ⚠️ 待辦
 
-**【第八十九輪，優先】例會自動發信通知——待使用者完成部署（Claude 這輪失去這個專案的 Supabase CLI 權限，沒辦法自己來）**：
+**【第九十輪，優先】例會自動發信通知——改用各社自己的 Gmail，待使用者完成部署（Claude 這輪還是連不到這個專案的 Supabase CLI，沒辦法自己來）**：
 
-1. 到 [Resend](https://resend.com) 申請帳號（免費額度應該夠用），拿到一組 **API Key**，並**驗證一個寄件網域**（Resend 的測試網域只能寄給帳號擁有者自己的信箱，正式要寄給全體社友一定要驗證自己的網域，Resend 後台有清楚的 DNS 設定步驟）
-2. 到 Supabase Dashboard → Edge Functions → Secrets，新增兩個：
-   - `RESEND_API_KEY`：上一步拿到的金鑰
-   - `RESEND_FROM_EMAIL`：寄件人格式，例如 `國際扶輪3481地區 <notify@你的網域.com>`（一定要用剛剛驗證過的網域，不能亂填）
-3. 部署 Edge Function：`supabase functions deploy notify-meeting-created`（或到 Dashboard 手動貼 [`supabase/functions/notify-meeting-created/index.ts`](supabase/functions/notify-meeting-created/index.ts) 的內容新增函式）
-4. 到 SQL Editor 執行 [`057_meeting_email_notify.sql`](supabase/migrations/057_meeting_email_notify.sql)（新增一筆預設關閉的 `K1_meeting_email_notify` feature flag）
-5. 到「功能開關管理」把「新增例會自動發信通知社友（測試中）」打開
-6. **實測**：先確認本社社友名冊裡至少有一筆填了自己能收到信的 Email，新增一場例會，應該會跳出「已發送例會通知信給 X 位社友」的 toast，並實際收到信（標題含社名/例會場次/日期，內容有主題/講師/地點/備註）；社友名冊沒填 Email 的人應該被略過但不影響其他人收信；編輯既有例會**不會**觸發發信（只有新增才會）
-7. **這輪意外發現的環境問題，順便處理**：這台機器登入的 Supabase CLI 帳號已經不再是這個專案（`xdwqrgthsxyzclnjlmvy`）的成員了，`supabase link` 直接被拒絕。如果之後還想繼續讓 Claude 直接用 CLI 部署/查資料庫（前幾輪都是這樣做的，比較快），需要用有權限的帳號重新 `supabase login`；不然的話，之後每輪都要比照這次，把 migration SQL 跟 Edge Function 程式碼整份交給使用者自己貼上執行。
+使用者確認想用 Gmail 而不是集中式的 Resend，且要比照第39輪規劃、現有 LINE 通知同一套「每社自己設定」模式（原因：全地區共用一組 Gmail 帳號寄信量太大會撞到 Gmail 每日寄信上限）。第八十九輪寫的 Resend 版本已經整個換掉，**上一輪待辦清單裡的 Resend 步驟作廢，請改照下面這份**：
+
+1. 到 SQL Editor 依序執行 [`057_meeting_email_notify.sql`](supabase/migrations/057_meeting_email_notify.sql)（新增 `K1_meeting_email_notify` feature flag，預設關閉）、[`058_club_email_notifications.sql`](supabase/migrations/058_club_email_notifications.sql)（`club_notification_channels` 新增 `email_from`/`email_app_password` 兩欄）
+2. 部署兩支 Edge Function（都會用到 `denomailer` 這個 Deno SMTP 套件透過 Gmail SMTP 寄信，不需要額外設定 secret，帳密是存在資料庫裡、每社各自輸入的）：
+   - `supabase functions deploy notify-meeting-created`
+   - `supabase functions deploy send-test-email`
+3. 到「功能開關管理」把「新增例會自動發信通知社友（測試中）」打開——這個開關同時控制「進階設定」選單會不會出現「Email 通知設定」入口，跟新增例會會不會真的觸發發信
+4. **每個要用這個功能的社，自己的執秘/社長要做**：登入後到「進階設定 → Email 通知設定（測試中）」
+   - 先到自己 Google 帳號開啟兩步驟驗證，再到 [Google 應用程式密碼頁面](https://myaccount.google.com/apppasswords) 產生一組 16 碼應用程式密碼（**不是**平常登入 Gmail 用的密碼）
+   - 把 Gmail 帳號 + 應用程式密碼貼到「Email 通知設定」頁面存起來
+   - 按「發送測試信」寄一封給自己確認帳密正確可以寄出
+5. **實測**：確認本社社友名冊裡至少有一筆填了自己能收到信的 Email，新增一場例會，應該會跳出「已發送例會通知信給 X 位社友」的 toast，並實際收到信（標題含社名/例會場次/日期，內容有主題/講師/地點/備註）；社友名冊沒填 Email 的人應該被略過但不影響其他人收信；編輯既有例會**不會**觸發發信（只有新增才會）；本社沒設定 Gmail 帳密就新增例會，應該會跳出「尚未設定本社 Gmail 寄信帳號」的錯誤 toast，不會整個崩潰
+6. **CLI 權限問題還沒解決**：這台機器登入的 Supabase CLI 帳號已經不再是這個專案（`xdwqrgthsxyzclnjlmvy`）的成員了，`supabase link` 直接被拒絕（第八十九輪就發現了，這輪還是一樣）。如果想恢復讓 Claude 直接用 CLI 部署/查資料庫（前幾輪都是這樣做的，比較快），需要用有權限的帳號重新 `supabase login`；不然之後每輪都要比照這兩輪，把 migration SQL 跟 Edge Function 程式碼整份交給使用者自己貼上執行。
 
 **【第七十五輪】九宮格 — 待使用者部署 `list-apps` Edge Function**：
 
