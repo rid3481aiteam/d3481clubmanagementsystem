@@ -6,6 +6,7 @@ import { useMeetingsStore } from '@/stores/meetings'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useFeaturesStore } from '@/stores/features'
 import { useToastStore } from '@/stores/toast'
+import PageHelp from '@/components/help/PageHelp.vue'
 import type { Activity, ActivityCategory, ActivityInsert, ActivityStatus, MeetingInsert } from '@/types'
 
 const auth = useAuthStore()
@@ -17,6 +18,13 @@ const toast = useToastStore()
 
 const canManage = computed(() => permissions.can('activities', 'edit'))
 const canManageMeetings = computed(() => permissions.can('meetings', 'edit'))
+
+const activitiesHelpItems = [
+  '例會（每週/每月固定的社內例會）跟社內活動、友社活動、地區活動都在這裡管理，上方可依類別、時間（即將到來/全部/已過期）、狀態篩選。',
+  '新增「例會」類別時，系統會自動建立對應的出席記錄與報名活動，不用另外設定；其他類別的活動直接填標題、時間、地點即可。',
+  '點進任一活動可以看到報名狀況、名額、報名截止時間，社友自己在裡面按「報名」或「不克參加」；例會類的活動在列表上有「出席記錄」可直接登記當天出席名單。',
+  '「編輯」可修改時間地點等資訊；例會的「刪除」會連同出席記錄、報名活動一併清除且無法復原，請確認後再刪。',
+]
 
 const STATUS_LABELS: Record<ActivityStatus, string> = {
   draft: '草稿', open: '招募中', closed: '已截止', cancelled: '已取消',
@@ -199,7 +207,10 @@ watch(() => auth.isDistrictAdminView, loadActivities)
 <template>
   <div class="page">
     <div class="ph">
-      <h1>活動</h1>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h1>活動</h1>
+        <PageHelp title="活動怎麼用" :items="activitiesHelpItems" />
+      </div>
       <button v-if="canManage || canManageMeetings" class="btn btn-gold" @click="openAdd">+ 新增</button>
     </div>
 
