@@ -622,6 +622,8 @@ export interface ClubNotificationChannel {
   line_channel_secret: string | null
   line_channel_access_token: string | null
   status: NotificationChannelStatus
+  email_from: string | null
+  email_app_password: string | null
   updated_by: string | null
   created_at: string
   updated_at: string

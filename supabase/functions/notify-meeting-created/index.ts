@@ -1,10 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
-const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL')!
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,6 +65,16 @@ Deno.serve(async (req) => {
   if (!meeting) return errorResponse('找不到這場例會', 404)
   if (meeting.club_id !== currentClubId) return errorResponse('只能發送本社例會的通知', 403)
 
+  const { data: channel } = await adminClient
+    .from('club_notification_channels')
+    .select('email_from, email_app_password')
+    .eq('club_id', meeting.club_id)
+    .maybeSingle()
+
+  if (!channel?.email_from || !channel?.email_app_password) {
+    return errorResponse('尚未設定本社 Gmail 寄信帳號，請先到「Email 通知設定」頁面設定', 400)
+  }
+
   const { data: club } = await adminClient
     .from('clubs')
     .select('name')
@@ -120,40 +129,44 @@ Deno.serve(async (req) => {
     <p>國際扶輪 3481 地區</p>
   `
 
-  // Resend batch API 一次最多 100 封，分批送
-  const batches: (typeof recipients)[] = []
-  for (let i = 0; i < recipients.length; i += 100) batches.push(recipients.slice(i, i + 100))
+  const client = new SMTPClient({
+    connection: {
+      hostname: 'smtp.gmail.com',
+      port: 465,
+      tls: true,
+      auth: {
+        username: channel.email_from,
+        password: channel.email_app_password,
+      },
+    },
+  })
 
   let sent = 0
-  const batchErrors: string[] = []
+  const sendErrors: string[] = []
 
-  for (const batch of batches) {
-    const payload = batch.map((m) => ({
-      from: RESEND_FROM_EMAIL,
-      to: [m.email],
-      subject,
-      html,
-    }))
-
-    const resendResponse = await fetch('https://api.resend.com/emails/batch', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-
-    if (!resendResponse.ok) {
-      const errText = await resendResponse.text()
-      batchErrors.push(`HTTP ${resendResponse.status}：${errText}`)
-      continue
+  for (const member of recipients) {
+    try {
+      await client.send({
+        from: channel.email_from,
+        to: member.email as string,
+        subject,
+        content: 'auto',
+        html,
+      })
+      sent++
+    } catch (err) {
+      sendErrors.push(`${member.email}：${err instanceof Error ? err.message : String(err)}`)
     }
-    sent += batch.length
   }
 
-  if (sent === 0 && batchErrors.length) {
-    return errorResponse(`寄信失敗：${batchErrors.join('; ')}`, 502)
+  try {
+    await client.close()
+  } catch {
+    // 連線關閉失敗不影響已經送出的信件結果
+  }
+
+  if (sent === 0 && sendErrors.length) {
+    return errorResponse(`寄信失敗：${sendErrors[0]}`, 502)
   }
 
   return new Response(
@@ -161,7 +174,7 @@ Deno.serve(async (req) => {
       success: true,
       sent,
       skipped_no_email: allMembers.length - recipients.length,
-      partial_errors: batchErrors.length ? batchErrors : undefined,
+      partial_errors: sendErrors.length ? sendErrors : undefined,
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
