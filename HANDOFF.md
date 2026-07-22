@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-20（第八十八輪，**「活動」頁補上使用教學（原「例會管理」）**——延續上一輪社友名冊試點，使用者指定下一頁是「例會管理」，但這個頁面已經在第八十輪～八十五輪的並行 session 裡被刪除（`MeetingListView.vue` 移除，例會功能併入 [`ActivityListView.vue`](src/views/activities/ActivityListView.vue)、變成活動的一個類別），選單標籤也已改叫「活動」，跟使用者說的頁名對不上——這輪直接在「活動」頁套用，沒有另外詢問確認（合理判斷使用者要的還是同一批功能，只是名稱跟著上游改版變了）。比照社友名冊做法在標題旁加 `PageHelp`，內容 4 條：例會跟其他類別活動的差異（都在同一頁管理，靠類別/時間/狀態篩選）、新增「例會」類別會自動建出席記錄與報名活動不用另外設定、點進活動可看報名狀況並自己按報名/不克參加、例會的「刪除」會連動清掉出席記錄跟報名活動且無法復原的提醒。本機瀏覽器驗證過面板正確開關顯示。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**待辦：確認下一個要補使用教學的頁面**。
+> 最後更新：2026-07-22（第八十九輪，**新增例會後可自動發信通知社友（K1_meeting_email_notify）＋這輪發現 Claude 對正式 Supabase 專案的 CLI 部署權限不見了**。功能面：延續第39輪規劃決策（原本要各社自己申請 Gmail App 密碼），使用者這次選擇改用**集中式交易型郵件服務（Resend）**——設定簡單很多，不用每社各自申請。發信對象是本社名冊裡狀態正常、且有登記 Email 的社友（不限已報名者），跟活動報名系統無關。新增 [`notify-meeting-created`](supabase/functions/notify-meeting-created/index.ts) Edge Function：驗證呼叫者是本社 `club_admin`/`club_secretary`，撈本社例會詳情＋社友 email 清單，組信件內容用 Resend batch API（每批最多 100 封）分批送出。`meetings` store 的 `insert()` 補回傳新建列的 `id`；[`ActivityListView.vue`](src/views/activities/ActivityListView.vue) 新增例會（不是編輯）且 `K1_meeting_email_notify` 開啟時才呼叫，toast 顯示發送結果。比照 `J1_line_notify` 的做法，[`057_meeting_email_notify.sql`](supabase/migrations/057_meeting_email_notify.sql) 新增這個 flag，**預設關閉**。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過，本機這輪沒有真實 `.env.local`，無法真的登入測試。**重要環境變化**：這輪一開始想沿用之前 session 能直接用 `supabase` CLI 部署 Edge Function/查 DB 的做法，結果 `supabase link --project-ref xdwqrgthsxyzclnjlmvy`（正式站實際在用的專案，用抓正式站 bundle 裡的 supabase host 反查確認過沒有搞錯 ref）直接回傳「帳號沒有權限存取這個端點」——這台機器登入的 Supabase CLI 帳號，已經不再是這個專案的成員了（`supabase projects list` 也確認看不到這個 ref 了，只看得到另一個組織底下兩個不相關、都是 INACTIVE 狀態的 `Eric Rotary`／`3481Rotary`，這兩個八成是別人建的類似名稱專案，不是本專案）。**這代表這輪沒辦法像前幾輪一樣自己部署 migration/Edge Function**，待辦清單裡的步驟都要使用者自己動手（或者找回一個對這個專案有權限的 Supabase 帳號登入這台機器的 CLI）。
+
+> 最後更新（上一輪）：2026-07-20（第八十八輪，**「活動」頁補上使用教學（原「例會管理」）**——延續上一輪社友名冊試點，使用者指定下一頁是「例會管理」，但這個頁面已經在第八十輪～八十五輪的並行 session 裡被刪除（`MeetingListView.vue` 移除，例會功能併入 [`ActivityListView.vue`](src/views/activities/ActivityListView.vue)、變成活動的一個類別），選單標籤也已改叫「活動」，跟使用者說的頁名對不上——這輪直接在「活動」頁套用，沒有另外詢問確認（合理判斷使用者要的還是同一批功能，只是名稱跟著上游改版變了）。比照社友名冊做法在標題旁加 `PageHelp`，內容 4 條：例會跟其他類別活動的差異（都在同一頁管理，靠類別/時間/狀態篩選）、新增「例會」類別會自動建出席記錄與報名活動不用另外設定、點進活動可看報名狀況並自己按報名/不克參加、例會的「刪除」會連動清掉出席記錄跟報名活動且無法復原的提醒。本機瀏覽器驗證過面板正確開關顯示。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**待辦：確認下一個要補使用教學的頁面**。
 
 > 最後更新（上一輪）：2026-07-20（第八十七輪，**新增頁面內「使用教學」元件，先在社友名冊試點**——延續先前討論「新用戶導覽功能可以把全部功能都做介紹嗎」的結論：首次登入導覽只在第一次出現，之後想不起來某功能怎麼用還是得問人，改成「每個頁面裡面增加使用教學功能」比較能長期發揮作用。跟使用者確認兩件事：① 既有首次登入導覽保留（負責「第一次進來，方向感」），跟新的頁面內教學（負責「隨時想查，這頁怎麼用」）分工不衝突；② 範圍不一次做全部 20 幾個頁面，先從「社友名冊」試點——使用者的理由是任何新加入平台的社，第一件事就是要把社友通訊錄資料填進去，這頁最關鍵。實作：新增可重複使用的 [`PageHelp.vue`](src/components/help/PageHelp.vue) 元件（`title`/`items` 兩個 prop），標題旁一顆小「?」圓button，點開一個用 `Teleport` 掛到 `body`、依按鈕位置動態定位的輕量說明面板（列點呈現重點，點外面/Esc/再點一次都會關閉，寫法比照 `TopMenu.vue` 既有的下拉選單定位模式），視覺風格沿用全站既有的卡片/陰影/配色變數，沒有另外引入套件。套用在 [`RosterView.vue`](src/views/roster/RosterView.vue) 標題旁，內容 4 條重點：這頁是全社通訊錄／社友多建議先下載範本用 Excel 整批匯入、比逐筆新增快／可整批編輯或匯出備份交接／搜尋框跟正常-請假-退社篩選的用法。本機瀏覽器桌面版（1200px）＋手機版（375px）都實測過面板正確定位、開關互動正常。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**待辦：其餘頁面要不要陸續補上使用教學，跟使用者確認下一個要做哪頁**（例如例會管理、活動報名等其他社友常問的地方）。
 
@@ -103,6 +105,18 @@
 ---
 
 ## ⚠️ 待辦
+
+**【第八十九輪，優先】例會自動發信通知——待使用者完成部署（Claude 這輪失去這個專案的 Supabase CLI 權限，沒辦法自己來）**：
+
+1. 到 [Resend](https://resend.com) 申請帳號（免費額度應該夠用），拿到一組 **API Key**，並**驗證一個寄件網域**（Resend 的測試網域只能寄給帳號擁有者自己的信箱，正式要寄給全體社友一定要驗證自己的網域，Resend 後台有清楚的 DNS 設定步驟）
+2. 到 Supabase Dashboard → Edge Functions → Secrets，新增兩個：
+   - `RESEND_API_KEY`：上一步拿到的金鑰
+   - `RESEND_FROM_EMAIL`：寄件人格式，例如 `國際扶輪3481地區 <notify@你的網域.com>`（一定要用剛剛驗證過的網域，不能亂填）
+3. 部署 Edge Function：`supabase functions deploy notify-meeting-created`（或到 Dashboard 手動貼 [`supabase/functions/notify-meeting-created/index.ts`](supabase/functions/notify-meeting-created/index.ts) 的內容新增函式）
+4. 到 SQL Editor 執行 [`057_meeting_email_notify.sql`](supabase/migrations/057_meeting_email_notify.sql)（新增一筆預設關閉的 `K1_meeting_email_notify` feature flag）
+5. 到「功能開關管理」把「新增例會自動發信通知社友（測試中）」打開
+6. **實測**：先確認本社社友名冊裡至少有一筆填了自己能收到信的 Email，新增一場例會，應該會跳出「已發送例會通知信給 X 位社友」的 toast，並實際收到信（標題含社名/例會場次/日期，內容有主題/講師/地點/備註）；社友名冊沒填 Email 的人應該被略過但不影響其他人收信；編輯既有例會**不會**觸發發信（只有新增才會）
+7. **這輪意外發現的環境問題，順便處理**：這台機器登入的 Supabase CLI 帳號已經不再是這個專案（`xdwqrgthsxyzclnjlmvy`）的成員了，`supabase link` 直接被拒絕。如果之後還想繼續讓 Claude 直接用 CLI 部署/查資料庫（前幾輪都是這樣做的，比較快），需要用有權限的帳號重新 `supabase login`；不然的話，之後每輪都要比照這次，把 migration SQL 跟 Edge Function 程式碼整份交給使用者自己貼上執行。
 
 **【第七十五輪】九宮格 — 待使用者部署 `list-apps` Edge Function**：
 
