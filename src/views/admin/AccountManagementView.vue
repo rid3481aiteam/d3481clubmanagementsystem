@@ -382,29 +382,31 @@ watch(isDistrictAdminView, loadAccounts)
               <td data-label="扶輪 SSO 自稱社別">{{ p.sso_rotary_club ?? '-' }}</td>
               <td data-label="扶輪地區">{{ p.sso_rotary_district ?? '-' }}</td>
               <td data-label="扶輪身分別">{{ p.sso_account_type ?? '-' }}</td>
-              <td style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                <template v-if="isDistrictAdminView && !p.club_id">
+              <td>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <template v-if="isDistrictAdminView && !p.club_id">
+                    <select
+                      class="fi"
+                      :value="pendingClubChoice[p.id] ?? ''"
+                      style="min-width:160px; padding:6px 8px;"
+                      @change="pendingClubChoice[p.id] = ($event.target as HTMLSelectElement).value"
+                    >
+                      <option value="" disabled>指派社別</option>
+                      <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                    <button class="btn btn-gold btn-sm" :disabled="!pendingClubChoice[p.id]" @click="assignPendingClub(p)">指派社別</button>
+                  </template>
                   <select
                     class="fi"
-                    :value="pendingClubChoice[p.id] ?? ''"
-                    style="min-width:160px; padding:6px 8px;"
-                    @change="pendingClubChoice[p.id] = ($event.target as HTMLSelectElement).value"
+                    :value="pendingRoleChoice(p)"
+                    style="min-width:110px; padding:6px 8px;"
+                    @change="pendingChoice[p.id] = ($event.target as HTMLSelectElement).value as UserRole"
                   >
-                    <option value="" disabled>指派社別</option>
-                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    <option value="club_secretary">各社管理員</option>
+                    <option value="club_member">一般社友</option>
                   </select>
-                  <button class="btn btn-gold btn-sm" :disabled="!pendingClubChoice[p.id]" @click="assignPendingClub(p)">指派社別</button>
-                </template>
-                <select
-                  class="fi"
-                  :value="pendingRoleChoice(p)"
-                  style="min-width:110px; padding:6px 8px;"
-                  @change="pendingChoice[p.id] = ($event.target as HTMLSelectElement).value as UserRole"
-                >
-                  <option value="club_secretary">各社管理員</option>
-                  <option value="club_member">一般社友</option>
-                </select>
-                <button class="btn btn-gold btn-sm" @click="applyPendingRole(p)">套用角色</button>
+                  <button class="btn btn-gold btn-sm" @click="applyPendingRole(p)">套用角色</button>
+                </div>
               </td>
             </tr>
             <tr v-if="!accounts.pending.length">
@@ -460,16 +462,18 @@ watch(isDistrictAdminView, loadAccounts)
               </button>
             </td>
             <td data-label="狀態"><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
-            <td style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button v-if="a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a.id, a.name)">
-                重設密碼
-              </button>
-              <button class="btn btn-g btn-sm" @click="toggleActive(a.id, a.is_active)">
-                {{ a.is_active ? '停用' : '啟用' }}
-              </button>
-              <button class="btn btn-red btn-sm" @click="removeAccount(a.id, a.name)">
-                永久刪除
-              </button>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button v-if="a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a.id, a.name)">
+                  重設密碼
+                </button>
+                <button class="btn btn-g btn-sm" @click="toggleActive(a.id, a.is_active)">
+                  {{ a.is_active ? '停用' : '啟用' }}
+                </button>
+                <button class="btn btn-red btn-sm" @click="removeAccount(a.id, a.name)">
+                  永久刪除
+                </button>
+              </div>
             </td>
           </tr>
           <tr v-if="!allAccounts.length">

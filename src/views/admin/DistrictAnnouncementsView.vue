@@ -131,9 +131,11 @@ onMounted(() => {
             </td>
             <td data-label="發布時間">{{ formatDateTime(item.published_at) }}</td>
             <td data-label="到期時間">{{ formatDateTime(item.expires_at) }}</td>
-            <td v-if="auth.isDistrictAdminView" style="display:flex; gap:6px;">
-              <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
-              <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+            <td v-if="auth.isDistrictAdminView">
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
+                <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!announcements.adminDistrictAnnouncements.length">

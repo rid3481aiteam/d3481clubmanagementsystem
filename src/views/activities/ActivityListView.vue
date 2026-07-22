@@ -245,11 +245,13 @@ watch(() => auth.isDistrictAdminView, loadActivities)
             </td>
             <td data-label="主辦社">{{ a.host_name || a.clubs?.name || '-' }}</td>
             <td data-label="地點">{{ a.location || '-' }}</td>
-            <td style="display:flex; gap:6px;">
-              <RouterLink :to="`/activities/${a.id}`" class="btn btn-g btn-sm">查看</RouterLink>
-              <RouterLink v-if="a.meeting_id" :to="`/meetings/${a.meeting_id}/attendance`" class="btn btn-g btn-sm">出席記錄</RouterLink>
-              <button v-if="canEdit(a)" class="btn btn-g btn-sm" @click="openEdit(a)">編輯</button>
-              <button v-if="a.meeting_id && canManageMeetings" class="btn btn-red btn-sm" @click="removeMeeting(a)">刪除</button>
+            <td>
+              <div style="display:flex; gap:6px;">
+                <RouterLink :to="`/activities/${a.id}`" class="btn btn-g btn-sm">查看</RouterLink>
+                <RouterLink v-if="a.meeting_id" :to="`/meetings/${a.meeting_id}/attendance`" class="btn btn-g btn-sm">出席記錄</RouterLink>
+                <button v-if="canEdit(a)" class="btn btn-g btn-sm" @click="openEdit(a)">編輯</button>
+                <button v-if="a.meeting_id && canManageMeetings" class="btn btn-red btn-sm" @click="removeMeeting(a)">刪除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!filtered.length">

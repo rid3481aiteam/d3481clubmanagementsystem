@@ -173,9 +173,11 @@ onMounted(() => {
             </td>
             <td data-label="狀態"><span class="bdg" :class="statusBadgeClass[c.status]">{{ c.status }}</span></td>
             <td data-label="說明" class="note-cell card-stack">{{ c.description || '-' }}</td>
-            <td v-if="canManage" style="display:flex; gap:6px;">
-              <button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button>
-              <button class="btn btn-red btn-sm" @click="remove(c)">刪除</button>
+            <td v-if="canManage">
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-g btn-sm" @click="openEdit(c)">編輯</button>
+                <button class="btn btn-red btn-sm" @click="remove(c)">刪除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!gg.cases.length">

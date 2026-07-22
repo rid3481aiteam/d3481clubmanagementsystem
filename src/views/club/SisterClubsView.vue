@@ -103,9 +103,11 @@ onMounted(() => {
             <td data-label="結盟時間">{{ formatDate(item.established_date) }}</td>
             <td data-label="當屆社長">{{ item.president_name || '-' }}</td>
             <td data-label="兩社情誼說明" class="note-cell card-stack">{{ item.relationship_note || '-' }}</td>
-            <td v-if="canManage" style="display:flex; gap:6px;">
-              <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
-              <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+            <td v-if="canManage">
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
+                <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!sisterClubs.list.length">
