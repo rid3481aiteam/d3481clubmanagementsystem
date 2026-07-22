@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Meeting, MeetingInsert, MeetingUpdate } from '@/types'
 
@@ -24,8 +25,34 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   async function insert(payload: MeetingInsert) {
-    const { error } = await supabase.from('meetings').insert(payload)
-    return { error }
+    const { data, error } = await supabase.from('meetings').insert(payload).select('id').single()
+    return { data, error }
+  }
+
+  // 新增例會後自動發信通知本社社友（K1_meeting_email_notify 開啟時才有意義呼叫）
+  async function notifyCreated(meetingId: string) {
+    const { data, error } = await supabase.functions.invoke<{
+      success: boolean
+      sent: number
+      skipped_no_email: number
+      message?: string
+    }>('notify-meeting-created', {
+      body: { meeting_id: meetingId },
+    })
+
+    if (error) {
+      let msg = error.message
+      if (error instanceof FunctionsHttpError) {
+        try {
+          const body = await error.context.json()
+          if (body?.error) msg = body.error
+        } catch {
+          // 回應不是 JSON，維持預設訊息
+        }
+      }
+      return { data: null, error: msg }
+    }
+    return { data, error: null }
   }
 
   async function update(id: string, payload: MeetingUpdate) {
@@ -38,5 +65,5 @@ export const useMeetingsStore = defineStore('meetings', () => {
     return { error }
   }
 
-  return { meetings, current, loading, fetchAll, fetchOne, insert, update, remove }
+  return { meetings, current, loading, fetchAll, fetchOne, insert, notifyCreated, update, remove }
 })

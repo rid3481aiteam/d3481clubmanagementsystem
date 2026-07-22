@@ -15,6 +15,7 @@ const DEFAULT_FLAGS: FeatureMap = {
   G1_iou: false,
   I1_gg: false,
   J1_line_notify: false,
+  K1_meeting_email_notify: false,
 }
 
 export const useFeaturesStore = defineStore('features', () => {

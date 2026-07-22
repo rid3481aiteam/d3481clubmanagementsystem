@@ -141,13 +141,19 @@ async function openEdit(a: Activity) {
 
 async function save() {
   saving.value = true
+  let newMeetingId: string | null = null
   if (isMeetingForm.value) {
     if (!meetingForm.value.date) { saving.value = false; return }
-    const { error } = editingMeetingId.value
-      ? await meetingsStore.update(editingMeetingId.value, meetingForm.value)
-      : await meetingsStore.insert(meetingForm.value)
-    saving.value = false
-    if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+    if (editingMeetingId.value) {
+      const { error } = await meetingsStore.update(editingMeetingId.value, meetingForm.value)
+      saving.value = false
+      if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+    } else {
+      const { data, error } = await meetingsStore.insert(meetingForm.value)
+      saving.value = false
+      if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+      newMeetingId = data?.id ?? null
+    }
   } else {
     if (!activityForm.value.title.trim() || !startLocal.value) { saving.value = false; return }
     const payload: ActivityInsert = {
@@ -170,6 +176,20 @@ async function save() {
   showModal.value = false
   toast.show(isEditing.value ? '已更新' : '已新增')
   await loadActivities()
+
+  // 新增例會（不是編輯）且功能開關有打開，才自動發信通知本社社友
+  if (newMeetingId && features.isEnabled('K1_meeting_email_notify')) {
+    const { data, error } = await meetingsStore.notifyCreated(newMeetingId)
+    if (error) {
+      toast.show('例會通知信發送失敗：' + error, 'err')
+    } else if (data) {
+      toast.show(
+        data.sent > 0
+          ? `已發送例會通知信給 ${data.sent} 位社友${data.skipped_no_email ? `（${data.skipped_no_email} 位沒有登記 Email，已略過）` : ''}`
+          : (data.message ?? '沒有可發送的對象'),
+      )
+    }
+  }
 }
 
 async function removeMeeting(a: Activity) {

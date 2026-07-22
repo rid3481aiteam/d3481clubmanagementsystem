@@ -217,6 +217,7 @@ export type FeatureKey =
   | 'G1_iou'
   | 'I1_gg'
   | 'J1_line_notify'
+  | 'K1_meeting_email_notify'
 
 export interface FeatureFlag {
   id: string
