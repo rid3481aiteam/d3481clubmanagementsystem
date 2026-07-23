@@ -187,7 +187,7 @@ export interface GovernorAwardApplication {
 
 // ── 社的年度幹部 ──────────────────────────────────────
 export type ClubOfficerRole =
-  | 'president' | 'president_elect' | 'vice_president' | 'secretary' | 'committee_member'
+  | 'president' | 'president_elect' | 'vice_president' | 'secretary' | 'committee_member' | 'primary_officer'
 
 export interface ClubOfficer {
   id: string

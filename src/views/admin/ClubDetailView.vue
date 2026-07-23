@@ -71,7 +71,7 @@ const classificationBreakdown = computed(() => {
   return [...map.entries()].sort((a, b) => b[1] - a[1])
 })
 
-const committeeMembers = computed(() => officers.list.filter(o => o.role === 'committee_member'))
+const committeeMembers = computed(() => officers.list.filter(o => o.role === 'committee_member' || o.role === 'primary_officer'))
 
 function officerName(role: ClubOfficerRole) {
   return officers.list.find(o => o.role === role)?.name || '-'
