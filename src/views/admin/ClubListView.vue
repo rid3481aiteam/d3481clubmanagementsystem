@@ -117,9 +117,11 @@ onMounted(() => {
               <td data-label="執秘">{{ c.sec_name || '-' }}</td>
               <td data-label="Email">{{ c.email || '-' }}</td>
               <td data-label="電話">{{ c.phone || '-' }}</td>
-              <td style="display:flex; gap:6px;">
-                <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社團資訊</RouterLink>
-                <RouterLink v-if="auth.isDistrictAdminView" :to="`/admin/clubs/${c.id}/edit`" class="btn btn-sky btn-sm">編輯</RouterLink>
+              <td>
+                <div style="display:flex; gap:6px;">
+                  <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社團資訊</RouterLink>
+                  <RouterLink v-if="auth.isDistrictAdminView" :to="`/admin/clubs/${c.id}/edit`" class="btn btn-sky btn-sm">編輯</RouterLink>
+                </div>
               </td>
             </tr>
           </template>

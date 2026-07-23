@@ -132,9 +132,11 @@ onMounted(() => {
             </td>
             <td data-label="發布時間">{{ formatDateTime(item.published_at) }}</td>
             <td data-label="到期時間">{{ formatDateTime(item.expires_at) }}</td>
-            <td style="display:flex; gap:6px;">
-              <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
-              <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+            <td>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
+                <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!announcements.adminClubAnnouncements.length">

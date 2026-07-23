@@ -6,6 +6,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useFeaturesStore } from '@/stores/features'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
+import PageHelp from '@/components/help/PageHelp.vue'
 import type {
   RosterMember,
   RosterMemberInsert,
@@ -21,6 +22,13 @@ const features = useFeaturesStore()
 const permissions = usePermissionsStore()
 const officersStore = useOfficersStore()
 const canManage = computed(() => permissions.can('roster', 'edit'))
+
+const rosterHelpItems = [
+  '這裡是全社社友的通訊錄（電話、Email、公司等），新社加入平台第一件事就是把社友資料建進來，之後每頁功能才有資料可以用。',
+  '社友人數多的話建議先「下載範本」，在 Excel 一次填好整批社友，再用「匯入 Excel」建立，比一筆一筆「+ 新增社友」快很多。',
+  '資料建好後可以「編輯名冊」直接在畫面上整批修改，或「匯出 Excel」備份、交接給下一屆使用。',
+  '上方搜尋框可查姓名/公司/電話/Email，「正常/請假/退社」篩選可以快速看目前有效社友或歷史紀錄。',
+]
 
 const OFFICER_ROLE_LABEL: Partial<Record<ClubOfficerRole, string>> = {
   president: '社長',
@@ -467,7 +475,10 @@ onMounted(() => {
 <template>
   <div class="page">
     <div class="ph">
-      <h1>社友名冊</h1>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h1>社友名冊</h1>
+        <PageHelp title="社友名冊怎麼用" :items="rosterHelpItems" />
+      </div>
       <div v-if="canManage" style="display:flex; gap:8px;">
         <template v-if="features.isEnabled('D2_roster_excel') && !bulkEditing">
           <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImport" />

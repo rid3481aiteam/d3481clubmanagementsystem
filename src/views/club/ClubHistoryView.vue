@@ -94,9 +94,11 @@ onMounted(() => {
             <td data-label="年份"><strong>{{ item.year_term }}</strong></td>
             <td data-label="社長">{{ item.president_name || '-' }}</td>
             <td data-label="重要記事" class="note-cell card-stack">{{ item.notable_events || '-' }}</td>
-            <td v-if="canManage" style="display:flex; gap:6px;">
-              <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
-              <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+            <td v-if="canManage">
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-g btn-sm" @click="openEdit(item)">編輯</button>
+                <button class="btn btn-red btn-sm" @click="remove(item)">刪除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!clubHistory.list.length">

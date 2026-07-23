@@ -6,6 +6,7 @@ import { useMeetingsStore } from '@/stores/meetings'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useFeaturesStore } from '@/stores/features'
 import { useToastStore } from '@/stores/toast'
+import PageHelp from '@/components/help/PageHelp.vue'
 import type { Activity, ActivityCategory, ActivityInsert, ActivityStatus, MeetingInsert } from '@/types'
 
 const auth = useAuthStore()
@@ -17,6 +18,13 @@ const toast = useToastStore()
 
 const canManage = computed(() => permissions.can('activities', 'edit'))
 const canManageMeetings = computed(() => permissions.can('meetings', 'edit'))
+
+const activitiesHelpItems = [
+  '例會（每週/每月固定的社內例會）跟社內活動、友社活動、地區活動都在這裡管理，上方可依類別、時間（即將到來/全部/已過期）、狀態篩選。',
+  '新增「例會」類別時，系統會自動建立對應的出席記錄與報名活動，不用另外設定；其他類別的活動直接填標題、時間、地點即可。',
+  '點進任一活動可以看到報名狀況、名額、報名截止時間，社友自己在裡面按「報名」或「不克參加」；例會類的活動在列表上有「出席記錄」可直接登記當天出席名單。',
+  '「編輯」可修改時間地點等資訊；例會的「刪除」會連同出席記錄、報名活動一併清除且無法復原，請確認後再刪。',
+]
 
 const STATUS_LABELS: Record<ActivityStatus, string> = {
   draft: '草稿', open: '招募中', closed: '已截止', cancelled: '已取消',
@@ -133,13 +141,19 @@ async function openEdit(a: Activity) {
 
 async function save() {
   saving.value = true
+  let newMeetingId: string | null = null
   if (isMeetingForm.value) {
     if (!meetingForm.value.date) { saving.value = false; return }
-    const { error } = editingMeetingId.value
-      ? await meetingsStore.update(editingMeetingId.value, meetingForm.value)
-      : await meetingsStore.insert(meetingForm.value)
-    saving.value = false
-    if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+    if (editingMeetingId.value) {
+      const { error } = await meetingsStore.update(editingMeetingId.value, meetingForm.value)
+      saving.value = false
+      if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+    } else {
+      const { data, error } = await meetingsStore.insert(meetingForm.value)
+      saving.value = false
+      if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+      newMeetingId = data?.id ?? null
+    }
   } else {
     if (!activityForm.value.title.trim() || !startLocal.value) { saving.value = false; return }
     const payload: ActivityInsert = {
@@ -162,6 +176,20 @@ async function save() {
   showModal.value = false
   toast.show(isEditing.value ? '已更新' : '已新增')
   await loadActivities()
+
+  // 新增例會（不是編輯）且功能開關有打開，才自動發信通知本社社友
+  if (newMeetingId && features.isEnabled('K1_meeting_email_notify')) {
+    const { data, error } = await meetingsStore.notifyCreated(newMeetingId)
+    if (error) {
+      toast.show('例會通知信發送失敗：' + error, 'err')
+    } else if (data) {
+      toast.show(
+        data.sent > 0
+          ? `已發送例會通知信給 ${data.sent} 位社友${data.skipped_no_email ? `（${data.skipped_no_email} 位沒有登記 Email，已略過）` : ''}`
+          : (data.message ?? '沒有可發送的對象'),
+      )
+    }
+  }
 }
 
 async function removeMeeting(a: Activity) {
@@ -199,7 +227,10 @@ watch(() => auth.isDistrictAdminView, loadActivities)
 <template>
   <div class="page">
     <div class="ph">
-      <h1>活動</h1>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h1>活動</h1>
+        <PageHelp title="活動怎麼用" :items="activitiesHelpItems" />
+      </div>
       <button v-if="canManage || canManageMeetings" class="btn btn-gold" @click="openAdd">+ 新增</button>
     </div>
 
@@ -245,11 +276,13 @@ watch(() => auth.isDistrictAdminView, loadActivities)
             </td>
             <td data-label="主辦社">{{ a.host_name || a.clubs?.name || '-' }}</td>
             <td data-label="地點">{{ a.location || '-' }}</td>
-            <td style="display:flex; gap:6px;">
-              <RouterLink :to="`/activities/${a.id}`" class="btn btn-g btn-sm">查看</RouterLink>
-              <RouterLink v-if="a.meeting_id" :to="`/meetings/${a.meeting_id}/attendance`" class="btn btn-g btn-sm">出席記錄</RouterLink>
-              <button v-if="canEdit(a)" class="btn btn-g btn-sm" @click="openEdit(a)">編輯</button>
-              <button v-if="a.meeting_id && canManageMeetings" class="btn btn-red btn-sm" @click="removeMeeting(a)">刪除</button>
+            <td>
+              <div style="display:flex; gap:6px;">
+                <RouterLink :to="`/activities/${a.id}`" class="btn btn-g btn-sm">查看</RouterLink>
+                <RouterLink v-if="a.meeting_id" :to="`/meetings/${a.meeting_id}/attendance`" class="btn btn-g btn-sm">出席記錄</RouterLink>
+                <button v-if="canEdit(a)" class="btn btn-g btn-sm" @click="openEdit(a)">編輯</button>
+                <button v-if="a.meeting_id && canManageMeetings" class="btn btn-red btn-sm" @click="removeMeeting(a)">刪除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!filtered.length">

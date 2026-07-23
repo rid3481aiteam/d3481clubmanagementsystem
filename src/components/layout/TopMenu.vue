@@ -155,6 +155,9 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('J1_line_notify')) {
       advancedItems.push({ to: '/club/line-notify', icon: '💬', label: 'LINE 通知設定（測試中）' })
     }
+    if (features.isEnabled('K1_meeting_email_notify')) {
+      advancedItems.push({ to: '/club/email-notify', icon: '📧', label: 'Email 通知設定（測試中）' })
+    }
     items.push({
       type: 'dropdown',
       icon: '⚙️',
