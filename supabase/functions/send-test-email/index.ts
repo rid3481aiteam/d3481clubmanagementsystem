@@ -61,6 +61,51 @@ function encodeSubjectHeader(subject: string): string {
   return ' ' + words.map((w) => `=?utf-8?Q?${w}?=`).join('\r\n ')
 }
 
+// denomailer 內建的 quoted-printable 內文編碼也有 bug：每 74 字元強制切一次軟換行時，
+// 沒處理「切點剛好落在某個字的 =XX=XX=XX 位元組序列中間」的狀況，會把沒切完的位元組
+// 憑空弄丟，導致內文某個字被腰斬。這裡自己正確實作，透過 SendConfig 的 mimeContent
+// 直接把編碼好的內容交給 denomailer，繞過它內建、有問題的編碼路徑（跟
+// notify-meeting-created 重複貼一份，原因同檔案開頭 encodeSubjectHeader() 的註解：
+// 這個專案的 Edge Function 目前都是各自獨立部署，沒有共用程式碼機制）。
+function quotedPrintableEncodeBody(text: string): string {
+  const LINE_MAX = 74
+  const rawLines = text.split(/\r\n|\n/)
+  const outLines: string[] = []
+
+  for (const rawLine of rawLines) {
+    const units: string[] = []
+    for (const ch of rawLine) {
+      const bytes = Array.from(new TextEncoder().encode(ch))
+      if (
+        bytes.length === 1 &&
+        bytes[0] !== 0x3d &&
+        ((bytes[0] >= 0x20 && bytes[0] <= 0x7e) || bytes[0] === 0x09)
+      ) {
+        units.push(String.fromCharCode(bytes[0]))
+      } else {
+        units.push(bytes.map((b) => '=' + b.toString(16).toUpperCase().padStart(2, '0')).join(''))
+      }
+    }
+    if (units.length) {
+      const last = units[units.length - 1]
+      if (last === ' ') units[units.length - 1] = '=20'
+      else if (last === '\t') units[units.length - 1] = '=09'
+    }
+
+    let current = ''
+    for (const unit of units) {
+      if (current.length + unit.length > LINE_MAX - 1) {
+        outLines.push(current + '=')
+        current = ''
+      }
+      current += unit
+    }
+    outLines.push(current)
+  }
+
+  return outLines.join('\r\n')
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -115,13 +160,17 @@ Deno.serve(async (req) => {
     },
   })
 
+  const testHtml = '<p>這是一封測試信，如果您收到這封信，代表本社的 Email 通知設定正確可以正常寄信。</p>'
+
   try {
     await client.send({
       from: channel.email_from,
       to: to_email.trim(),
       subject: encodeSubjectHeader('【測試信】D3481 社務管理平台 Email 通知設定'),
-      content: 'auto',
-      html: '<p>這是一封測試信，如果您收到這封信，代表本社的 Email 通知設定正確可以正常寄信。</p>',
+      mimeContent: [
+        { mimeType: 'text/plain; charset="utf-8"', content: quotedPrintableEncodeBody(testHtml.replace(/<[^>]+>/g, '')), transferEncoding: 'quoted-printable' },
+        { mimeType: 'text/html; charset="utf-8"', content: quotedPrintableEncodeBody(testHtml), transferEncoding: 'quoted-printable' },
+      ],
     })
   } catch (err) {
     return errorResponse(

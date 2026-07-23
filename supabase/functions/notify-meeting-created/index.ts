@@ -4,6 +4,8 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+// 跟 invite-user/index.ts 用同一個正式站網址
+const SITE_URL = 'https://d3481clubmanagementsystem.pages.dev'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,6 +67,53 @@ function encodeSubjectHeader(subject: string): string {
   if (current) words.push(current)
 
   return ' ' + words.map((w) => `=?utf-8?Q?${w}?=`).join('\r\n ')
+}
+
+// denomailer 內建的 quoted-printable 內文編碼（透過 content/html 參數觸發）也有 bug：
+// 每 74 字元強制切一次軟換行時，最後一段沒有處理「切點剛好落在某個字的 =XX=XX=XX
+// 位元組序列中間」的狀況，會直接把沒切完的那幾個位元組憑空弄丟，導致內文某個字被
+// 腰斬（親身重現過：範本裡的「國際扶輪」被弄丟一個位元組變成「國際e6輪」）。這裡
+// 自己正確實作（每個字當一個不可切割的單位再包裝成軟換行行），透過 SendConfig 的
+// mimeContent 直接把編碼好的內容交給 denomailer（denomailer 對 mimeContent 只會原封
+// 不動寫到 SMTP DATA 裡，不會再處理一次），繞過它內建、有問題的編碼路徑。
+function quotedPrintableEncodeBody(text: string): string {
+  const LINE_MAX = 74
+  const rawLines = text.split(/\r\n|\n/)
+  const outLines: string[] = []
+
+  for (const rawLine of rawLines) {
+    const units: string[] = []
+    for (const ch of rawLine) {
+      const bytes = Array.from(new TextEncoder().encode(ch))
+      if (
+        bytes.length === 1 &&
+        bytes[0] !== 0x3d &&
+        ((bytes[0] >= 0x20 && bytes[0] <= 0x7e) || bytes[0] === 0x09)
+      ) {
+        units.push(String.fromCharCode(bytes[0]))
+      } else {
+        units.push(bytes.map((b) => '=' + b.toString(16).toUpperCase().padStart(2, '0')).join(''))
+      }
+    }
+    // 行尾如果剛好是空白/tab，要編碼成 =20/=09，避免被某些 SMTP relay 沿路修剪掉
+    if (units.length) {
+      const last = units[units.length - 1]
+      if (last === ' ') units[units.length - 1] = '=20'
+      else if (last === '\t') units[units.length - 1] = '=09'
+    }
+
+    let current = ''
+    for (const unit of units) {
+      if (current.length + unit.length > LINE_MAX - 1) {
+        outLines.push(current + '=')
+        current = ''
+      }
+      current += unit
+    }
+    outLines.push(current)
+  }
+
+  return outLines.join('\r\n')
 }
 
 Deno.serve(async (req) => {
@@ -167,12 +216,23 @@ Deno.serve(async (req) => {
   subjectParts.push(dateLabel)
   const subject = encodeSubjectHeader(subjectParts.join(' '))
 
+  // 對應的活動列（DB trigger 在新增例會時自動建立）用來組報名/回覆的連結
+  const { data: activity } = await adminClient
+    .from('activities')
+    .select('id')
+    .eq('meeting_id', meeting.id)
+    .maybeSingle()
+  const rsvpUrl = activity ? `${SITE_URL}/activities/${activity.id}` : SITE_URL
+
   const detailLines = [
+    meeting.session_no ? `場次：第 ${meeting.session_no} 次` : null,
     `日期：${dateLabel}`,
     meeting.title ? `主題：${escapeHtml(meeting.title)}` : null,
     meeting.speaker_name
       ? `講師：${escapeHtml(meeting.speaker_name)}${meeting.speaker_title ? `（${escapeHtml(meeting.speaker_title)}）` : ''}`
       : null,
+    meeting.speaker_phone ? `講師電話：${escapeHtml(meeting.speaker_phone)}` : null,
+    meeting.speaker_email ? `講師 Email：${escapeHtml(meeting.speaker_email)}` : null,
     meeting.venue ? `地點：${escapeHtml(meeting.venue)}` : null,
     meeting.note ? `備註：${escapeHtml(meeting.note)}` : null,
   ].filter((line): line is string => !!line)
@@ -181,8 +241,15 @@ Deno.serve(async (req) => {
     <p>親愛的社友，您好：</p>
     <p>${escapeHtml(clubName)}新增了一場例會，詳情如下：</p>
     <p>${detailLines.join('<br>')}</p>
-    <p>國際扶輪 3481 地區</p>
+    <p>回覆是否參加：<a href="${rsvpUrl}">${rsvpUrl}</a></p>
   `
+  // denomailer 的 text:'auto' 也是走同一個有 bug 的內文編碼，這裡自己比照它的 tag-strip
+  // 規則產生純文字版本，一樣用 quotedPrintableEncodeBody() 編碼
+  const plainText = html.replace(/<[^>]+>/g, '')
+  const mimeContent = [
+    { mimeType: 'text/plain; charset="utf-8"', content: quotedPrintableEncodeBody(plainText), transferEncoding: 'quoted-printable' },
+    { mimeType: 'text/html; charset="utf-8"', content: quotedPrintableEncodeBody(html), transferEncoding: 'quoted-printable' },
+  ]
 
   const client = new SMTPClient({
     connection: {
@@ -205,8 +272,7 @@ Deno.serve(async (req) => {
         from: channel.email_from,
         to: member.email as string,
         subject,
-        content: 'auto',
-        html,
+        mimeContent,
       })
       sent++
     } catch (err) {
