@@ -38,5 +38,11 @@ export const useOfficersStore = defineStore('officers', () => {
     return { error }
   }
 
-  return { list, loading, fetchAll, insert, update, remove }
+  async function fetchYearTerms(clubId: string): Promise<string[]> {
+    const { data } = await supabase.from('club_officers').select('year_term').eq('club_id', clubId)
+    const terms = new Set((data ?? []).map(d => d.year_term))
+    return [...terms].sort((a, b) => b.localeCompare(a))
+  }
+
+  return { list, loading, fetchAll, insert, update, remove, fetchYearTerms }
 })

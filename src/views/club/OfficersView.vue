@@ -12,6 +12,13 @@ const officers = useOfficersStore()
 const canManage = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
 
 const yearTerm = ref(currentYearTerm())
+const availableYearTerms = ref<string[]>([])
+const yearTermOptions = computed(() => {
+  const set = new Set(availableYearTerms.value)
+  set.add(currentYearTerm())
+  set.add(yearTerm.value)
+  return [...set].sort((a, b) => b.localeCompare(a))
+})
 
 const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
   { role: 'president', label: '社長' },
@@ -86,6 +93,23 @@ const committeeGroups = computed<CommitteeGroup[]>(() => {
   }))
 })
 
+const expandedCommittees = ref<Set<string>>(new Set())
+function isExpanded(name: string) {
+  return expandedCommittees.value.has(name)
+}
+function toggleCommittee(name: string) {
+  const next = new Set(expandedCommittees.value)
+  if (next.has(name)) next.delete(name)
+  else next.add(name)
+  expandedCommittees.value = next
+}
+function expandAllCommittees() {
+  expandedCommittees.value = new Set(committeeGroups.value.map(g => g.name))
+}
+function collapseAllCommittees() {
+  expandedCommittees.value = new Set()
+}
+
 function memberOptions(current: string) {
   if (current && !activeMemberKeys.value.includes(current)) return [current, ...activeMemberKeys.value]
   return activeMemberKeys.value
@@ -140,11 +164,13 @@ async function load() {
   if (!auth.clubId) return
   await roster.fetchAll(auth.clubId)
   await officers.fetchAll(auth.clubId, yearTerm.value)
+  availableYearTerms.value = await officers.fetchYearTerms(auth.clubId)
   const map: Record<string, string> = {}
   for (const { role } of SINGLE_ROLES) {
     map[role] = officers.list.find(o => o.role === role)?.name ?? ''
   }
   singleNames.value = map
+  expandedCommittees.value = new Set()
 }
 
 async function saveSingleRoles() {
@@ -270,7 +296,9 @@ watch(yearTerm, load)
       <h1>社的年度成員</h1>
       <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
         <label class="fl" style="display:inline-block; margin-right:6px;">年度</label>
-        <input v-model="yearTerm" class="fi" style="width:120px; display:inline-block;" :disabled="editing" placeholder="2025-2026" />
+        <select v-model="yearTerm" class="fi" style="width:170px; display:inline-block;" :disabled="editing">
+          <option v-for="t in yearTermOptions" :key="t" :value="t">{{ t }}{{ t === currentYearTerm() ? '（本年度）' : '' }}</option>
+        </select>
         <template v-if="canManage">
           <button v-if="!editing" class="btn btn-gold" @click="startEdit">編輯年度成員</button>
           <template v-else>
@@ -304,7 +332,13 @@ watch(yearTerm, load)
       <option v-for="p in POSITION_PRESETS" :key="p" :value="p" />
     </datalist>
 
-    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">委員會成員</h2>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy);">委員會成員</h2>
+      <div v-if="!editing && committeeGroups.length" style="display:flex; gap:8px;">
+        <button class="btn btn-g btn-sm" @click="expandAllCommittees">全部展開</button>
+        <button class="btn btn-g btn-sm" @click="collapseAllCommittees">全部收合</button>
+      </div>
+    </div>
     <div class="tw">
       <table class="card-table">
         <thead class="th">
@@ -339,15 +373,21 @@ watch(yearTerm, load)
         </tbody>
         <template v-else>
           <tbody v-for="g in committeeGroups" :key="g.name">
-            <tr class="zone-row">
-              <td colspan="2"><strong>{{ g.name }}</strong></td>
-            </tr>
-            <tr v-for="m in g.members" :key="m.id">
-              <td data-label="職稱">
-                <span class="bdg" :class="m.note === '主委' ? 'b-y' : m.note === '副主委' ? 'b-n' : 'b-g'">{{ m.note || '委員' }}</span>
+            <tr class="zone-row" @click="toggleCommittee(g.name)">
+              <td colspan="2">
+                <span class="zone-chevron">{{ isExpanded(g.name) ? '▾' : '▸' }}</span>
+                <strong>{{ g.name }}</strong>
+                <span style="color:var(--muted); font-weight:400;">（{{ g.members.length }} 人）</span>
               </td>
-              <td data-label="英文名稱">{{ memberDisplayName(m.name) }}</td>
             </tr>
+            <template v-if="isExpanded(g.name)">
+              <tr v-for="m in g.members" :key="m.id">
+                <td data-label="職稱">
+                  <span class="bdg" :class="m.note === '主委' ? 'b-y' : m.note === '副主委' ? 'b-n' : 'b-g'">{{ m.note || '委員' }}</span>
+                </td>
+                <td data-label="英文名稱">{{ memberDisplayName(m.name) }}</td>
+              </tr>
+            </template>
           </tbody>
           <tbody v-if="!committeeGroups.length">
             <tr>
@@ -398,5 +438,23 @@ watch(yearTerm, load)
 
 .table-input {
   min-width: 180px;
+}
+
+.zone-row {
+  cursor: pointer;
+  background: var(--gold-p);
+}
+.zone-row:hover td {
+  background: var(--gold-p);
+}
+.zone-row td {
+  font-size: 13px;
+  color: var(--navy);
+  padding: 8px 14px;
+}
+.zone-chevron {
+  display: inline-block;
+  width: 14px;
+  color: var(--muted);
 }
 </style>
