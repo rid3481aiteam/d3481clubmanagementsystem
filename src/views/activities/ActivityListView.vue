@@ -80,6 +80,17 @@ const selectedRecipientIds = ref<string[]>([])
 const emailableMembers = computed(() =>
   rosterStore.members.filter(m => m.member_status === 'normal' && m.email && m.email.trim())
 )
+// 額外手動輸入的非社友收件人（例如來賓、講師），一行或用逗號分隔多組
+const extraEmailsInput = ref('')
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+function parseExtraEmails(): string[] {
+  return Array.from(new Set(
+    extraEmailsInput.value
+      .split(/[,、\n]/)
+      .map(s => s.trim())
+      .filter(s => s && EMAIL_RE.test(s)),
+  ))
+}
 
 async function syncRecipientDefaults() {
   if (!(isMeetingForm.value && !isEditing.value && features.isEnabled('K1_meeting_email_notify'))) return
@@ -123,6 +134,7 @@ function openAdd() {
   startLocal.value = ''
   deadlineLocal.value = ''
   selectedRecipientIds.value = []
+  extraEmailsInput.value = ''
   showModal.value = true
   syncRecipientDefaults()
 }
@@ -194,15 +206,16 @@ async function save() {
   toast.show(isEditing.value ? '已更新' : '已新增')
   await loadActivities()
 
-  // 新增例會（不是編輯）且功能開關有打開，才自動發信通知本社社友（勾選名單）
+  // 新增例會（不是編輯）且功能開關有打開，才自動發信通知本社社友（勾選名單＋手動加的收件人）
   if (newMeetingId && features.isEnabled('K1_meeting_email_notify')) {
-    const { data, error } = await meetingsStore.notifyCreated(newMeetingId, selectedRecipientIds.value)
+    const extraEmails = parseExtraEmails()
+    const { data, error } = await meetingsStore.notifyCreated(newMeetingId, selectedRecipientIds.value, extraEmails)
     if (error) {
       toast.show('例會通知信發送失敗：' + error, 'err')
     } else if (data) {
       toast.show(
         data.sent > 0
-          ? `已發送例會通知信給 ${data.sent} 位社友${data.skipped_no_email ? `（${data.skipped_no_email} 位沒有登記 Email，已略過）` : ''}`
+          ? `已發送例會通知信給 ${data.sent} 人${data.skipped_no_email ? `（${data.skipped_no_email} 位社友沒有登記 Email，已略過）` : ''}`
           : (data.message ?? '沒有可發送的對象'),
       )
     }
@@ -382,6 +395,9 @@ watch(() => auth.isDistrictAdminView, loadActivities)
                   {{ m.nick_name || m.name }}
                 </label>
               </div>
+
+              <label class="fl" style="margin-top:12px;">其他收件人（非社友，例如來賓、講師，可貼多組 Email，用逗號或換行分隔）</label>
+              <textarea v-model="extraEmailsInput" class="fi" style="min-height:56px;" placeholder="guest1@example.com, guest2@example.com"></textarea>
             </div>
           </template>
 

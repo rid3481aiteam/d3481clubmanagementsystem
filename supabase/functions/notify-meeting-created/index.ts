@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
     return errorResponse('沒有權限發送例會通知', 403)
   }
 
-  const { meeting_id, roster_ids } = await req.json()
+  const { meeting_id, roster_ids, extra_emails } = await req.json()
   if (!meeting_id) return errorResponse('缺少 meeting_id', 400)
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
@@ -171,36 +171,46 @@ Deno.serve(async (req) => {
     .eq('id', meeting.club_id)
     .single()
 
-  let membersQuery = adminClient
-    .from('roster')
-    .select('id, name, email')
-    .eq('club_id', meeting.club_id)
-    .eq('member_status', 'normal')
-
   // roster_ids 有帶（不管是不是空陣列）代表前端用勾選名單指定收件人；
-  // 沒帶（undefined）維持舊行為＝發給本社全部有 Email 的正常社友
-  if (Array.isArray(roster_ids)) {
-    if (!roster_ids.length) {
-      return new Response(
-        JSON.stringify({ success: true, sent: 0, skipped_no_email: 0, message: '未勾選任何收件人，未發送通知信' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-    membersQuery = membersQuery.in('id', roster_ids)
+  // 沒帶（undefined）維持舊行為＝發給本社全部有 Email 的正常社友。帶空陣列時完全
+  // 不查名冊（等同「不發給任何社友」），是否還有信可寄要看下面的 extra_emails。
+  let allMembers: { id: string; name: string | null; email: string | null }[] = []
+  if (!Array.isArray(roster_ids) || roster_ids.length) {
+    let membersQuery = adminClient
+      .from('roster')
+      .select('id, name, email')
+      .eq('club_id', meeting.club_id)
+      .eq('member_status', 'normal')
+    if (Array.isArray(roster_ids)) membersQuery = membersQuery.in('id', roster_ids)
+    const { data: members } = await membersQuery
+    allMembers = members ?? []
   }
+  const rosterRecipients = allMembers.filter((m) => m.email && m.email.trim())
 
-  const { data: members } = await membersQuery
+  // 使用者手動加的非社友收件人（例如來賓、講師），簡單驗證格式、去掉跟社友清單重複
+  // 的地址（避免同一人收到兩封），caller 已經確認是本社 club_admin/club_secretary，
+  // 不用像 roster_ids 那樣限制「一定要屬於本社」——本來就是使用者自己手動輸入的。
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const rosterEmailSet = new Set(rosterRecipients.map((m) => (m.email as string).trim().toLowerCase()))
+  const extraEmails = Array.isArray(extra_emails)
+    ? Array.from(new Set(
+        (extra_emails as unknown[])
+          .map((e) => (typeof e === 'string' ? e.trim() : ''))
+          .filter((e) => e && EMAIL_RE.test(e) && !rosterEmailSet.has(e.toLowerCase())),
+      ))
+    : []
 
-  const allMembers = members ?? []
-  const recipients = allMembers.filter((m) => m.email && m.email.trim())
+  const recipientEmails = [...rosterRecipients.map((m) => m.email as string), ...extraEmails]
 
-  if (!recipients.length) {
+  if (!recipientEmails.length) {
     return new Response(
       JSON.stringify({
         success: true,
         sent: 0,
-        skipped_no_email: allMembers.length,
-        message: '本社名冊裡沒有登記 Email 的社友，未發送任何通知',
+        skipped_no_email: allMembers.length - rosterRecipients.length,
+        message: Array.isArray(roster_ids) && !roster_ids.length
+          ? '未勾選任何收件人，未發送通知信'
+          : '本社名冊裡沒有登記 Email 的社友，未發送任何通知',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
@@ -266,17 +276,17 @@ Deno.serve(async (req) => {
   let sent = 0
   const sendErrors: string[] = []
 
-  for (const member of recipients) {
+  for (const email of recipientEmails) {
     try {
       await client.send({
         from: channel.email_from,
-        to: member.email as string,
+        to: email,
         subject,
         mimeContent,
       })
       sent++
     } catch (err) {
-      sendErrors.push(`${member.email}：${err instanceof Error ? err.message : String(err)}`)
+      sendErrors.push(`${email}：${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -294,7 +304,8 @@ Deno.serve(async (req) => {
     JSON.stringify({
       success: true,
       sent,
-      skipped_no_email: allMembers.length - recipients.length,
+      skipped_no_email: allMembers.length - rosterRecipients.length,
+      extra_sent: extraEmails.length,
       partial_errors: sendErrors.length ? sendErrors : undefined,
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

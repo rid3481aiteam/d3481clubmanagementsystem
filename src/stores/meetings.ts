@@ -31,16 +31,20 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   // 新增例會後自動發信通知本社社友（K1_meeting_email_notify 開啟時才有意義呼叫）
   // rosterIds 有帶＝只發給勾選的名單（空陣列＝使用者沒勾任何人，不發信）；
-  // 不帶＝維持發給本社全部有 Email 的正常社友
-  async function notifyCreated(meetingId: string, rosterIds?: string[]) {
+  // 不帶＝維持發給本社全部有 Email 的正常社友。extraEmails 是額外手動輸入的非社友
+  // 收件人（例如來賓、講師），會加進去一起發，不受 rosterIds 邏輯影響
+  async function notifyCreated(meetingId: string, rosterIds?: string[], extraEmails?: string[]) {
+    const body: Record<string, unknown> = { meeting_id: meetingId }
+    if (rosterIds) body.roster_ids = rosterIds
+    if (extraEmails?.length) body.extra_emails = extraEmails
+
     const { data, error } = await supabase.functions.invoke<{
       success: boolean
       sent: number
       skipped_no_email: number
+      extra_sent?: number
       message?: string
-    }>('notify-meeting-created', {
-      body: rosterIds ? { meeting_id: meetingId, roster_ids: rosterIds } : { meeting_id: meetingId },
-    })
+    }>('notify-meeting-created', { body })
 
     if (error) {
       let msg = error.message
