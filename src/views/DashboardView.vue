@@ -261,7 +261,7 @@ function toggleZone(zone: string) {
         <div class="stat-label">本月例會數</div>
         <div class="stat-value">{{ dashboard.meetingCount }}</div>
       </div>
-      <div class="stat-card c-sky clickable" @click="router.push('/attendance/monthly')">
+      <div class="stat-card c-sky" :class="{ clickable: auth.role !== 'club_member' }" @click="auth.role !== 'club_member' && router.push('/attendance/monthly')">
         <div class="stat-label">本月出席率</div>
         <div class="stat-value">{{ dashboard.monthlyRate !== null ? dashboard.monthlyRate + '%' : '-' }}</div>
         <div v-if="dashboard.monthlyRate !== null" class="bar-track" style="margin-top:10px;">
@@ -278,7 +278,7 @@ function toggleZone(zone: string) {
       </div>
       </div>
 
-      <div v-if="auth.clubId" style="margin-bottom:16px;">
+      <div v-if="auth.clubId && auth.role !== 'club_member'" style="margin-bottom:16px;">
         <RouterLink to="/attendance/monthly" class="btn btn-g btn-sm">查看歷月出席率 →</RouterLink>
       </div>
 

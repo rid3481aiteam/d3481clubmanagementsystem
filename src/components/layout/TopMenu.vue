@@ -108,7 +108,7 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('E1_activities') || features.isEnabled('B1_meeting_info')) {
       items.push({ type: 'link', to: '/activities', icon: '📅', label: '活動' })
     }
-    if (features.isEnabled('B2_attendance_summary')) {
+    if (features.isEnabled('B2_attendance_summary') && auth.role !== 'club_member') {
       items.push({ type: 'link', to: '/attendance/monthly', icon: '📈', label: '出席月報' })
     }
     const memberItems: { to: string; icon: string; label: string }[] = [
@@ -136,7 +136,7 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('G1_iou')) {
       items.push({ type: 'link', to: '/club/iou', icon: '💰', label: 'IOU' })
     }
-    if (features.isEnabled('I1_gg')) {
+    if (features.isEnabled('I1_gg') && auth.role !== 'club_member') {
       items.push({ type: 'link', to: '/club/gg', icon: '🌐', label: 'GG案' })
     }
     if (isClubManager && features.isEnabled('B5_edm')) {
