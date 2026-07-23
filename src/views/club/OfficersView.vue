@@ -311,6 +311,8 @@ function addCommitteeMembers() {
     })
   }
   newMemberValues.value = []
+  newCommitteeName.value = ''
+  newMemberNote.value = '委員'
 }
 
 function removeCommitteeMember(key: string) {
@@ -331,6 +333,8 @@ function addPrimaryOfficers() {
     })
   }
   newPrimaryOfficerValues.value = []
+  newPrimaryPositionName.value = ''
+  newPrimaryOfficerNote.value = ''
 }
 
 function removePrimaryOfficer(key: string) {
