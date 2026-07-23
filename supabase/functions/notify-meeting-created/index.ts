@@ -26,6 +26,47 @@ function escapeHtml(text: string) {
     .replace(/>/g, '&gt;')
 }
 
+// denomailer 對 Subject 的 RFC 2047 編碼有 bug：超過約 74 個編碼字元（中文約 8 個字）
+// 就整個截斷、不做正確的 header folding，導致收件端（實測 Gmail、Outlook 都會）整封信
+// 顯示成沒解碼的原始 MIME 亂碼（見 https://github.com/EC-Nordbund/denomailer/issues/90）。
+// 我們的主旨（社名＋場次＋日期）幾乎一定會超過這個長度，沒辦法靠縮短內容繞開。
+// 這裡自己正確實作 RFC 2047 多段 encoded-word + header folding，直接把編碼好的結果
+// 傳給 denomailer；開頭刻意加一個空白字元，是因為 denomailer 的
+// quotedPrintableEncodeInline() 只要偵測到字串「以 =? 開頭」就會誤判成「已經編碼過」
+// 再整包錯誤地重新編碼一次——加這個空白能讓它判斷成「不需要編碼」而原樣送出，等於
+// 繞過那個 bug，不用改動/替換整個寄信套件。
+function encodeSubjectHeader(subject: string): string {
+  const MAX_PAYLOAD = 60 // 保守值，含 "=?utf-8?Q?" 跟 "?=" 頭尾後仍在 RFC 2047 建議的 75 字元單段上限內
+  const units: string[] = []
+  for (const ch of subject) {
+    let unit = ''
+    for (const byte of new TextEncoder().encode(ch)) {
+      if (byte === 0x20) {
+        unit += '_'
+      } else if (byte >= 0x21 && byte <= 0x7e && byte !== 0x3d && byte !== 0x3f && byte !== 0x5f) {
+        unit += String.fromCharCode(byte)
+      } else {
+        unit += '=' + byte.toString(16).toUpperCase().padStart(2, '0')
+      }
+    }
+    units.push(unit)
+  }
+
+  const words: string[] = []
+  let current = ''
+  for (const unit of units) {
+    if (current && current.length + unit.length > MAX_PAYLOAD) {
+      words.push(current)
+      current = unit
+    } else {
+      current += unit
+    }
+  }
+  if (current) words.push(current)
+
+  return ' ' + words.map((w) => `=?utf-8?Q?${w}?=`).join('\r\n ')
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -124,7 +165,7 @@ Deno.serve(async (req) => {
   const subjectParts = [`【${clubName}】例會通知`]
   if (meeting.session_no) subjectParts.push(`第${meeting.session_no}次`)
   subjectParts.push(dateLabel)
-  const subject = subjectParts.join(' ')
+  const subject = encodeSubjectHeader(subjectParts.join(' '))
 
   const detailLines = [
     `日期：${dateLabel}`,
