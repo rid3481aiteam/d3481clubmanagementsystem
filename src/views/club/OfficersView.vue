@@ -33,19 +33,58 @@ interface CommitteeDraft {
   id: string | null
   committee_name: string
   name: string
+  note: string
+}
+
+const POSITION_PRESETS = ['主委', '副主委', '委員', '總幹事', '執行長', '顧問', '司儀', '召集人']
+
+function notePriority(note: string): number {
+  if (note === '主委') return 0
+  if (note === '副主委') return 1
+  return 2
 }
 
 const singleNames = ref<Record<string, string>>({})
 const draftSingleNames = ref<Record<string, string>>({})
 const draftCommitteeMembers = ref<CommitteeDraft[]>([])
 const newCommitteeName = ref('')
-const newMemberName = ref('')
+const newMemberNote = ref('委員')
+const newMemberValues = ref<string[]>([])
 const saving = ref(false)
 const editing = ref(false)
 
 const committeeMembers = computed(() => officers.list.filter(o => o.role === 'committee_member'))
 const activeMembers = computed(() => roster.members.filter(m => m.is_active))
 const activeMemberKeys = computed(() => activeMembers.value.map(memberValue))
+
+const existingCommitteeNames = computed(() => {
+  const names = new Set<string>()
+  for (const m of committeeMembers.value) if (m.committee_name) names.add(m.committee_name)
+  for (const d of draftCommitteeMembers.value) if (d.committee_name) names.add(d.committee_name)
+  return [...names].sort((a, b) => a.localeCompare(b, 'zh-Hant'))
+})
+
+interface CommitteeGroup {
+  name: string
+  members: typeof officers.list
+}
+
+const committeeGroups = computed<CommitteeGroup[]>(() => {
+  const order: string[] = []
+  const map = new Map<string, typeof officers.list>()
+  for (const m of committeeMembers.value) {
+    const key = m.committee_name || '未分類'
+    if (!map.has(key)) {
+      map.set(key, [])
+      order.push(key)
+    }
+    map.get(key)!.push(m)
+  }
+  return order.map(name => ({
+    name,
+    members: [...map.get(name)!].sort((a, b) => notePriority(a.note || '') - notePriority(b.note || '')),
+  }))
+})
 
 function memberOptions(current: string) {
   if (current && !activeMemberKeys.value.includes(current)) return [current, ...activeMemberKeys.value]
@@ -80,9 +119,11 @@ function startEdit() {
     id: m.id,
     committee_name: m.committee_name || '',
     name: m.name,
+    note: m.note || '',
   }))
   newCommitteeName.value = ''
-  newMemberName.value = ''
+  newMemberNote.value = '委員'
+  newMemberValues.value = []
   editing.value = true
 }
 
@@ -90,7 +131,8 @@ function cancelEdit() {
   draftSingleNames.value = {}
   draftCommitteeMembers.value = []
   newCommitteeName.value = ''
-  newMemberName.value = ''
+  newMemberNote.value = '委員'
+  newMemberValues.value = []
   editing.value = false
 }
 
@@ -145,12 +187,12 @@ async function saveSingleRoles() {
       role: 'committee_member' as ClubOfficerRole,
       name: draft.name.trim(),
       committee_name: draft.committee_name.trim() || null,
-      note: null,
+      note: draft.note.trim() || null,
     }
     if (!payload.name) continue
     if (draft.id) {
       const existing = committeeMembers.value.find(m => m.id === draft.id)
-      if (existing && (existing.name !== payload.name || (existing.committee_name || '') !== (payload.committee_name || ''))) {
+      if (existing && (existing.name !== payload.name || (existing.committee_name || '') !== (payload.committee_name || '') || (existing.note || '') !== (payload.note || ''))) {
         const { error } = await officers.update(draft.id, payload)
         if (error) {
           alert('儲存失敗：' + error.message)
@@ -198,16 +240,20 @@ async function syncRosterAnnualPositions() {
   }
 }
 
-async function addCommitteeMember() {
-  if (!auth.clubId || !editing.value || !newMemberName.value.trim()) return
-  draftCommitteeMembers.value.push({
-    key: `new-${Date.now()}-${newMemberName.value}`,
-    id: null,
-    name: newMemberName.value.trim(),
-    committee_name: newCommitteeName.value.trim(),
-  })
-  newCommitteeName.value = ''
-  newMemberName.value = ''
+function addCommitteeMembers() {
+  if (!editing.value || !newCommitteeName.value.trim() || !newMemberValues.value.length) return
+  const committeeName = newCommitteeName.value.trim()
+  const note = newMemberNote.value.trim() || '委員'
+  for (const value of newMemberValues.value) {
+    draftCommitteeMembers.value.push({
+      key: `new-${Date.now()}-${value}-${Math.random().toString(36).slice(2, 7)}`,
+      id: null,
+      name: value,
+      committee_name: committeeName,
+      note,
+    })
+  }
+  newMemberValues.value = []
 }
 
 function removeCommitteeMember(key: string) {
@@ -251,19 +297,32 @@ watch(yearTerm, load)
       </div>
     </div>
 
+    <datalist id="committee-name-options">
+      <option v-for="n in existingCommitteeNames" :key="n" :value="n" />
+    </datalist>
+    <datalist id="position-presets">
+      <option v-for="p in POSITION_PRESETS" :key="p" :value="p" />
+    </datalist>
+
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">委員會成員</h2>
     <div class="tw">
       <table class="card-table">
         <thead class="th">
-          <tr>
+          <tr v-if="editing">
             <th>委員會</th>
+            <th>職稱</th>
             <th>英文名稱</th>
-            <th v-if="editing"></th>
+            <th></th>
+          </tr>
+          <tr v-else>
+            <th>職稱</th>
+            <th>英文名稱</th>
           </tr>
         </thead>
         <tbody v-if="editing">
           <tr v-for="m in draftCommitteeMembers" :key="m.key">
-            <td data-label="委員會"><input v-model="m.committee_name" class="fi table-input" /></td>
+            <td data-label="委員會"><input v-model="m.committee_name" list="committee-name-options" class="fi table-input" /></td>
+            <td data-label="職稱"><input v-model="m.note" list="position-presets" class="fi table-input" placeholder="委員" /></td>
             <td data-label="英文名稱">
               <select v-model="m.name" class="fi table-input">
                 <option value="">請選擇</option>
@@ -275,34 +334,52 @@ watch(yearTerm, load)
             </td>
           </tr>
           <tr v-if="!draftCommitteeMembers.length">
-            <td colspan="3" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>
+            <td colspan="4" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>
           </tr>
         </tbody>
-        <tbody v-else>
-          <tr v-for="m in committeeMembers" :key="m.id">
-            <td data-label="委員會">{{ m.committee_name || '-' }}</td>
-            <td data-label="英文名稱">{{ memberDisplayName(m.name) }}</td>
-          </tr>
-          <tr v-if="!committeeMembers.length">
-            <td colspan="2" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>
-          </tr>
-        </tbody>
+        <template v-else>
+          <tbody v-for="g in committeeGroups" :key="g.name">
+            <tr class="zone-row">
+              <td colspan="2"><strong>{{ g.name }}</strong></td>
+            </tr>
+            <tr v-for="m in g.members" :key="m.id">
+              <td data-label="職稱">
+                <span class="bdg" :class="m.note === '主委' ? 'b-y' : m.note === '副主委' ? 'b-n' : 'b-g'">{{ m.note || '委員' }}</span>
+              </td>
+              <td data-label="英文名稱">{{ memberDisplayName(m.name) }}</td>
+            </tr>
+          </tbody>
+          <tbody v-if="!committeeGroups.length">
+            <tr>
+              <td colspan="2" style="text-align:center; color:var(--muted);">尚無委員會成員資料</td>
+            </tr>
+          </tbody>
+        </template>
       </table>
     </div>
 
-    <div v-if="canManage && editing" style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:flex-end;">
-      <div>
-        <label class="fl">委員會名稱</label>
-        <input v-model="newCommitteeName" class="fi" placeholder="例如：會員發展委員會" style="min-width:200px;" />
+    <div v-if="canManage && editing" class="tw" style="padding:16px 20px; margin-top:14px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:10px;">新增委員會成員</h2>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+        <div>
+          <label class="fl">委員會名稱</label>
+          <input v-model="newCommitteeName" class="fi" list="committee-name-options" placeholder="例如：會員發展委員會" style="min-width:200px;" />
+        </div>
+        <div>
+          <label class="fl">職稱</label>
+          <input v-model="newMemberNote" class="fi" list="position-presets" style="width:120px;" />
+        </div>
       </div>
-      <div>
-        <label class="fl">英文名稱</label>
-        <select v-model="newMemberName" class="fi" style="min-width:160px;">
-          <option value="">請選擇</option>
-          <option v-for="n in activeMemberKeys" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
-        </select>
+      <label class="fl">勾選要加入這個委員會的成員（可多選）</label>
+      <div style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin:8px 0 12px; border:1px solid var(--border); border-radius:var(--r); padding:10px;">
+        <label v-for="n in activeMemberKeys" :key="n" style="display:flex; align-items:center; gap:6px; font-size:13px;">
+          <input type="checkbox" :value="n" v-model="newMemberValues" />
+          {{ memberOptionLabel(n) }}
+        </label>
       </div>
-      <button class="btn btn-g" @click="addCommitteeMember">+ 新增委員</button>
+      <button class="btn btn-g" :disabled="!newCommitteeName.trim() || !newMemberValues.length" @click="addCommitteeMembers">
+        + 加入所選成員（{{ newMemberValues.length }}）
+      </button>
     </div>
   </div>
 </template>
