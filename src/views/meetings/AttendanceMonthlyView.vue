@@ -5,6 +5,7 @@ import { useAttendanceStore } from '@/stores/attendance'
 import { useMembershipReportsStore } from '@/stores/membershipReports'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useFeaturesStore } from '@/stores/features'
+import PageHelp from '@/components/help/PageHelp.vue'
 import type { ClubMonthlyMembershipReportUpdate } from '@/types'
 
 const auth = useAuthStore()
@@ -12,6 +13,13 @@ const attendance = useAttendanceStore()
 const reports = useMembershipReportsStore()
 const permissions = usePermissionsStore()
 const features = useFeaturesStore()
+
+const attendanceMonthlyHelpItems = [
+  '這頁自動彙整「活動」頁例會逐人登記的出席紀錄，換上方「選擇月份」就能看該月出席率、例會場次跟每場例會的應出席／實際出席人數。',
+  '如果有例會沒有透過「活動」頁逐人登記，可以在「快速新增／補登例會出席」直接填當天應出席／實際出席人數；該天若已逐人登記過，請改到「活動」頁該場例會的出席記錄編輯，不要兩邊都填。',
+  '有開通 RI 半年報功能的話，「RI 半年報基準人數」區塊可以填基準／當月男女社友人數與年齡分布，系統會自動算出淨成長，供社長每半年填報 RI 用。',
+  '最下面「歷月出席月報」是全部月份的總表，可以用來對照出席率趨勢，60% 是扶輪社規定的最低出席門檻。',
+]
 
 const canEditAttendance = computed(() => permissions.can('attendance', 'edit'))
 const canEditMembership = computed(() => permissions.can('membership_reports', 'edit'))
@@ -118,7 +126,10 @@ watch(selectedMonth, async () => {
 <template>
   <div class="page">
     <div class="ph">
-      <h1>出席月報</h1>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h1>出席月報</h1>
+        <PageHelp title="出席月報怎麼用" :items="attendanceMonthlyHelpItems" />
+      </div>
     </div>
 
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
