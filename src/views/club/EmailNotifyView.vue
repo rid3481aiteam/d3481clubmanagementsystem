@@ -68,11 +68,19 @@ onMounted(() => {
 
     <div class="tw" style="padding:20px; margin-bottom:20px;">
       <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:4px;">1. 設定 Gmail 帳號 + 應用程式密碼</h2>
-      <p style="font-size:12.5px; color:var(--muted); margin-bottom:14px;">
+      <p style="font-size:12.5px; color:var(--muted); margin-bottom:10px;">
         先到 Google 帳號開啟兩步驟驗證，再到
         <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">應用程式密碼</a>
         頁面產生一組 16 碼的應用程式密碼（**不是**你平常登入 Gmail 的密碼），貼在下面。
       </p>
+
+      <ol style="font-size:12.5px; color:var(--muted); line-height:1.7; margin:0 0 14px 18px; padding:0;">
+        <li>點上面那個「應用程式密碼」連結，會開新分頁跳到 Google 帳戶的「應用程式密碼」設定頁（用你想拿來寄信的那個 Gmail 帳號登入）。</li>
+        <li>在「應用程式名稱」欄位輸入一個好辨認的名稱，例如「社務管理平台Email通知」，方便之後在密碼清單裡認出這組密碼的用途。</li>
+        <li>輸入完按「建立」，會跳出一組系統產生的 16 碼密碼（用空格分成 4 組，長得像 xxxx xxxx xxxx xxxx）。<strong>這組密碼只會顯示這一次</strong>，先把它整組複製起來。</li>
+        <li>回到這頁，把 Gmail 帳號填進下面的「Gmail 帳號」欄位，剛剛複製的密碼貼進「應用程式密碼」欄位（貼上時通常會自動去掉中間的空格，不影響使用），按「儲存憑證」。</li>
+        <li>儲存後，到下面「2. 發送測試信」輸入想收測試信的 Email，按「發送測試信」確認能正常寄出。</li>
+      </ol>
 
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
         <span class="bdg" :class="isConnected ? 'b-gr' : 'b-g'">{{ isConnected ? '已設定' : '尚未設定' }}</span>
