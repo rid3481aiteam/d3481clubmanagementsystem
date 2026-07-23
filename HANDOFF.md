@@ -1,5 +1,7 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-23（第九十四輪，**修復例會通知信/測試信主旨中文亂碼**——使用者截圖回報 Outlook、Gmail 收到的例會通知信整封顯示成沒解碼的原始 MIME 內容（一堆 `=e8=a6=aa=e6=84=9b=...` 這種 quoted-printable 編碼文字，不是正常中文）。追查根因不是我們自己的程式碼，是 [`denomailer`](https://github.com/EC-Nordbund/denomailer)（第九十輪開始用來透過 Gmail SMTP 寄信的套件）本身的已知 bug（[issue #90](https://github.com/EC-Nordbund/denomailer/issues/90)）：Subject 只要是中文，編碼後長度超過約 74 個字元（中文大概 8 個字）就會觸發，它不會照 RFC 2047 規範把過長的 header 折成多行，而是直接把編碼字串攔腰截斷、破壞多位元組字元，產生無效的 Subject header，部分郵件用戶端（實測 Outlook、Gmail 都會）碰到這種壞掉的 header 會直接放棄解析整封信、退回顯示原始碼。我們的例會通知信主旨（社名＋場次＋日期）幾乎必然超過這個長度，靠縮短內容沒辦法可靠繞開（很多社名本身就快 8 個字）；`send-test-email` 固定文字的測試信主旨其實也超過門檻，一樣會中招，只是之前都還沒真的寄信測試過才沒發現。修法：`notify-meeting-created`、`send-test-email` 兩支函式都新增 `encodeSubjectHeader()`，自己正確實作 RFC 2047 多段 encoded-word + header folding；刻意在開頭加一個空白字元，是利用 denomailer 原始碼「字串開頭是 `=?` 才會誤判成已經編碼過、再整包重新（錯誤地）編碼一次」的判斷邏輯漏洞，讓它把我們已經編碼好的字串原樣送出，等於不用替換整個寄信套件就繞過這個 bug（詳細原理寫在函式上方的註解）。**這次沒有用猜的**：把 denomailer 原始碼從 GitHub 抓下來，用 Node 腳本逐行複製它實際的編碼邏輯重現使用者截圖裡一模一樣的截斷位置/亂碼（`=e6=ac=` 被硬生生從中間切斷、破壞「次」這個字），再用同一份腳本驗證修法：5 組案例（短/長中文主旨、純 ASCII、單一短中文字、超長社名）用真實 denomailer 邏輯 + 標準 RFC 2047 解碼器都通過「denomailer 原樣送出＋解碼回去等於原文」的往返驗證。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過（Edge Function 是 Deno 檔案不在這個檢查範圍內，前端沒有改動）。**這輪一樣沒有真實 `.env.local`，沒辦法做真正的 SMTP 寄信測試**，邏輯層驗證已經盡力做到位，但實際寄送效果還是要使用者部署後用真的長中文主旨（例如有場次編號的例會）實測才能 100% 確認。**待使用者：重新部署這兩支函式**（跟第九十三輪一樣的部署方式，兩支都要重新貼一次最新內容上去，`notify-meeting-created` 因為第九十三輪加過勾選收件人的改動、這輪又加了這個修復，`send-test-email` 這輪第一次真的改到內容），部署後在「Email 通知設定」頁按「發送測試信」，確認收到的測試信主旨正常顯示中文（不是亂碼/原始碼），再實際新增一場例會確認通知信主旨也正常。
+
 > 最後更新：2026-07-23（第九十三輪，**新增例會發信時可勾選收件人名單，不用一定發給全社**。延續第九十輪的自動發信功能，使用者問「可以在新增例會的時候，選擇發信給指定人或是全發這個功能嗎」，確認要用勾選名單（不是簡單開關）。[`ActivityListView.vue`](src/views/activities/ActivityListView.vue) 新增例會的表單裡加一個社友勾選區（只在**新增**、且 `K1_meeting_email_notify` 開啟時顯示；編輯既有例會本來就不會觸發發信，所以編輯模式不顯示），列出本社名冊裡狀態正常、有登記 Email 的社友，預設全部勾選（`syncRecipientDefaults()` 在開啟新增視窗、以及切換類別成「例會」時透過 `rosterStore.fetchAll()` 抓最新名冊自動全選），可自行取消勾選或按「全不選」跳過這次發信，也有「全選」一鍵還原。[`notify-meeting-created`](supabase/functions/notify-meeting-created/index.ts) Edge Function 新增 `roster_ids` 參數：前端有帶就只發給這些人（**伺服器端仍會重新用 `club_id`/`member_status='normal'` 過濾一次，不信任前端傳來的名單本身**，避免有人竄改請求夾帶別社的 roster id）；帶空陣列（使用者全部取消勾選）直接回傳「未勾選任何收件人，未發送通知信」不寄信；不帶這個參數（例如舊版前端或未來其他呼叫端）維持原本「發給全部有 Email 的正常社友」的行為，向下相容。`meetings` store 的 `notifyCreated()` 同步加上可選的 `rosterIds` 參數。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過，本機這輪一樣沒有真實 `.env.local`，無法真的登入測試互動與實際收信。**推送這輪時跟並行 session 的第九十一～九十二輪（隱藏選單、出席月報使用教學）撞在一起，`git rebase origin/main` 只有 HANDOFF.md 衝突，改成這輪掛第九十三輪、接在對方第九十二輪之後，程式碼檔案沒有衝突。**待使用者：部署更新後的 `notify-meeting-created` Edge Function（唯一有動到後端的檔案，第九十輪已部署過的 `send-test-email` 跟兩個 migration 不用重跑），然後上正式站新增一場例會，確認表單裡看得到社友勾選清單、預設全選、取消勾選幾位後只有勾選的人收到信、全部取消勾選後不寄信也不報錯。**
 
 > 最後更新（上一輪）：2026-07-23（第九十二輪，**「出席月報」頁補上使用教學**——延續第八十七輪社友名冊、第八十八輪活動頁的 `PageHelp` 試點，繼續往下一頁推廣。在 [`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 標題旁加 `PageHelp`，內容 4 條：出席率資料來源是「活動」頁例會逐人登記自動彙整、換月份查看方式；沒逐人登記時可用「快速新增／補登」直接填當天人數，但同一天不要兩邊都填以免重複；RI 半年報基準人數區塊用途（填基準/當月人數，系統自動算淨成長）；最下面「歷月出席月報」總表用來對照趨勢，60% 是扶輪社規定最低出席門檻。實作跟前兩頁完全比照同一套模式，沒有另外修改 `PageHelp.vue` 元件本身。驗證：`vue-tsc --noEmit`＋`npm run build` 皆通過；本機用 `window.__pinia`/`window.__router` 灌假 auth/features 資料（社長角色、B2_attendance_summary + B6_membership_report 開啟）繞過登入，瀏覽器實測「?」按鈕正確顯示在標題旁、點擊後面板正確彈出且四條內容顯示正確、位置跟其他頁一致，驗證後已還原 `main.ts`/刪除臨時 `.env.local`。**待辦：確認下一個要補使用教學的頁面**（例如活動報名相關頁、儀表板等其他社友常查的地方）。
@@ -112,20 +114,20 @@
 
 ## ⚠️ 待辦
 
-**【第九十三輪，優先】例會自動發信通知（含勾選收件人）——待使用者完成部署，這是目前最新最完整的版本（Claude 這輪還是連不到這個專案的 Supabase CLI，沒辦法自己來）**：
+**【第九十四輪，優先】例會自動發信通知（含勾選收件人＋主旨亂碼修復）——待使用者完成部署，這是目前最新最完整的版本（Claude 這輪還是連不到這個專案的 Supabase CLI，沒辦法自己來）**：
 
-這是第八十九～九十三輪同一個功能的最終狀態，如果還沒部署過任何一輪的東西，直接照下面這份從頭做一次即可，**不用理會更早輪次提過的 Resend 步驟（已作廢）**：
+這是第八十九～九十四輪同一個功能的最終狀態，如果還沒部署過任何一輪的東西，直接照下面這份從頭做一次即可，**不用理會更早輪次提過的 Resend 步驟（已作廢）**：
 
 1. 到 SQL Editor 依序執行 [`057_meeting_email_notify.sql`](supabase/migrations/057_meeting_email_notify.sql)（新增 `K1_meeting_email_notify` feature flag，預設關閉）、[`058_club_email_notifications.sql`](supabase/migrations/058_club_email_notifications.sql)（`club_notification_channels` 新增 `email_from`/`email_app_password` 兩欄）
-2. 部署兩支 Edge Function（都會用到 `denomailer` 這個 Deno SMTP 套件透過 Gmail SMTP 寄信，不需要額外設定 secret，帳密是存在資料庫裡、每社各自輸入的；**如果第九十輪時已經部署過 `notify-meeting-created`，這輪新增了勾選收件人的功能，一定要重新部署一次，內容已經改了**）：
+2. 部署兩支 Edge Function（都會用到 `denomailer` 這個 Deno SMTP 套件透過 Gmail SMTP 寄信，不需要額外設定 secret，帳密是存在資料庫裡、每社各自輸入的）。**這輪兩支都改了主旨中文亂碼的修復，不管之前有沒有部署過都要重新貼一次最新內容**：
    - `supabase functions deploy notify-meeting-created`
    - `supabase functions deploy send-test-email`
 3. 到「功能開關管理」把「新增例會自動發信通知社友（測試中）」打開——這個開關同時控制「進階設定」選單會不會出現「Email 通知設定」入口，跟新增例會會不會真的觸發發信
 4. **每個要用這個功能的社，自己的執秘/社長要做**：登入後到「進階設定 → Email 通知設定（測試中）」
    - 先到自己 Google 帳號開啟兩步驟驗證，再到 [Google 應用程式密碼頁面](https://myaccount.google.com/apppasswords) 產生一組 16 碼應用程式密碼（**不是**平常登入 Gmail 用的密碼）
    - 把 Gmail 帳號 + 應用程式密碼貼到「Email 通知設定」頁面存起來
-   - 按「發送測試信」寄一封給自己確認帳密正確可以寄出
-5. **實測**：確認本社社友名冊裡至少有一筆填了自己能收到信的 Email，新增一場例會，**表單裡應該會多一區「發信通知社友」的勾選清單，預設全部勾選**；取消勾選幾位、只留一兩位再儲存，應該只有還勾著的人收到信（標題含社名/例會場次/日期，內容有主題/講師/地點/備註）；全部取消勾選後儲存，應該跳「未勾選任何收件人，未發送通知信」不會真的寄信；社友名冊沒填 Email 的人不會出現在勾選清單裡；編輯既有例會**不會**觸發發信也不會顯示勾選區（只有新增才會）；本社沒設定 Gmail 帳密就新增例會，應該會跳出「尚未設定本社 Gmail 寄信帳號」的錯誤 toast，不會整個崩潰
+   - 按「發送測試信」寄一封給自己，**這次要確認測試信主旨顯示正常中文，不是一堆 `=e8=a6=aa=...` 的亂碼**（這是第九十四輪修的那個 bug，之前沒修的版本測試信主旨也會中招）
+5. **實測**：確認本社社友名冊裡至少有一筆填了自己能收到信的 Email，新增一場例會，**表單裡應該會多一區「發信通知社友」的勾選清單，預設全部勾選**；取消勾選幾位、只留一兩位再儲存，應該只有還勾著的人收到信，**主旨（含社名/場次/日期）跟內文都要是正常中文**；全部取消勾選後儲存，應該跳「未勾選任何收件人，未發送通知信」不會真的寄信；社友名冊沒填 Email 的人不會出現在勾選清單裡；編輯既有例會**不會**觸發發信也不會顯示勾選區（只有新增才會）；本社沒設定 Gmail 帳密就新增例會，應該會跳出「尚未設定本社 Gmail 寄信帳號」的錯誤 toast，不會整個崩潰
 6. **CLI 權限問題還沒解決**：這台機器登入的 Supabase CLI 帳號已經不再是這個專案（`xdwqrgthsxyzclnjlmvy`）的成員了，`supabase link` 直接被拒絕（第八十九輪就發現了，這輪還是一樣）。如果想恢復讓 Claude 直接用 CLI 部署/查資料庫（前幾輪都是這樣做的，比較快），需要用有權限的帳號重新 `supabase login`；不然之後每輪都要比照這幾輪，把 migration SQL 跟 Edge Function 程式碼整份交給使用者自己貼上執行。
 
 **【第七十五輪】九宮格 — 待使用者部署 `list-apps` Edge Function**：
