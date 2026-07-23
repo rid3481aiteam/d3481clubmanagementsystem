@@ -120,6 +120,14 @@
 
 ## ⚠️ 待辦
 
+**【第九十七輪，未來功能，先記錄不急著做】Email 通知設定支援非 Gmail 信箱**：
+
+使用者問「如果別人要用不是 Gmail 系統的，可以怎麼處理」，先記錄下來之後再擴充，這輪沒有動任何程式碼。目前 `notify-meeting-created`／`send-test-email` 這兩支 Edge Function 的 SMTP 主機是寫死 `smtp.gmail.com:465`（見程式碼裡的 `new SMTPClient({connection: {hostname: 'smtp.gmail.com', ...}})`），`club_notification_channels` 表也只存 `email_from`/`email_app_password`，沒有主機/連接埠欄位，所以目前**只能用 Gmail**。討論過的方向：
+
+- 「Email 通知設定」頁加一個信箱類型選單：Gmail／Outlook（Office365）／Yahoo 幾個常見的列出來，選了自動帶入對應主機/連接埠，使用者只要填帳號密碼；另外留一個「自訂 SMTP」選項給真的要用網域信箱的社自己填主機/連接埠/加密方式。
+- 取捨：`club_notification_channels` 要新增 host/port/加密方式欄位，兩支 Edge Function 的寄信邏輯要從「寫死 Gmail」改成「讀這個社存的設定」，工作量比現在的 Gmail-only 版本大；如果只想先加 Outlook，改動會小很多（一個 Gmail/Outlook 二選一開關即可，不用做到自訂 SMTP 這麼完整）。
+- 使用者還沒決定要哪個方向，之後有需要再回頭做。
+
 **【第九十五輪，優先】例會自動發信通知（含勾選收件人＋主旨/內文亂碼修復＋回覆連結）——待使用者完成部署，這是目前最新最完整的版本（Claude 這輪還是連不到這個專案的 Supabase CLI，沒辦法自己來）**：
 
 這是第八十九～九十五輪同一個功能的最終狀態，如果還沒部署過任何一輪的東西，直接照下面這份從頭做一次即可，**不用理會更早輪次提過的 Resend 步驟（已作廢）**：
