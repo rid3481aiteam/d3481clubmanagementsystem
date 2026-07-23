@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useActivitiesStore } from '@/stores/activities'
 import { useMeetingsStore } from '@/stores/meetings'
+import { useRosterStore } from '@/stores/roster'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useFeaturesStore } from '@/stores/features'
 import { useToastStore } from '@/stores/toast'
@@ -12,6 +13,7 @@ import type { Activity, ActivityCategory, ActivityInsert, ActivityStatus, Meetin
 const auth = useAuthStore()
 const activitiesStore = useActivitiesStore()
 const meetingsStore = useMeetingsStore()
+const rosterStore = useRosterStore()
 const permissions = usePermissionsStore()
 const features = useFeaturesStore()
 const toast = useToastStore()
@@ -73,6 +75,19 @@ const startLocal = ref('')
 const deadlineLocal = ref('')
 const saving = ref(false)
 
+// 新增例會的發信收件人勾選名單（只有新增、且 K1_meeting_email_notify 開啟時才會用到）
+const selectedRecipientIds = ref<string[]>([])
+const emailableMembers = computed(() =>
+  rosterStore.members.filter(m => m.member_status === 'normal' && m.email && m.email.trim())
+)
+
+async function syncRecipientDefaults() {
+  if (!(isMeetingForm.value && !isEditing.value && features.isEnabled('K1_meeting_email_notify'))) return
+  await rosterStore.fetchAll(auth.clubId)
+  selectedRecipientIds.value = emailableMembers.value.map(m => m.id)
+}
+watch(pickedCategory, syncRecipientDefaults)
+
 function emptyMeetingForm(): MeetingInsert {
   return {
     club_id: auth.clubId ?? '', date: '', session_no: null, title: null,
@@ -107,7 +122,9 @@ function openAdd() {
   activityForm.value = emptyActivityForm()
   startLocal.value = ''
   deadlineLocal.value = ''
+  selectedRecipientIds.value = []
   showModal.value = true
+  syncRecipientDefaults()
 }
 
 async function openEdit(a: Activity) {
@@ -177,9 +194,9 @@ async function save() {
   toast.show(isEditing.value ? '已更新' : '已新增')
   await loadActivities()
 
-  // 新增例會（不是編輯）且功能開關有打開，才自動發信通知本社社友
+  // 新增例會（不是編輯）且功能開關有打開，才自動發信通知本社社友（勾選名單）
   if (newMeetingId && features.isEnabled('K1_meeting_email_notify')) {
-    const { data, error } = await meetingsStore.notifyCreated(newMeetingId)
+    const { data, error } = await meetingsStore.notifyCreated(newMeetingId, selectedRecipientIds.value)
     if (error) {
       toast.show('例會通知信發送失敗：' + error, 'err')
     } else if (data) {
@@ -348,6 +365,23 @@ watch(() => auth.isDistrictAdminView, loadActivities)
             <div>
               <label class="fl">備註</label>
               <input v-model="meetingForm.note" class="fi" />
+            </div>
+
+            <div v-if="!isEditing && features.isEnabled('K1_meeting_email_notify')" class="tw" style="padding:12px; margin-top:4px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                <label class="fl" style="margin-bottom:0;">發信通知社友（{{ selectedRecipientIds.length }} / {{ emailableMembers.length }} 人）</label>
+                <div style="display:flex; gap:8px;">
+                  <button type="button" class="btn btn-g" style="padding:2px 10px; font-size:12px;" @click="selectedRecipientIds = emailableMembers.map(m => m.id)">全選</button>
+                  <button type="button" class="btn btn-g" style="padding:2px 10px; font-size:12px;" @click="selectedRecipientIds = []">全不選</button>
+                </div>
+              </div>
+              <p v-if="!emailableMembers.length" style="font-size:12.5px; color:var(--muted);">本社名冊目前沒有登記 Email 的社友，無法發信。</p>
+              <div v-else style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px;">
+                <label v-for="m in emailableMembers" :key="m.id" style="display:flex; align-items:center; gap:6px; font-size:13px;">
+                  <input type="checkbox" :value="m.id" v-model="selectedRecipientIds" />
+                  {{ m.nick_name || m.name }}
+                </label>
+              </div>
             </div>
           </template>
 

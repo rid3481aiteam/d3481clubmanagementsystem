@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     return errorResponse('沒有權限發送例會通知', 403)
   }
 
-  const { meeting_id } = await req.json()
+  const { meeting_id, roster_ids } = await req.json()
   if (!meeting_id) return errorResponse('缺少 meeting_id', 400)
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
@@ -81,11 +81,25 @@ Deno.serve(async (req) => {
     .eq('id', meeting.club_id)
     .single()
 
-  const { data: members } = await adminClient
+  let membersQuery = adminClient
     .from('roster')
-    .select('name, email')
+    .select('id, name, email')
     .eq('club_id', meeting.club_id)
     .eq('member_status', 'normal')
+
+  // roster_ids 有帶（不管是不是空陣列）代表前端用勾選名單指定收件人；
+  // 沒帶（undefined）維持舊行為＝發給本社全部有 Email 的正常社友
+  if (Array.isArray(roster_ids)) {
+    if (!roster_ids.length) {
+      return new Response(
+        JSON.stringify({ success: true, sent: 0, skipped_no_email: 0, message: '未勾選任何收件人，未發送通知信' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    membersQuery = membersQuery.in('id', roster_ids)
+  }
+
+  const { data: members } = await membersQuery
 
   const allMembers = members ?? []
   const recipients = allMembers.filter((m) => m.email && m.email.trim())
