@@ -85,20 +85,19 @@ interface OfficerGroup {
 }
 
 function groupByName(entries: ClubOfficer[]): OfficerGroup[] {
-  const order: string[] = []
   const map = new Map<string, ClubOfficer[]>()
   for (const m of entries) {
     const key = m.committee_name || '未分類'
-    if (!map.has(key)) {
-      map.set(key, [])
-      order.push(key)
-    }
+    if (!map.has(key)) map.set(key, [])
     map.get(key)!.push(m)
   }
-  return order.map(name => ({
-    name,
-    members: [...map.get(name)!].sort((a, b) => notePriority(a.note || '') - notePriority(b.note || '')),
-  }))
+  return [...map.entries()]
+    .map(([name, members]) => ({
+      name,
+      members: [...members].sort((a, b) => notePriority(a.note || '') - notePriority(b.note || '')),
+    }))
+    // 按名稱排序，讓開頭相同的職位/委員會（例如「財務」「財務助理」）排在一起
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'))
 }
 
 const committeeGroups = computed(() => groupByName(committeeMembers.value))
@@ -363,20 +362,6 @@ watch(yearTerm, load)
       </div>
     </div>
 
-    <div class="tw" style="padding:20px; margin-bottom:20px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:14px;">主要幹部</h2>
-      <div style="display:flex; flex-direction:column; gap:12px; max-width:400px;">
-        <div v-for="r in SINGLE_ROLES" :key="r.role">
-          <label class="fl">{{ r.label }}</label>
-          <select v-if="editing" v-model="draftSingleNames[r.role]" class="fi">
-            <option value="">請選擇</option>
-            <option v-for="n in memberOptions(draftSingleNames[r.role])" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
-          </select>
-          <div v-else class="readonly-field">{{ memberOptionLabel(singleNames[r.role] || '') || '-' }}</div>
-        </div>
-      </div>
-    </div>
-
     <datalist id="committee-name-options">
       <option v-for="n in existingCommitteeNames" :key="n" :value="n" />
     </datalist>
@@ -387,14 +372,25 @@ watch(yearTerm, load)
       <option v-for="p in POSITION_PRESETS" :key="p" :value="p" />
     </datalist>
 
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy);">其他主要幹部</h2>
-      <div v-if="!editing && primaryOfficerGroups.length" style="display:flex; gap:8px;">
-        <button class="btn btn-g btn-sm" @click="officerExpansion.expandAll">全部展開</button>
-        <button class="btn btn-g btn-sm" @click="officerExpansion.collapseAll">全部收合</button>
+    <div class="tw" style="padding:20px; margin-bottom:20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+        <h2 style="font-size:14px; font-weight:700; color:var(--navy);">主要幹部</h2>
+        <div v-if="!editing && primaryOfficerGroups.length" style="display:flex; gap:8px;">
+          <button class="btn btn-g btn-sm" @click="officerExpansion.expandAll">全部展開</button>
+          <button class="btn btn-g btn-sm" @click="officerExpansion.collapseAll">全部收合</button>
+        </div>
       </div>
-    </div>
-    <div class="tw" style="margin-bottom:20px;">
+      <div style="display:flex; flex-direction:column; gap:12px; max-width:400px; margin-bottom:20px;">
+        <div v-for="r in SINGLE_ROLES" :key="r.role">
+          <label class="fl">{{ r.label }}</label>
+          <select v-if="editing" v-model="draftSingleNames[r.role]" class="fi">
+            <option value="">請選擇</option>
+            <option v-for="n in memberOptions(draftSingleNames[r.role])" :key="n" :value="n">{{ memberOptionLabel(n) }}</option>
+          </select>
+          <div v-else class="readonly-field">{{ memberOptionLabel(singleNames[r.role] || '') || '-' }}</div>
+        </div>
+      </div>
+
       <table class="card-table">
         <thead class="th">
           <tr v-if="editing">
@@ -449,30 +445,30 @@ watch(yearTerm, load)
           </tbody>
         </template>
       </table>
-    </div>
 
-    <div v-if="canManage && editing" class="tw" style="padding:16px 20px; margin-bottom:20px;">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:10px;">新增其他主要幹部</h2>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
-        <div>
-          <label class="fl">職位名稱</label>
-          <input v-model="newPrimaryPositionName" class="fi" list="primary-position-options" placeholder="例如：財務、糾察、理事" style="min-width:200px;" />
+      <div v-if="canManage && editing" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+        <label class="fl" style="margin-bottom:8px; display:block;">新增其他主要幹部</label>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+          <div>
+            <label class="fl">職位名稱</label>
+            <input v-model="newPrimaryPositionName" class="fi" list="primary-position-options" placeholder="例如：財務、糾察、理事" style="min-width:200px;" />
+          </div>
+          <div>
+            <label class="fl">備註</label>
+            <input v-model="newPrimaryOfficerNote" class="fi" list="position-presets" placeholder="選填" style="width:120px;" />
+          </div>
         </div>
-        <div>
-          <label class="fl">備註</label>
-          <input v-model="newPrimaryOfficerNote" class="fi" list="position-presets" placeholder="選填" style="width:120px;" />
+        <label class="fl">勾選要加入這個職位的成員（可多選）</label>
+        <div style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin:8px 0 12px; border:1px solid var(--border); border-radius:var(--r); padding:10px;">
+          <label v-for="n in activeMemberKeys" :key="n" style="display:flex; align-items:center; gap:6px; font-size:13px;">
+            <input type="checkbox" :value="n" v-model="newPrimaryOfficerValues" />
+            {{ memberOptionLabel(n) }}
+          </label>
         </div>
+        <button class="btn btn-g" :disabled="!newPrimaryPositionName.trim() || !newPrimaryOfficerValues.length" @click="addPrimaryOfficers">
+          + 加入所選成員（{{ newPrimaryOfficerValues.length }}）
+        </button>
       </div>
-      <label class="fl">勾選要加入這個職位的成員（可多選）</label>
-      <div style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin:8px 0 12px; border:1px solid var(--border); border-radius:var(--r); padding:10px;">
-        <label v-for="n in activeMemberKeys" :key="n" style="display:flex; align-items:center; gap:6px; font-size:13px;">
-          <input type="checkbox" :value="n" v-model="newPrimaryOfficerValues" />
-          {{ memberOptionLabel(n) }}
-        </label>
-      </div>
-      <button class="btn btn-g" :disabled="!newPrimaryPositionName.trim() || !newPrimaryOfficerValues.length" @click="addPrimaryOfficers">
-        + 加入所選成員（{{ newPrimaryOfficerValues.length }}）
-      </button>
     </div>
 
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">

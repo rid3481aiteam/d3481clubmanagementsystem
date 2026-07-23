@@ -50,12 +50,6 @@ const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
   { role: 'secretary', label: '秘書' },
 ]
 
-const MEMBER_STATUS_LABEL: Record<RosterMemberStatus, string> = {
-  normal: '正常',
-  leave: '請假',
-  resigned: '退社',
-}
-
 function memberStatus(m: RosterMember): RosterMemberStatus {
   return m.member_status ?? (m.is_active ? 'normal' : 'resigned')
 }
@@ -70,8 +64,6 @@ const classificationBreakdown = computed(() => {
   }
   return [...map.entries()].sort((a, b) => b[1] - a[1])
 })
-
-const committeeMembers = computed(() => officers.list.filter(o => o.role === 'committee_member' || o.role === 'primary_officer'))
 
 function officerName(role: ClubOfficerRole) {
   return officers.list.find(o => o.role === role)?.name || '-'
@@ -204,21 +196,9 @@ watch(() => route.params.id, load)
 
     <h2 class="section-h">社的年度成員（{{ yearTerm }}）</h2>
     <div class="tw" style="padding:16px 20px; margin-bottom:24px;">
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <span class="bdg b-g" v-for="r in SINGLE_ROLES" :key="r.role">{{ r.label }}：{{ officerName(r.role) }}</span>
       </div>
-      <table v-if="committeeMembers.length" class="card-table">
-        <thead class="th">
-          <tr><th>委員會</th><th>姓名</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in committeeMembers" :key="m.id">
-            <td data-label="委員會">{{ m.committee_name || '-' }}</td>
-            <td data-label="姓名">{{ m.name }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <p v-else style="color:var(--muted); font-size:13px;">尚無委員會成員資料</p>
     </div>
 
     <h2 class="section-h">潛在社友</h2>
@@ -387,11 +367,6 @@ watch(() => route.params.id, load)
             <th>職業分類</th>
             <th>公司</th>
             <th>職稱</th>
-            <th>個人電話</th>
-            <th>公司電話</th>
-            <th>Email</th>
-            <th>入社日期</th>
-            <th>狀態</th>
           </tr>
         </thead>
         <tbody>
@@ -402,18 +377,9 @@ watch(() => route.params.id, load)
             <td data-label="職業分類">{{ m.classification || '-' }}</td>
             <td data-label="公司">{{ m.company || '-' }}</td>
             <td data-label="職稱">{{ m.job_title || '-' }}</td>
-            <td data-label="個人電話">{{ m.personal_phone || m.phone || '-' }}</td>
-            <td data-label="公司電話">{{ m.company_phone || '-' }}</td>
-            <td data-label="Email">{{ m.email || '-' }}</td>
-            <td data-label="入社日期">{{ m.join_date || '-' }}</td>
-            <td data-label="狀態">
-              <span class="bdg" :class="memberStatus(m) === 'resigned' ? 'b-g' : memberStatus(m) === 'leave' ? 'b-y' : 'b-gr'">
-                {{ MEMBER_STATUS_LABEL[memberStatus(m)] }}
-              </span>
-            </td>
           </tr>
           <tr v-if="!roster.members.length">
-            <td colspan="11" style="text-align:center; color:var(--muted);">該社尚無社友資料</td>
+            <td colspan="6" style="text-align:center; color:var(--muted);">該社尚無社友資料</td>
           </tr>
         </tbody>
       </table>
