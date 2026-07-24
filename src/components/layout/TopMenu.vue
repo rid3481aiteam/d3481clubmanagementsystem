@@ -12,7 +12,9 @@
             :data-tour="tourId(item.label)"
             @click.stop="toggleDropdown(item.label, $event)"
           >
-            <span class="tnav-ic">{{ item.icon }}</span>{{ item.label }}<span class="tnav-chev">▾</span>
+            <span class="tnav-ic">{{ item.icon }}</span>{{ item.label }}
+            <span v-if="item.badge" class="tnav-badge">{{ item.badge }}</span>
+            <span class="tnav-chev">▾</span>
           </button>
         </div>
 
@@ -39,6 +41,7 @@
         @click="dropdownOpen = null"
       >
         <span class="tnav-ic">{{ sub.icon }}</span>{{ sub.label }}
+        <span v-if="sub.badge" class="tnav-badge">{{ sub.badge }}</span>
       </RouterLink>
     </div>
   </Teleport>
@@ -48,14 +51,38 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useFeaturesStore } from '@/stores/features'
+import { useAccountsStore } from '@/stores/accounts'
 
-type NavLink = { type: 'link'; to: string; icon: string; label: string }
+type NavLink = { type: 'link'; to: string; icon: string; label: string; badge?: number }
 type NavDivider = { type: 'divider' }
-type NavDropdown = { type: 'dropdown'; icon: string; label: string; items: { to: string; icon: string; label: string }[] }
+type NavDropdown = { type: 'dropdown'; icon: string; label: string; badge?: number; items: { to: string; icon: string; label: string; badge?: number }[] }
 type NavItem = NavLink | NavDivider | NavDropdown
 
 const auth = useAuthStore()
 const features = useFeaturesStore()
+const accounts = useAccountsStore()
+
+// 有新人透過 RotarySSO 申請帳號時原本不會主動通知管理員，只能自己點進帳號
+// 管理頁才看得到，改成導覽列的「進階設定」掛數字徽章，登入後不用特地去查。
+const canManagePending = computed(() => {
+  if (auth.isDistrictView) return auth.isDistrictAdminView
+  return auth.role === 'club_admin' || auth.role === 'club_secretary'
+})
+
+let pendingPollTimer: ReturnType<typeof setInterval> | undefined
+
+async function refreshPendingCount() {
+  if (!canManagePending.value) return
+  const scopeId = auth.isDistrictAdminView ? null : auth.clubId
+  await accounts.fetchPendingCount(scopeId)
+}
+
+onMounted(() => {
+  refreshPendingCount()
+  pendingPollTimer = setInterval(refreshPendingCount, 60000)
+})
+onBeforeUnmount(() => clearInterval(pendingPollTimer))
+watch(() => [auth.isDistrictView, auth.clubId, auth.isLoggedIn], refreshPendingCount)
 
 const navItems = computed<NavItem[]>(() => {
   const items: NavItem[] = [
@@ -90,8 +117,9 @@ const navItems = computed<NavItem[]>(() => {
         type: 'dropdown',
         icon: '⚙️',
         label: '進階設定',
+        badge: accounts.pendingCount || undefined,
         items: [
-          { to: '/club/invite', icon: '👤', label: '邀請 / 管理地區帳號' },
+          { to: '/club/invite', icon: '👤', label: '邀請 / 管理地區帳號', badge: accounts.pendingCount || undefined },
           { to: '/admin/features', icon: '⚙️', label: '功能開關' },
           { to: '/admin/permissions', icon: '🔐', label: '權限矩陣' },
           { to: '/admin/bug-reports', icon: '🐞', label: '錯誤回報' },
@@ -155,8 +183,8 @@ const navItems = computed<NavItem[]>(() => {
 
   if (isClubManager) {
     items.push({ type: 'divider' })
-    const advancedItems: { to: string; icon: string; label: string }[] = [
-      { to: '/club/invite', icon: '👤', label: '邀請 / 管理本社帳號' },
+    const advancedItems: { to: string; icon: string; label: string; badge?: number }[] = [
+      { to: '/club/invite', icon: '👤', label: '邀請 / 管理本社帳號', badge: accounts.pendingCount || undefined },
     ]
     if (features.isEnabled('J1_line_notify')) {
       advancedItems.push({ to: '/club/line-notify', icon: '💬', label: 'LINE 通知設定（測試中）' })
@@ -168,6 +196,7 @@ const navItems = computed<NavItem[]>(() => {
       type: 'dropdown',
       icon: '⚙️',
       label: '進階設定',
+      badge: accounts.pendingCount || undefined,
       items: advancedItems,
     })
   }
@@ -300,6 +329,23 @@ onBeforeUnmount(() => {
 }
 .tnav-ic { font-size: 14px; }
 .tnav-chev { font-size: 9px; margin-left: 2px; }
+
+.tnav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red, #dc2626);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 4px;
+}
+.tnav-drop-link .tnav-badge { margin-left: auto; }
 
 .tdiv {
   width: 1px;

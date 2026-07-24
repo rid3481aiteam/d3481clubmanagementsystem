@@ -16,6 +16,7 @@ function unwrapFunctionError(error: unknown) {
 export const useAccountsStore = defineStore('accounts', () => {
   const managed = ref<UserProfile[]>([])
   const pending = ref<UserProfile[]>([])
+  const pendingCount = ref(0)
   const members = ref<UserProfile[]>([])
   const collaborators = ref<UserClubRole[]>([])
   const loading = ref(false)
@@ -52,6 +53,18 @@ export const useAccountsStore = defineStore('accounts', () => {
       : query.or('requested_role.not.is.null,club_id.is.null')
     const { data } = await query
     pending.value = data ?? []
+    pendingCount.value = pending.value.length
+  }
+
+  // 給導覽列徽章用的輕量版：不用 SSO 待審整包資料（含姓名/職稱等），
+  // 只查數量，讓管理員不用點進帳號管理頁就能在導覽列看到「有人在等審核」。
+  async function fetchPendingCount(scopeId: string | null) {
+    let query = supabase.from('user_profiles').select('id', { count: 'exact', head: true })
+    query = scopeId
+      ? query.eq('club_id', scopeId).not('requested_role', 'is', null)
+      : query.or('requested_role.not.is.null,club_id.is.null')
+    const { count } = await query
+    pendingCount.value = count ?? 0
   }
 
   async function approveRole(id: string, role: UserRole) {
@@ -66,15 +79,21 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
-  // 指派 RotarySSO 待審帳號所屬的社（club_id 從 NULL 變成實際的社）。
+  // 一鍵啟動待審帳號：指派社別（若尚未指派）＋套用角色，合併成一次寫入、
+  // 一顆按鈕（原本 assignClub／approveRole 分兩步，管理員要按兩次）。
+  // clubId 留空代表這筆待審帳號已經有 club_id（各社管理員視角只審角色），
   // protect_user_profile_privileged_fields trigger 已經放行地區管理員改 club_id，不用另開 Edge Function。
-  async function assignClub(id: string, clubId: string) {
+  async function activatePending(id: string, role: UserRole, clubId?: string) {
+    const payload: Record<string, unknown> = { role, requested_role: null }
+    if (clubId) payload.club_id = clubId
     const { error } = await supabase
       .from('user_profiles')
-      .update({ club_id: clubId })
+      .update(payload)
       .eq('id', id)
     if (!error) {
-      await Promise.all([fetchPending(), fetchManaged(), fetchMembers()])
+      pending.value = pending.value.filter(u => u.id !== id)
+      pendingCount.value = pending.value.length
+      await Promise.all([fetchManaged(), fetchMembers()])
     }
     return { error }
   }
@@ -84,7 +103,10 @@ export const useAccountsStore = defineStore('accounts', () => {
       .from('user_profiles')
       .update({ requested_role: null })
       .eq('id', id)
-    if (!error) pending.value = pending.value.filter(u => u.id !== id)
+    if (!error) {
+      pending.value = pending.value.filter(u => u.id !== id)
+      pendingCount.value = pending.value.length
+    }
     return { error }
   }
 
@@ -210,9 +232,9 @@ export const useAccountsStore = defineStore('accounts', () => {
   }
 
   return {
-    managed, pending, members, collaborators, loading,
+    managed, pending, pendingCount, members, collaborators, loading,
     setScope,
-    fetchManaged, fetchPending, approveRole, assignClub, dismissPending,
+    fetchManaged, fetchPending, fetchPendingCount, approveRole, activatePending, dismissPending,
     fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictRole, deleteAccount,
     fetchClubCollaborators, updateCollaboratorRole, revokeCollaborator,

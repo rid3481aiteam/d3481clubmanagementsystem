@@ -85,12 +85,33 @@ function pendingClubLabel(p: UserProfile) {
 const pendingChoice = ref<Record<string, UserRole>>({})
 const pendingClubChoice = ref<Record<string, string>>({})
 
-async function assignPendingClub(p: UserProfile) {
-  const targetClubId = pendingClubChoice.value[p.id]
-  if (!targetClubId) return
-  const { error } = await accounts.assignClub(p.id, targetClubId)
-  if (error) alert(error.message)
+// SSO 帶回來的自稱社別通常是簡稱（例如「忠孝社」），跟社團目錄的正式全名
+// （「台北忠孝扶輪社」）對不上，去掉「扶輪社／扶輪／社」這類共同字樣後
+// 再比對，只有唯一命中才自動帶入，避免同名分社猜錯（例如兩個社都叫「XX社」）。
+function normalizeClubName(name: string) {
+  return name.replace(/扶輪社|扶輪|社$/g, '').trim()
 }
+
+function suggestClubId(p: UserProfile): string | null {
+  if (!p.sso_rotary_club) return null
+  const target = normalizeClubName(p.sso_rotary_club)
+  if (!target) return null
+  const matches = club.allClubs.filter(c => {
+    const n = normalizeClubName(c.name)
+    return n === target || n.includes(target) || target.includes(n)
+  })
+  return matches.length === 1 ? matches[0].id : null
+}
+
+// 待審清單一到，就把猜得出來的社別預先帶進選單，管理員看到的就已經是
+// 建議值，不對再自己改，不用每筆都手動選一次。
+watch(() => accounts.pending, (list) => {
+  for (const p of list) {
+    if (p.club_id || pendingClubChoice.value[p.id]) continue
+    const guess = suggestClubId(p)
+    if (guess) pendingClubChoice.value[p.id] = guess
+  }
+}, { immediate: true })
 
 function pendingRoleChoice(p: UserProfile) {
   const choice = pendingChoice.value[p.id] ?? p.requested_role ?? 'club_member'
@@ -99,8 +120,17 @@ function pendingRoleChoice(p: UserProfile) {
   return choice === 'club_admin' ? 'club_secretary' : choice
 }
 
-async function applyPendingRole(p: UserProfile) {
-  const { error } = await accounts.approveRole(p.id, pendingRoleChoice(p))
+// 待審清單一鍵啟動：地區視角且尚未指派社別時，社別是必填（不然存進去
+// club_id 還是 NULL，跟沒指派一樣），其他情況（已有 club_id，或各社
+// 管理員視角只審角色）不用挑社別。
+function canActivatePending(p: UserProfile) {
+  return !(isDistrictAdminView.value && !p.club_id) || !!pendingClubChoice.value[p.id]
+}
+
+async function activatePendingAccount(p: UserProfile) {
+  const targetClubId = isDistrictAdminView.value && !p.club_id ? pendingClubChoice.value[p.id] : undefined
+  if (isDistrictAdminView.value && !p.club_id && !targetClubId) return
+  const { error } = await accounts.activatePending(p.id, pendingRoleChoice(p), targetClubId)
   if (error) alert(error.message)
 }
 
@@ -384,18 +414,16 @@ watch(isDistrictAdminView, loadAccounts)
               <td data-label="扶輪身分別">{{ p.sso_account_type ?? '-' }}</td>
               <td>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                  <template v-if="isDistrictAdminView && !p.club_id">
-                    <select
-                      class="fi"
-                      :value="pendingClubChoice[p.id] ?? ''"
-                      style="min-width:160px; padding:6px 8px;"
-                      @change="pendingClubChoice[p.id] = ($event.target as HTMLSelectElement).value"
-                    >
-                      <option value="" disabled>指派社別</option>
-                      <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
-                    </select>
-                    <button class="btn btn-gold btn-sm" :disabled="!pendingClubChoice[p.id]" @click="assignPendingClub(p)">指派社別</button>
-                  </template>
+                  <select
+                    v-if="isDistrictAdminView && !p.club_id"
+                    class="fi"
+                    :value="pendingClubChoice[p.id] ?? ''"
+                    style="min-width:160px; padding:6px 8px;"
+                    @change="pendingClubChoice[p.id] = ($event.target as HTMLSelectElement).value"
+                  >
+                    <option value="" disabled>選擇社別</option>
+                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
                   <select
                     class="fi"
                     :value="pendingRoleChoice(p)"
@@ -405,7 +433,7 @@ watch(isDistrictAdminView, loadAccounts)
                     <option value="club_secretary">各社管理員</option>
                     <option value="club_member">一般社友</option>
                   </select>
-                  <button class="btn btn-gold btn-sm" @click="applyPendingRole(p)">套用角色</button>
+                  <button class="btn btn-gold btn-sm" :disabled="!canActivatePending(p)" @click="activatePendingAccount(p)">啟動</button>
                 </div>
               </td>
             </tr>
