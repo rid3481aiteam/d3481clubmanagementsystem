@@ -218,6 +218,7 @@ export type FeatureKey =
   | 'I1_gg'
   | 'J1_line_notify'
   | 'K1_meeting_email_notify'
+  | 'L1_knowledge_base'
 
 export interface FeatureFlag {
   id: string
@@ -638,6 +639,23 @@ export interface LineBinding {
   line_user_id: string
   bound_at: string
 }
+
+// ── 地區知識庫 ────────────────────────────────────────
+export interface KnowledgeArticle {
+  id: string
+  title: string
+  category: string | null
+  tags: string[]
+  description: string | null
+  file_path: string
+  file_name: string
+  content_text: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type KnowledgeArticleInsert = Omit<KnowledgeArticle, 'id' | 'created_at' | 'updated_at'>
 
 // ── Pinia Store 型別 ──────────────────────────────────
 export interface AuthState {

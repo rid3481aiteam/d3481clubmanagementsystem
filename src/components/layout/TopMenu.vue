@@ -75,6 +75,9 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('H1_directory')) {
       items.push({ type: 'link', to: '/directory', icon: '📖', label: '地區通訊錄' })
     }
+    if (features.isEnabled('L1_knowledge_base')) {
+      items.push({ type: 'link', to: '/knowledge-base', icon: '📚', label: '知識庫（測試中）' })
+    }
     if (features.isEnabled('E1_activities') || features.isEnabled('B1_meeting_info')) {
       items.push({ type: 'link', to: '/activities', icon: '📅', label: '活動' })
     }
@@ -144,6 +147,9 @@ const navItems = computed<NavItem[]>(() => {
     }
     if (features.isEnabled('H1_directory')) {
       items.push({ type: 'link', to: '/directory', icon: '📖', label: '地區通訊錄' })
+    }
+    if (features.isEnabled('L1_knowledge_base')) {
+      items.push({ type: 'link', to: '/knowledge-base', icon: '📚', label: '知識庫（測試中）' })
     }
   }
 

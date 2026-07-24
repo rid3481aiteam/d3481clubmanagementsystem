@@ -30,6 +30,7 @@ const LABELS: Record<FeatureKey, string> = {
   I1_gg: 'GG案盤點（全球獎助金）',
   J1_line_notify: 'LINE 通知設定（測試中）',
   K1_meeting_email_notify: '新增例會自動發信通知社友（測試中）',
+  L1_knowledge_base: '地區知識庫（測試中）',
 }
 
 const LOCKED: FeatureKey[] = ['A1_login', 'A2_roles', 'A3_isolation']
@@ -48,6 +49,7 @@ const groups = [
   { title: '捐獻', keys: keysByPrefix('G') },
   { title: '獎助金', keys: keysByPrefix('I') },
   { title: '通知', keys: [...keysByPrefix('J'), ...keysByPrefix('K')] },
+  { title: '知識庫', keys: keysByPrefix('L') },
 ]
 
 function flagFor(key: FeatureKey) {

@@ -157,6 +157,13 @@ const router = createRouter({
       component: () => import('@/views/directory/DirectoryView.vue'),
       meta: { feature: 'H1_directory' as FeatureKey },
     },
+    // L 知識庫
+    {
+      path: '/knowledge-base',
+      name: 'knowledge-base',
+      component: () => import('@/views/knowledge/KnowledgeBaseView.vue'),
+      meta: { feature: 'L1_knowledge_base' as FeatureKey },
+    },
     // Admin（地區：第 3 級唯讀 + 第 4 級地區管理員共用進得去，畫面內再依 isDistrictAdminView 決定能不能編輯）
     {
       path: '/admin/clubs',
