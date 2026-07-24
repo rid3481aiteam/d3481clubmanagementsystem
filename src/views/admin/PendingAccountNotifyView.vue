@@ -10,11 +10,12 @@ const districtNotify = useDistrictNotifyStore()
 const helpItems = [
   '密碼欄位要填的是「應用程式密碼」，不是平常登入 Gmail 用的密碼——這是 Google 的安全機制，要先到該 Gmail 帳號開啟兩步驟驗證，才能在應用程式密碼頁面產生一組 16 碼的專用密碼。',
   '設定完成後先按「發送測試信」寄一封給自己確認帳密沒填錯；之後要到「功能開關管理」把「RotarySSO 新帳號待審核 Email 通知」打開，才會真的在有人申請時發信。',
-  '收件人是目前所有「地區權限＝編輯」的帳號（跟帳號總覽那個切換開關是同一批人），不用另外設定收件清單。',
+  '「通知收件人」是自己指定的 Email，不是系統自動判斷的地區管理員名單，填誰就通知誰，可以填多個（用逗號分隔）。',
 ]
 
 const emailInput = ref('')
 const passwordInput = ref('')
+const notifyToInput = ref('')
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 const saved = ref(false)
@@ -24,11 +25,11 @@ const testEmailInput = ref('')
 const isConnected = computed(() => !!districtNotify.channel?.email_from)
 
 async function save() {
-  if (!emailInput.value.trim() || !passwordInput.value.trim()) return
+  if (!emailInput.value.trim() || !passwordInput.value.trim() || !notifyToInput.value.trim()) return
   saving.value = true
   saveError.value = null
   saved.value = false
-  const { error } = await districtNotify.saveChannel(emailInput.value, passwordInput.value, auth.user?.id ?? null)
+  const { error } = await districtNotify.saveChannel(emailInput.value, passwordInput.value, notifyToInput.value, auth.user?.id ?? null)
   saving.value = false
   if (error) {
     saveError.value = error.message
@@ -46,6 +47,7 @@ async function sendTest() {
 onMounted(() => {
   districtNotify.fetchChannel().then(() => {
     emailInput.value = districtNotify.channel?.email_from ?? ''
+    notifyToInput.value = districtNotify.channel?.notify_to ?? ''
   })
 })
 </script>
@@ -61,13 +63,13 @@ onMounted(() => {
     </div>
 
     <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">
-      設定一組地區共用的 Gmail 帳號後，有人透過 RotarySSO 首次登入、產生待審核帳號時，
-      會自動寄信通知所有有地區編輯權限的管理員，不用自己點進「帳號管理」頁才發現。
-      是否真的發信由「功能開關管理」統一控制，這裡只負責設定要用哪組 Gmail 帳號寄信。
+      設定一組地區共用的 Gmail 帳號＋要通知的收件人後，有人透過 RotarySSO 首次登入、
+      產生待審核帳號時，會自動寄信通知指定的人，不用自己點進「帳號管理」頁才發現。
+      是否真的發信由「功能開關管理」統一控制。
     </p>
 
     <div class="tw" style="padding:20px; margin-bottom:20px;">
-      <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:4px;">1. 設定 Gmail 帳號 + 應用程式密碼</h2>
+      <h2 style="font-size:15px; font-weight:700; color:var(--navy); margin-bottom:4px;">1. 設定 Gmail 帳號 + 應用程式密碼 + 通知收件人</h2>
       <p style="font-size:12.5px; color:var(--muted); margin-bottom:10px;">
         先到 Google 帳號開啟兩步驟驗證，再到
         <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">應用程式密碼</a>
@@ -96,8 +98,12 @@ onMounted(() => {
           <label class="fl">應用程式密碼</label>
           <input v-model="passwordInput" type="password" class="fi" placeholder="16 碼應用程式密碼" />
         </div>
+        <div>
+          <label class="fl">通知收件人</label>
+          <input v-model="notifyToInput" type="text" class="fi" placeholder="例如：ds@example.com, da@example.com" />
+        </div>
       </div>
-      <button class="btn btn-gold" :disabled="saving" @click="save">{{ saving ? '儲存中...' : '儲存憑證' }}</button>
+      <button class="btn btn-gold" :disabled="saving" @click="save">{{ saving ? '儲存中...' : '儲存設定' }}</button>
       <span v-if="saved" style="margin-left:10px; color:var(--green); font-size:13px;">已儲存</span>
       <span v-if="saveError" style="margin-left:10px; color:var(--red); font-size:13px;">{{ saveError }}</span>
     </div>

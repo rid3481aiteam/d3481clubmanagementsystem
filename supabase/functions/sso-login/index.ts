@@ -134,13 +134,18 @@ async function notifyDistrictAdminsOfPendingAccount(
 
   const { data: channel } = await adminClient
     .from('district_notification_channel')
-    .select('email_from, email_app_password')
+    .select('email_from, email_app_password, notify_to')
     .eq('id', 'default')
     .maybeSingle()
-  if (!channel?.email_from || !channel?.email_app_password) return
+  if (!channel?.email_from || !channel?.email_app_password || !channel?.notify_to) return
 
-  const { data: recipients } = await adminClient.rpc('district_admin_emails')
-  const recipientEmails = (recipients as string[] | null) ?? []
+  // notify_to 是地區管理員在設定頁自己填的指定收件人（逗號分隔），不是系統動態
+  // 判斷「誰是地區管理員」——使用者明確要求發給指定人就好，不用整批地區管理員都收到。
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const recipientEmails = channel.notify_to
+    .split(',')
+    .map((e: string) => e.trim())
+    .filter((e: string) => EMAIL_RE.test(e))
   if (!recipientEmails.length) return
 
   const applicantName = info.name || info.email

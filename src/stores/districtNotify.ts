@@ -22,12 +22,13 @@ export const useDistrictNotifyStore = defineStore('districtNotify', () => {
     loading.value = false
   }
 
-  async function saveChannel(emailFrom: string, appPassword: string, userId: string | null) {
+  async function saveChannel(emailFrom: string, appPassword: string, notifyTo: string, userId: string | null) {
     const { error } = await supabase
       .from('district_notification_channel')
       .update({
         email_from: emailFrom.trim(),
         email_app_password: appPassword.trim(),
+        notify_to: notifyTo.trim(),
         updated_by: userId,
       })
       .eq('id', 'default')

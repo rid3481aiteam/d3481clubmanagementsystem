@@ -649,6 +649,7 @@ export interface DistrictNotificationChannel {
   id: 'default'
   email_from: string | null
   email_app_password: string | null
+  notify_to: string | null
   updated_by: string | null
   created_at: string
   updated_at: string
