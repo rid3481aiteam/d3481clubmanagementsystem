@@ -27,7 +27,13 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
     meta: { title: string; category: string | null; tags: string[]; description: string | null; contentText: string },
     userId: string | null,
   ) {
-    const path = `${crypto.randomUUID()}-${file.name}`
+    // Storage 的物件 key 只接受 ASCII 安全字元（S3 相容限制），中文檔名放進去會被
+    // Supabase 拒絕（Invalid key）。這裡 key 只用 UUID＋副檔名，原始檔名另外存在
+    // file_name 欄位，下載/開啟時用 signed URL 的 download 選項帶回去，使用者看到
+    // 的還是原本的中文檔名，只是後端實際存放的路徑跟檔名無關。
+    const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/)
+    const ext = extMatch ? extMatch[0] : '.pdf'
+    const path = `${crypto.randomUUID()}${ext}`
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, { contentType: 'application/pdf' })
@@ -56,8 +62,10 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
     return { error }
   }
 
-  async function getSignedUrl(filePath: string) {
-    const { data } = await supabase.storage.from(BUCKET).createSignedUrl(filePath, 3600)
+  async function getSignedUrl(filePath: string, downloadName?: string) {
+    const { data } = await supabase.storage
+      .from(BUCKET)
+      .createSignedUrl(filePath, 3600, downloadName ? { download: downloadName } : undefined)
     return data?.signedUrl ?? null
   }
 
