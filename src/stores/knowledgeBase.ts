@@ -7,9 +7,10 @@ const BUCKET = 'knowledge-pdfs'
 
 export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
   const articles = ref<KnowledgeArticle[]>([])
+  const categories = ref<string[]>([])
   const loading = ref(false)
 
-  async function fetchAll(query?: string) {
+  async function fetchAll(query?: string, category?: string) {
     loading.value = true
     let q = supabase.from('knowledge_articles').select('*').order('created_at', { ascending: false })
     const term = query?.trim().replace(/[,%]/g, ' ').trim()
@@ -17,9 +18,17 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
       const pattern = `%${term}%`
       q = q.or(`title.ilike.${pattern},description.ilike.${pattern},content_text.ilike.${pattern}`)
     }
+    if (category) q = q.eq('category', category)
     const { data } = await q
     articles.value = data ?? []
     loading.value = false
+  }
+
+  // 搜尋框上方的類別快選按鈕，內容從實際上傳過的文件動態算出來，不是寫死的清單
+  async function fetchCategories() {
+    const { data } = await supabase.from('knowledge_articles').select('category')
+    const unique = new Set((data ?? []).map(r => r.category).filter((c): c is string => !!c && !!c.trim()))
+    categories.value = [...unique].sort((a, b) => a.localeCompare(b, 'zh-Hant'))
   }
 
   async function upload(
@@ -69,5 +78,5 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBase', () => {
     return data?.signedUrl ?? null
   }
 
-  return { articles, loading, fetchAll, upload, remove, getSignedUrl }
+  return { articles, categories, loading, fetchAll, fetchCategories, upload, remove, getSignedUrl }
 })

@@ -19,10 +19,15 @@ const helpItems = [
 ]
 
 const keyword = ref('')
+const selectedCategory = ref<string | null>(null)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 function onSearchInput() {
   if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => kb.fetchAll(keyword.value), 300)
+  searchTimer = setTimeout(() => kb.fetchAll(keyword.value, selectedCategory.value ?? undefined), 300)
+}
+function selectCategory(category: string | null) {
+  selectedCategory.value = category
+  kb.fetchAll(keyword.value, category ?? undefined)
 }
 
 const showUpload = ref(false)
@@ -87,7 +92,10 @@ async function submitUpload() {
   toast.show('已上傳')
   showUpload.value = false
   resetUploadForm()
-  await kb.fetchAll(keyword.value)
+  await Promise.all([
+    kb.fetchAll(keyword.value, selectedCategory.value ?? undefined),
+    kb.fetchCategories(),
+  ])
 }
 
 async function removeArticle(item: KnowledgeArticle) {
@@ -95,6 +103,10 @@ async function removeArticle(item: KnowledgeArticle) {
   const { error } = await kb.remove(item.id, item.file_path)
   if (error) { toast.show('刪除失敗：' + error.message, 'err'); return }
   toast.show('已刪除')
+  await Promise.all([
+    kb.fetchAll(keyword.value, selectedCategory.value ?? undefined),
+    kb.fetchCategories(),
+  ])
 }
 
 async function openArticle(item: KnowledgeArticle) {
@@ -105,6 +117,7 @@ async function openArticle(item: KnowledgeArticle) {
 
 onMounted(() => {
   kb.fetchAll()
+  kb.fetchCategories()
 })
 </script>
 
@@ -127,6 +140,20 @@ onMounted(() => {
       @input="onSearchInput"
     />
 
+    <div v-if="kb.categories.length" class="segmented" style="margin-bottom:16px; flex-wrap:wrap;">
+      <button type="button" class="seg-btn" :class="{ active: selectedCategory === null }" @click="selectCategory(null)">全部分類</button>
+      <button
+        v-for="c in kb.categories"
+        :key="c"
+        type="button"
+        class="seg-btn"
+        :class="{ active: selectedCategory === c }"
+        @click="selectCategory(c)"
+      >
+        {{ c }}
+      </button>
+    </div>
+
     <div v-if="kb.loading" style="color:var(--muted); font-size:13px;">搜尋中...</div>
 
     <div v-else style="display:flex; flex-direction:column; gap:12px;">
@@ -146,7 +173,7 @@ onMounted(() => {
         </div>
       </div>
       <div v-if="!kb.articles.length" style="text-align:center; color:var(--muted); padding:32px 0;">
-        {{ keyword.trim() ? '沒有符合的文件' : '知識庫目前還沒有文件' }}
+        {{ keyword.trim() || selectedCategory ? '沒有符合的文件' : '知識庫目前還沒有文件' }}
       </div>
     </div>
 
