@@ -113,17 +113,21 @@ const navItems = computed<NavItem[]>(() => {
     }
     if (auth.isDistrictAdminView) {
       items.push({ type: 'divider' })
+      const districtAdvancedItems: { to: string; icon: string; label: string; badge?: number }[] = [
+        { to: '/club/invite', icon: '👤', label: '邀請 / 管理地區帳號', badge: accounts.pendingCount || undefined },
+        { to: '/admin/features', icon: '⚙️', label: '功能開關' },
+        { to: '/admin/permissions', icon: '🔐', label: '權限矩陣' },
+        { to: '/admin/bug-reports', icon: '🐞', label: '錯誤回報' },
+      ]
+      if (features.isEnabled('M1_pending_account_notify')) {
+        districtAdvancedItems.push({ to: '/admin/pending-notify', icon: '📧', label: '帳號審核 Email 通知設定（測試中）' })
+      }
       items.push({
         type: 'dropdown',
         icon: '⚙️',
         label: '進階設定',
         badge: accounts.pendingCount || undefined,
-        items: [
-          { to: '/club/invite', icon: '👤', label: '邀請 / 管理地區帳號', badge: accounts.pendingCount || undefined },
-          { to: '/admin/features', icon: '⚙️', label: '功能開關' },
-          { to: '/admin/permissions', icon: '🔐', label: '權限矩陣' },
-          { to: '/admin/bug-reports', icon: '🐞', label: '錯誤回報' },
-        ],
+        items: districtAdvancedItems,
       })
     }
     return items

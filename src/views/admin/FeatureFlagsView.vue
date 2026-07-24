@@ -31,6 +31,7 @@ const LABELS: Record<FeatureKey, string> = {
   J1_line_notify: 'LINE 通知設定（測試中）',
   K1_meeting_email_notify: '新增例會自動發信通知社友（測試中）',
   L1_knowledge_base: '地區知識庫（測試中）',
+  M1_pending_account_notify: 'RotarySSO 新帳號待審核 Email 通知（測試中）',
 }
 
 const LOCKED: FeatureKey[] = ['A1_login', 'A2_roles', 'A3_isolation']
@@ -48,7 +49,7 @@ const groups = [
   { title: '行事曆', keys: keysByPrefix('F') },
   { title: '捐獻', keys: keysByPrefix('G') },
   { title: '獎助金', keys: keysByPrefix('I') },
-  { title: '通知', keys: [...keysByPrefix('J'), ...keysByPrefix('K')] },
+  { title: '通知', keys: [...keysByPrefix('J'), ...keysByPrefix('K'), ...keysByPrefix('M')] },
   { title: '知識庫', keys: keysByPrefix('L') },
 ]
 

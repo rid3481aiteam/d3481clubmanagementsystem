@@ -219,6 +219,7 @@ export type FeatureKey =
   | 'J1_line_notify'
   | 'K1_meeting_email_notify'
   | 'L1_knowledge_base'
+  | 'M1_pending_account_notify'
 
 export interface FeatureFlag {
   id: string
@@ -639,6 +640,18 @@ export interface LineBinding {
   phone: string
   line_user_id: string
   bound_at: string
+}
+
+// ── 地區帳號審核 Email 通知（見 062_district_pending_account_notify.sql）
+// 單列表，不像 ClubNotificationChannel 有 club_id：這是地區共用一組
+// Gmail，不分社。
+export interface DistrictNotificationChannel {
+  id: 'default'
+  email_from: string | null
+  email_app_password: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
 }
 
 // ── 地區知識庫 ────────────────────────────────────────

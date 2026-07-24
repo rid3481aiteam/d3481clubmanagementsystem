@@ -227,6 +227,12 @@ const router = createRouter({
       meta: { role: 'district_admin' },
     },
     {
+      path: '/admin/pending-notify',
+      name: 'admin-pending-notify',
+      component: () => import('@/views/admin/PendingAccountNotifyView.vue'),
+      meta: { role: 'district_admin' },
+    },
+    {
       path: '/club/edm',
       name: 'club-edm',
       component: () => import('@/views/edm/EdmGeneratorView.vue'),

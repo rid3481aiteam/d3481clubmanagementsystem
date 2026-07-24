@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -7,6 +8,8 @@ const ROTARYSSO_CLIENT_SECRET = Deno.env.get('ROTARYSSO_CLIENT_SECRET')!
 
 const ROTARYSSO_ISSUER = 'https://rotarysso.vercel.app'
 const DISTRICT_ADMIN_ACCOUNT_TYPE = '管理者'
+// 跟 invite-user/notify-meeting-created 用同一個正式站網址
+const SITE_URL = 'https://d3481clubmanagementsystem.pages.dev'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +23,91 @@ function errorResponse(message: string, status: number) {
   })
 }
 
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+// denomailer 對 Subject 的 RFC 2047 編碼有 bug（見 send-test-email/notify-meeting-created
+// 同一支函式開頭的說明），這裡自己正確實作再交給 denomailer，繞過那個 bug。跟其他寄信
+// Edge Function 重複貼一份，是因為這個專案的 Edge Function 目前都是各自獨立部署、沒有
+// 共用程式碼的機制（沒有 `_shared` 資料夾）。
+function encodeSubjectHeader(subject: string): string {
+  const MAX_PAYLOAD = 60
+  const units: string[] = []
+  for (const ch of subject) {
+    let unit = ''
+    for (const byte of new TextEncoder().encode(ch)) {
+      if (byte === 0x20) {
+        unit += '_'
+      } else if (byte >= 0x21 && byte <= 0x7e && byte !== 0x3d && byte !== 0x3f && byte !== 0x5f) {
+        unit += String.fromCharCode(byte)
+      } else {
+        unit += '=' + byte.toString(16).toUpperCase().padStart(2, '0')
+      }
+    }
+    units.push(unit)
+  }
+
+  const words: string[] = []
+  let current = ''
+  for (const unit of units) {
+    if (current && current.length + unit.length > MAX_PAYLOAD) {
+      words.push(current)
+      current = unit
+    } else {
+      current += unit
+    }
+  }
+  if (current) words.push(current)
+
+  return ' ' + words.map((w) => `=?utf-8?Q?${w}?=`).join('\r\n ')
+}
+
+// denomailer 內建的 quoted-printable 內文編碼也有 bug（同上，見其他寄信 Edge Function
+// 開頭的說明），這裡自己正確實作，透過 SendConfig 的 mimeContent 繞過它內建、有問題的
+// 編碼路徑。
+function quotedPrintableEncodeBody(text: string): string {
+  const LINE_MAX = 74
+  const rawLines = text.split(/\r\n|\n/)
+  const outLines: string[] = []
+
+  for (const rawLine of rawLines) {
+    const units: string[] = []
+    for (const ch of rawLine) {
+      const bytes = Array.from(new TextEncoder().encode(ch))
+      if (
+        bytes.length === 1 &&
+        bytes[0] !== 0x3d &&
+        ((bytes[0] >= 0x20 && bytes[0] <= 0x7e) || bytes[0] === 0x09)
+      ) {
+        units.push(String.fromCharCode(bytes[0]))
+      } else {
+        units.push(bytes.map((b) => '=' + b.toString(16).toUpperCase().padStart(2, '0')).join(''))
+      }
+    }
+    if (units.length) {
+      const last = units[units.length - 1]
+      if (last === ' ') units[units.length - 1] = '=20'
+      else if (last === '\t') units[units.length - 1] = '=09'
+    }
+
+    let current = ''
+    for (const unit of units) {
+      if (current.length + unit.length > LINE_MAX - 1) {
+        outLines.push(current + '=')
+        current = ''
+      }
+      current += unit
+    }
+    outLines.push(current)
+  }
+
+  return outLines.join('\r\n')
+}
+
 interface RotarySsoUserInfo {
   sub: string
   email: string
@@ -27,6 +115,74 @@ interface RotarySsoUserInfo {
   rotary_club?: string
   rotary_district?: string
   account_type?: string
+}
+
+// 全新帳號（case 3）建立後，寄信通知地區管理員有人在等審核。刻意整包包在
+// try/catch 裡呼叫（見下方呼叫處），寄信失敗（Gmail 憑證還沒設定、沒開
+// M1 flag、SMTP 出錯…）都不能擋到使用者本人的登入流程，最多在 log 留一筆。
+async function notifyDistrictAdminsOfPendingAccount(
+  adminClient: ReturnType<typeof createClient>,
+  info: RotarySsoUserInfo,
+) {
+  const { data: flag } = await adminClient
+    .from('feature_flags')
+    .select('enabled')
+    .is('club_id', null)
+    .eq('feature_key', 'M1_pending_account_notify')
+    .maybeSingle()
+  if (!flag?.enabled) return
+
+  const { data: channel } = await adminClient
+    .from('district_notification_channel')
+    .select('email_from, email_app_password')
+    .eq('id', 'default')
+    .maybeSingle()
+  if (!channel?.email_from || !channel?.email_app_password) return
+
+  const { data: recipients } = await adminClient.rpc('district_admin_emails')
+  const recipientEmails = (recipients as string[] | null) ?? []
+  if (!recipientEmails.length) return
+
+  const applicantName = info.name || info.email
+  const subject = encodeSubjectHeader(`【D3481】有新的 RotarySSO 帳號待審核（${applicantName}）`)
+  const detailLines = [
+    `申請人：${escapeHtml(applicantName)}（${escapeHtml(info.email)}）`,
+    `SSO 自稱社別：${escapeHtml(info.rotary_club || '未提供')}`,
+    `扶輪地區：${escapeHtml(info.rotary_district || '未提供')}`,
+    `扶輪身分別：${escapeHtml(info.account_type || '未提供')}`,
+  ]
+  const html = `
+    <p>您好：</p>
+    <p>有人剛透過 RotarySSO 登入本平台，正在等待指派社別／審核角色：</p>
+    <p>${detailLines.join('<br>')}</p>
+    <p>請到「帳號管理」頁審核：<a href="${SITE_URL}/club/invite">${SITE_URL}/club/invite</a></p>
+  `
+  const plainText = html.replace(/<[^>]+>/g, '')
+  const mimeContent = [
+    { mimeType: 'text/plain; charset="utf-8"', content: quotedPrintableEncodeBody(plainText), transferEncoding: 'quoted-printable' },
+    { mimeType: 'text/html; charset="utf-8"', content: quotedPrintableEncodeBody(html), transferEncoding: 'quoted-printable' },
+  ]
+
+  const client = new SMTPClient({
+    connection: {
+      hostname: 'smtp.gmail.com',
+      port: 465,
+      tls: true,
+      auth: { username: channel.email_from, password: channel.email_app_password },
+    },
+  })
+
+  try {
+    for (const email of recipientEmails) {
+      await client.send({ from: channel.email_from, to: email, subject, mimeContent })
+    }
+  } finally {
+    try {
+      await client.close()
+    } catch {
+      // 連線關閉失敗不影響已經送出的信件結果
+    }
+  }
 }
 
 Deno.serve(async (req) => {
@@ -142,6 +298,12 @@ Deno.serve(async (req) => {
         return errorResponse(message, 400)
       }
       targetUserId = created.user.id
+
+      try {
+        await notifyDistrictAdminsOfPendingAccount(adminClient, info)
+      } catch (notifyErr) {
+        console.error('notifyDistrictAdminsOfPendingAccount failed:', notifyErr)
+      }
     }
   }
 

@@ -17,6 +17,7 @@ const DEFAULT_FLAGS: FeatureMap = {
   J1_line_notify: false,
   K1_meeting_email_notify: false,
   L1_knowledge_base: false,
+  M1_pending_account_notify: false,
 }
 
 export const useFeaturesStore = defineStore('features', () => {
