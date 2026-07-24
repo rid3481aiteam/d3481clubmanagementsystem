@@ -333,6 +333,7 @@ export interface MemberAttendanceRate {
   club_id: string
   member_id: string
   member_name: string
+  member_nick_name: string | null
   counted: number
   present: number
   absent: number

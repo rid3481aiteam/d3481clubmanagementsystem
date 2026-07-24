@@ -291,7 +291,7 @@ function toggleZone(zone: string) {
           <div v-if="dashboard.needsCare.length" class="care-list">
             <div v-for="m in dashboard.needsCare" :key="m.member_id" class="care-item">
               <div class="care-body">
-                <span class="care-name">{{ m.member_name }}</span>
+                <span class="care-name">{{ m.member_name }}<template v-if="m.member_nick_name">（{{ m.member_nick_name }}）</template></span>
                 <span class="bdg care-badge" :class="careLevel(m).badge">{{ careLevel(m).label }} {{ m.rate }}%</span>
               </div>
               <button v-if="canManageTodos" class="btn btn-g btn-sm" @click="openCare(m)">✏️ 記錄</button>
