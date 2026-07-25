@@ -2,46 +2,23 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
-import { useProspectiveStore } from '@/stores/prospective'
-import { useMeetingsStore } from '@/stores/meetings'
 import { useAttendanceStore } from '@/stores/attendance'
 import { useMembershipReportsStore } from '@/stores/membershipReports'
 import { useFeaturesStore } from '@/stores/features'
-import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus, UserProfile, UserRole, ProspectStatus } from '@/types'
+import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus } from '@/types'
 
 const route = useRoute()
-const auth = useAuthStore()
 const roster = useRosterStore()
 const officers = useOfficersStore()
-const prospective = useProspectiveStore()
-const meetingsStore = useMeetingsStore()
 const attendance = useAttendanceStore()
 const membershipReports = useMembershipReportsStore()
 const features = useFeaturesStore()
 const club = ref<Club | null>(null)
 const lastMeeting = ref<Meeting | null>(null)
 const avgRate = ref<number | null>(null)
-const registeredAccounts = ref<UserProfile[]>([])
 const yearTerm = currentYearTerm()
-
-const PROSPECT_STATUS_LABEL: Record<ProspectStatus, string> = {
-  not_invited: '尚未邀請',
-  invited: '已邀請',
-  joined: '已入社',
-  no_reply: '無回應',
-  declined: '婉拒',
-}
-
-const PROSPECT_STATUS_BADGE: Record<ProspectStatus, string> = {
-  not_invited: 'b-g',
-  invited: 'b-n',
-  joined: 'b-gr',
-  no_reply: 'b-y',
-  declined: 'b-r',
-}
 
 const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
   { role: 'president', label: '社長' },
@@ -69,30 +46,6 @@ function officerName(role: ClubOfficerRole) {
   return officers.list.find(o => o.role === role)?.name || '-'
 }
 
-function accountRoleLabel(role: UserRole) {
-  if (role === 'district_admin') return '地區管理員'
-  if (role === 'club_admin' || role === 'club_secretary') return '各社管理員'
-  if (role === 'club_member') return '一般社友'
-  return role
-}
-
-async function changeDistrictRole(accountId: string, value: string) {
-  const districtRole = value === 'view' || value === 'admin' ? value : null
-  const { error } = await supabase
-    .from('user_profiles')
-    .update({ district_role: districtRole })
-    .eq('id', accountId)
-
-  if (error) {
-    alert(error.message)
-    return
-  }
-
-  registeredAccounts.value = registeredAccounts.value.map(a => (
-    a.id === accountId ? { ...a, district_role: districtRole } : a
-  ))
-}
-
 async function load() {
   const id = route.params.id as string
   const { data } = await supabase.from('clubs').select('*').eq('id', id).single()
@@ -100,18 +53,8 @@ async function load() {
 
   await roster.fetchAll(id)
   await officers.fetchAll(id, yearTerm)
-  await prospective.fetchAll(id)
-  await meetingsStore.fetchAll(id)
   await attendance.fetchMonthlyRates(id)
   await membershipReports.fetchAll(id)
-
-  const { data: accounts } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('club_id', id)
-    .order('role')
-    .order('name')
-  registeredAccounts.value = accounts ?? []
 
   const { data: meeting } = await supabase
     .from('meetings')
@@ -201,60 +144,6 @@ watch(() => route.params.id, load)
       </div>
     </div>
 
-    <h2 class="section-h">潛在社友</h2>
-    <div class="tw" style="margin-bottom:24px;">
-      <table class="card-table">
-        <thead class="th">
-          <tr>
-            <th>姓名</th>
-            <th>職稱</th>
-            <th>公司</th>
-            <th>推薦人</th>
-            <th>追蹤日</th>
-            <th>狀態</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="p in prospective.prospects" :key="p.id">
-            <td data-label="姓名">{{ p.name }}</td>
-            <td data-label="職稱">{{ p.job_title || '-' }}</td>
-            <td data-label="公司">{{ p.company || '-' }}</td>
-            <td data-label="推薦人">{{ p.ref_name || '-' }}</td>
-            <td data-label="追蹤日">{{ p.follow_up_date || '-' }}</td>
-            <td data-label="狀態"><span class="bdg" :class="PROSPECT_STATUS_BADGE[p.status]">{{ PROSPECT_STATUS_LABEL[p.status] }}</span></td>
-          </tr>
-          <tr v-if="!prospective.prospects.length">
-            <td colspan="6" style="text-align:center; color:var(--muted);">該社尚無潛在社友資料</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2 class="section-h">例會管理</h2>
-    <div class="tw" style="margin-bottom:24px;">
-      <table class="card-table">
-        <thead class="th">
-          <tr>
-            <th>日期</th>
-            <th>主題</th>
-            <th>講者</th>
-            <th>地點</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in meetingsStore.meetings" :key="m.id">
-            <td data-label="日期">{{ m.date }}</td>
-            <td data-label="主題">{{ m.title || '-' }}</td>
-            <td data-label="講者">{{ m.speaker_name || '-' }}</td>
-            <td data-label="地點">{{ m.venue || '-' }}</td>
-          </tr>
-          <tr v-if="!meetingsStore.meetings.length">
-            <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無例會紀錄</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
     <h2 class="section-h">歷月出席月報</h2>
     <div class="tw" style="margin-bottom:24px; overflow-x:auto;">
       <table class="card-table">
@@ -304,86 +193,6 @@ watch(() => route.params.id, load)
       </table>
     </div>
 
-    <template v-if="auth.isDistrictAdminView">
-      <h2 class="section-h">已註冊帳號</h2>
-      <div class="tw" style="margin-bottom:24px;">
-        <table class="card-table">
-          <thead class="th">
-            <tr>
-              <th>姓名</th>
-              <th>角色</th>
-              <th>可見範圍</th>
-              <th>狀態</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="a in registeredAccounts" :key="a.id">
-              <td data-label="姓名">{{ a.name }}</td>
-              <td data-label="角色">{{ accountRoleLabel(a.role) }}</td>
-              <td data-label="可見範圍">
-                <div class="segmented" role="group" aria-label="可見範圍">
-                  <button
-                    type="button"
-                    class="seg-btn"
-                    :class="{ active: (a.district_role ?? 'club') === 'club' }"
-                    @click="changeDistrictRole(a.id, 'club')"
-                  >只能看到各社</button>
-                  <button
-                    type="button"
-                    class="seg-btn"
-                    :class="{ active: a.district_role === 'view' }"
-                    @click="changeDistrictRole(a.id, 'view')"
-                  >地區（唯讀）</button>
-                  <button
-                    type="button"
-                    class="seg-btn"
-                    :class="{ active: a.district_role === 'admin' }"
-                    @click="changeDistrictRole(a.id, 'admin')"
-                  >地區管理員</button>
-                </div>
-              </td>
-              <td data-label="狀態">
-                <span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">
-                  {{ a.is_active ? '啟用中' : '已停用' }}
-                </span>
-              </td>
-            </tr>
-            <tr v-if="!registeredAccounts.length">
-              <td colspan="4" style="text-align:center; color:var(--muted);">該社尚無已註冊帳號</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </template>
-
-    <h2 class="section-h">社員名單</h2>
-    <div class="tw">
-      <table class="card-table">
-        <thead class="th">
-          <tr>
-            <th>英文名稱</th>
-            <th>中文姓名</th>
-            <th>社內職稱</th>
-            <th>職業分類</th>
-            <th>公司</th>
-            <th>職稱</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in roster.members" :key="m.id">
-            <td data-label="英文名稱">{{ m.nick_name || '-' }}</td>
-            <td data-label="中文姓名">{{ m.name }}</td>
-            <td data-label="社內職稱">{{ m.club_position || '社友' }}</td>
-            <td data-label="職業分類">{{ m.classification || '-' }}</td>
-            <td data-label="公司">{{ m.company || '-' }}</td>
-            <td data-label="職稱">{{ m.job_title || '-' }}</td>
-          </tr>
-          <tr v-if="!roster.members.length">
-            <td colspan="6" style="text-align:center; color:var(--muted);">該社尚無社友資料</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
   </div>
 </template>
 

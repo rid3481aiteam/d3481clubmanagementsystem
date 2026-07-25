@@ -89,27 +89,20 @@ const navItems = computed<NavItem[]>(() => {
     { type: 'link', to: '/', icon: '📊', label: '儀表板' },
   ]
 
-  if (features.isEnabled('F1_district_calendar')) {
-    items.push({ type: 'link', to: '/calendar', icon: '🗓️', label: '地區行事曆' })
-  }
-
   if (auth.isDistrictView) {
     items.push({ type: 'divider' })
-    items.push({ type: 'link', to: '/admin/clubs', icon: '🏢', label: '社團總覽' })
-    items.push({ type: 'link', to: '/admin/attendance', icon: '📈', label: '出席月報' })
+    if (features.isEnabled('F1_district_calendar')) {
+      items.push({ type: 'link', to: '/calendar', icon: '🗓️', label: '地區行事曆' })
+    }
     items.push({ type: 'link', to: '/admin/announcements', icon: '📣', label: '地區公告' })
-    items.push({ type: 'link', to: '/admin/governor-awards', icon: '🏅', label: '總監獎項統整' })
     if (features.isEnabled('H1_directory')) {
       items.push({ type: 'link', to: '/directory', icon: '📖', label: '地區通訊錄' })
     }
+    items.push({ type: 'link', to: '/admin/attendance', icon: '📈', label: '出席月報' })
+    items.push({ type: 'link', to: '/admin/clubs', icon: '🏢', label: '社團總覽' })
+    items.push({ type: 'link', to: '/admin/governor-awards', icon: '🏅', label: '總監獎項統整' })
     if (features.isEnabled('L1_knowledge_base')) {
       items.push({ type: 'link', to: '/knowledge-base', icon: '📚', label: '知識庫（測試中）' })
-    }
-    if (features.isEnabled('E1_activities') || features.isEnabled('B1_meeting_info')) {
-      items.push({ type: 'link', to: '/activities', icon: '📅', label: '活動' })
-    }
-    if (features.isEnabled('B5_edm')) {
-      items.push({ type: 'link', to: '/admin/edm', icon: '📧', label: 'EDM 產生器' })
     }
     if (auth.isDistrictAdminView) {
       items.push({ type: 'divider' })
@@ -136,16 +129,13 @@ const navItems = computed<NavItem[]>(() => {
   const isClubManager = auth.role === 'club_secretary' || auth.role === 'club_admin'
   if (isClubManager || auth.role === 'club_member') {
     items.push({ type: 'divider' })
-    if (isClubManager) {
-      items.push({ type: 'link', to: '/club/announcements', icon: '📣', label: '社內公告' })
-      items.push({ type: 'link', to: '/club/governor-award', icon: '🏅', label: '總監獎項申請' })
+    if (isClubManager && features.isEnabled('B2_attendance_summary')) {
+      items.push({ type: 'link', to: '/attendance/monthly', icon: '📈', label: '出席月報' })
     }
     if (features.isEnabled('E1_activities') || features.isEnabled('B1_meeting_info')) {
       items.push({ type: 'link', to: '/activities', icon: '📅', label: '活動' })
     }
-    if (features.isEnabled('B2_attendance_summary') && auth.role !== 'club_member') {
-      items.push({ type: 'link', to: '/attendance/monthly', icon: '📈', label: '出席月報' })
-    }
+    items.push({ type: 'link', to: '/club/announcements', icon: '📣', label: '社內公告' })
     const memberItems: { to: string; icon: string; label: string }[] = [
       { to: '/club/officers', icon: '🎖️', label: '社的年度成員' },
     ]
@@ -168,17 +158,17 @@ const navItems = computed<NavItem[]>(() => {
         { to: '/club/sister-clubs', icon: '🤝', label: '友好社' },
       ],
     })
-    if (features.isEnabled('G1_iou')) {
-      items.push({ type: 'link', to: '/club/iou', icon: '💰', label: 'IOU' })
-    }
-    if (features.isEnabled('I1_gg') && auth.role !== 'club_member') {
-      items.push({ type: 'link', to: '/club/gg', icon: '🌐', label: 'GG案' })
-    }
-    if (isClubManager && features.isEnabled('B5_edm')) {
-      items.push({ type: 'link', to: '/club/edm', icon: '📧', label: 'EDM 產生器' })
+    if (features.isEnabled('F1_district_calendar')) {
+      items.push({ type: 'link', to: '/calendar', icon: '🗓️', label: '地區行事曆' })
     }
     if (features.isEnabled('H1_directory')) {
       items.push({ type: 'link', to: '/directory', icon: '📖', label: '地區通訊錄' })
+    }
+    if (isClubManager) {
+      items.push({ type: 'link', to: '/club/governor-award', icon: '🏅', label: '總監獎項申請' })
+    }
+    if (features.isEnabled('I1_gg') && auth.role !== 'club_member') {
+      items.push({ type: 'link', to: '/club/gg', icon: '🌐', label: 'GG案' })
     }
     if (features.isEnabled('L1_knowledge_base')) {
       items.push({ type: 'link', to: '/knowledge-base', icon: '📚', label: '知識庫（測試中）' })

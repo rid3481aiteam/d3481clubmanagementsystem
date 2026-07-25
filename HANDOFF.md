@@ -1,5 +1,25 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-26（第一百一十四輪，**地區／各社導覽選單依使用者給的精確清單重排＋刪減，社團總覽詳情頁瘦身，「帳號權限授予」開放給各社使用**——使用者這輪直接給出地區、各社（有/無編輯權限）三份完整的選單清單，逐條對照重排：
+
+> **(1) [`TopMenu.vue`](src/components/layout/TopMenu.vue) 地區選單**：改成「儀表板／地區行事曆／地區公告／地區通訊錄／出席月報／社團總覽／總監獎項統整／知識庫／進階設定」，**拿掉「活動」**（原本 `E1_activities`/`B1_meeting_info` 那個連結整個刪除，不是隱藏）。「EDM 產生器」不在清單裡，這輪判斷是**依照給定清單當作完整規格**（不是描述現況），所以也一併拿掉——這點是我的解讀判斷，`B5_edm` flag 預設關閉所以之前也看不到，如果之後想要保留這個入口要另外講。
+
+> **(2) 各社選單分兩版**：有編輯權限（`club_secretary`/`club_admin`）＝「儀表板／出席月報／活動／社內公告／社的成員／本社歷程／地區行事曆／地區通訊錄／總監獎項申請／GG案／知識庫／進階設定」；沒有編輯權限（`club_member`）＝「儀表板／活動／社內公告／社的成員／本社歷程／地區行事曆／地區通訊錄／知識庫」。**「社內公告」這次改成一般社友也看得到**（原本只有 `isClubManager` 才有這條連結，現在拿掉這個限制，兩種身分都會顯示——頁面本身的編輯權限判斷沒有動，只是導覽列多一個入口讓社友能讀）。「IOU」跟 club 版「EDM 產生器」同樣不在清單裡，一併拿掉（原因同上，flag 預設都是關的）。地區行事曆在各社選單裡的位置從原本最上面移到「本社歷程」之後，跟地區選單裡的位置不一樣，是刻意分開處理（各社跟地區原本共用同一段 `F1_district_calendar` push，這輪拆成兩段各自安插在指定位置）。
+
+> **(3) [`ClubDetailView.vue`](src/views/admin/ClubDetailView.vue)（地區視角瀏覽「社團總覽→單一社」的詳情頁）整段刪除四個區塊**：潛在社友、例會管理、已註冊帳號、社員名單（使用者原文「淺在社友」判斷是「潛在社友」的手誤）。保留：頂部四個統計卡（社友人數／出席率／例會時間地點／最後一次例會）、領域分布、社的年度成員、歷月出席月報。連同只被這四塊用到的 script 一起清掉：`prospective`／`meetingsStore` 兩個 store 的引入跟呼叫、`registeredAccounts`／`accountRoleLabel()`／`changeDistrictRole()`、`PROSPECT_STATUS_LABEL`／`PROSPECT_STATUS_BADGE`，連帶 `useAuthStore` 也因為只被「已註冊帳號」那個 `v-if` 用到、拿掉後整個沒用到而移除。`roster` store 保留（社友人數／領域分布還在用 `roster.members`）。
+
+> **(4) 「帳號權限授予」開放給各社有編輯權限的人用**：使用者原話「要可以邀請帳號，將已經有申請SSO的加入到該社並指定是否有權限」——這正好是上一輪（113）新做的「帳號權限授予」（用 Email 查既有 SSO 帳號授權）的地區版，這輪把它也開放給各社。[`invite-user`](supabase/functions/invite-user/index.ts) Edge Function 恢復用 `current_club_id()`/`current_user_role()` 判斷呼叫者是不是 `club_admin`/`club_secretary`（跟 113 輪之前舊版的邏輯類似，但範圍縮小成只放行 `grant_type=club`），**各社只能授權「加入自己目前檢視中的社」，不能幫別的社加人、也不能授予地區工作人員**（`grant_type=district` 明確擋掉非地區管理員）。[`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue) 「帳號權限授予」卡片的 `v-if` 從只給 `isDistrictAdminView` 放寬成 `isDistrictAdminView || isClubTier`，各社視角看到的是簡化版表單（沒有「授權類型」下拉、沒有「所屬社團」選單，只有 Email＋角色檢視/編輯切換），`submitGrant()` 依視角決定 `club_id` 帶 `grantClubId`（地區手選）還是 `auth.clubId`（各社固定自己）。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過（`AccountManagementView` chunk 15.03kB）。這輪一樣沒有實機截圖驗證（比照使用者一貫偏好）。**這輪只有 `invite-user` 這支 Edge Function 有改動，其餘都是前端邏輯**。
+
+> **待使用者：**① 部署 `invite-user`（**這是唯一需要重新部署的 Edge Function**）：
+
+```bash
+supabase functions deploy invite-user
+```
+
+> ② 上正式站確認三份選單順序跟拿掉的項目符合預期（尤其「社內公告」現在一般社友也看得到，「活動」在地區選單消失、IOU/EDM 產生器在各社選單消失，如果這幾個判斷跟你想的不一樣，跟我說要調整哪個）；③ 用一個各社管理員帳號測「帳號權限授予」，確認只能選自己社、不會出現地區選項，且不能對別的社加人（可以故意用瀏覽器開發者工具改 `club_id` 送出測試，確認後端會擋）。
+
 > 最後更新：2026-07-26（第一百一十三輪，**帳號審核分流「社帳號／社友申請」＋轉交通知信＋「邀請社友」改成「帳號權限授予」（修掉 SSO 上線後沒同步的死路）——這輪範圍很大，拆成幾塊記**：
 
 > **(1) 地區視角也隱藏「新增社員帳號（手機號碼）」**：使用者確認這塊不管地區或各社都不用了，[`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue) 整塊卡片＋相關 script（`memberName`／`memberPhone`／`memberZone`／`memberClubId`／`creatingMember`／`memberError`／`memberSuccess`／`memberZones`／`memberClubsInZone`／`onMemberZoneChange`／`submitCreateMember`／`ZONE_ORDER`／`zoneRank`）整段刪除（不是 v-if 隱藏，這塊確定沒人會再看到）。`accounts.ts` 的 `createMember` 保留不動（沒有其他呼叫端，但功能小、留著風險低，之後真的要用可以直接接）。

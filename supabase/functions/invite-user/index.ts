@@ -16,13 +16,17 @@ function errorResponse(message: string, status: number) {
   })
 }
 
+const CLUB_TIER_ROLES = ['club_admin', 'club_secretary']
+
 // 全站已完全改用 RotarySSO 登入（見 051_rotarysso.sql），沒有帳密登入頁面了。
 // 這支函式原本是「邀請新 Email 建帳號」（Supabase inviteUserByEmail 寄信設密碼），
 // 但設完密碼叫使用者回 /login 用密碼登入時，/login 早就只剩 SSO 按鈕，帳號建了
 // 卻永遠登不進去。改成單純的「幫既有帳號（一定要先自己用 SSO 登入過一次）
 // 額外授權」：地區管理員用 Email 查到既有帳號，選要授予「地區工作人員」
-// （district_role）還是「加入指定社」（user_club_roles 跨社協作），不再建立
-// 任何新帳號。
+// （district_role）還是「加入指定社」（user_club_roles 跨社協作）；各社有編輯
+// 權限的人（club_admin/club_secretary）也能用，但只能授予「加入本社」，
+// 且只能是自己目前檢視中的社（不能幫別的社加人），不能授予地區工作人員。
+// 都不再建立任何新帳號。
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -50,10 +54,25 @@ Deno.serve(async (req) => {
   if (!callerProfile) return errorResponse('找不到使用者資料', 403)
 
   const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'
-  if (!isDistrictAdmin) return errorResponse('只有地區管理員可以執行此操作', 403)
+
+  // 用 current_club_id()/current_user_role() 而不是 callerProfile 的 home
+  // club_id/role，才能正確反映「現在切換檢視中的社」——跨社協作的執秘
+  // 切到被授權的社之後，也要能授權那個社的帳號。
+  const { data: currentClubId } = await callerClient.rpc('current_club_id')
+  const { data: currentRole } = await callerClient.rpc('current_user_role')
+  const isClubTier = CLUB_TIER_ROLES.includes(currentRole)
+
+  if (!isDistrictAdmin && !isClubTier) return errorResponse('沒有權限執行此操作', 403)
 
   const { email, grant_type, district_role, club_id, role } = await req.json()
   if (!email || typeof email !== 'string' || !email.trim()) return errorResponse('請輸入 Email', 400)
+
+  if (grant_type === 'district' && !isDistrictAdmin) {
+    return errorResponse('只有地區管理員可以授予地區工作人員權限', 403)
+  }
+  if (grant_type === 'club' && !isDistrictAdmin && currentClubId !== club_id) {
+    return errorResponse('只能授權目前檢視中的社', 403)
+  }
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 

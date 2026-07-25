@@ -27,15 +27,17 @@ const grantError = ref<string | null>(null)
 const grantSuccessMessage = ref<string | null>(null)
 const showInviteLog = ref(false)
 
+// 各社視角不用選社團（一定是自己目前檢視中的社），地區視角才需要 grantClubId
 async function submitGrant() {
   if (!grantEmail.value.trim()) return
-  if (grantType.value === 'club' && !grantClubId.value) return
+  const targetClubId = isDistrictAdminView.value ? grantClubId.value : auth.clubId
+  if (grantType.value === 'club' && !targetClubId) return
   granting.value = true
   grantError.value = null
   grantSuccessMessage.value = null
   const payload = grantType.value === 'district'
     ? { grant_type: 'district' as const, district_role: grantDistrictRole.value }
-    : { grant_type: 'club' as const, club_id: grantClubId.value!, role: grantClubRole.value }
+    : { grant_type: 'club' as const, club_id: targetClubId!, role: grantClubRole.value }
   const { error } = await invites.grantAccess(grantEmail.value.trim(), payload)
   if (error) {
     grantError.value = error.message
@@ -235,11 +237,13 @@ watch(isDistrictAdminView, loadAccounts)
       <h1>帳號管理</h1>
     </div>
 
-    <template v-if="isDistrictAdminView">
+    <template v-if="isDistrictAdminView || isClubTier">
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號權限授予</h2>
 
     <div class="tw" style="padding:20px; margin-bottom:14px;">
-      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:6px;">查詢既有帳號並授權</h3>
+      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:6px;">
+        {{ isDistrictAdminView ? '查詢既有帳號並授權' : '邀請已申請 SSO 的帳號加入本社' }}
+      </h3>
       <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
         全站已改用扶輪帳號（RotarySSO）登入，這裡不會建立新帳號——對方要先自己用扶輪帳號登入過一次，才查得到。
       </p>
@@ -248,52 +252,68 @@ watch(isDistrictAdminView, loadAccounts)
           <label class="fl">Email</label>
           <input v-model="grantEmail" type="email" class="fi" placeholder="既有帳號的 Email" style="min-width:240px;" />
         </div>
-        <div>
-          <label class="fl">授權類型</label>
-          <select v-model="grantType" class="fi" style="min-width:160px;">
-            <option value="club">加入指定社的介面</option>
-            <option value="district">地區工作人員</option>
-          </select>
-        </div>
-        <template v-if="grantType === 'club'">
+        <template v-if="isDistrictAdminView">
           <div>
-            <label class="fl">所屬社團</label>
-            <select v-model="grantClubId" class="fi" style="min-width:200px;">
-              <option :value="null" disabled>請選擇</option>
-              <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <label class="fl">授權類型</label>
+            <select v-model="grantType" class="fi" style="min-width:160px;">
+              <option value="club">加入指定社的介面</option>
+              <option value="district">地區工作人員</option>
             </select>
           </div>
-          <div>
-            <label class="fl">角色</label>
-            <button
-              type="button"
-              class="toggle-switch"
-              role="switch"
-              :aria-checked="grantClubRole === 'club_secretary'"
-              aria-label="角色：檢視／編輯"
-              @click="grantClubRole = grantClubRole === 'club_member' ? 'club_secretary' : 'club_member'"
-            >
-              <span class="track"><span class="knob"></span></span>
-              <span class="label">{{ grantClubRole === 'club_member' ? '檢視' : '編輯' }}</span>
-            </button>
-          </div>
+          <template v-if="grantType === 'club'">
+            <div>
+              <label class="fl">所屬社團</label>
+              <select v-model="grantClubId" class="fi" style="min-width:200px;">
+                <option :value="null" disabled>請選擇</option>
+                <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">角色</label>
+              <button
+                type="button"
+                class="toggle-switch"
+                role="switch"
+                :aria-checked="grantClubRole === 'club_secretary'"
+                aria-label="角色：檢視／編輯"
+                @click="grantClubRole = grantClubRole === 'club_member' ? 'club_secretary' : 'club_member'"
+              >
+                <span class="track"><span class="knob"></span></span>
+                <span class="label">{{ grantClubRole === 'club_member' ? '檢視' : '編輯' }}</span>
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <div>
+              <label class="fl">地區權限</label>
+              <button
+                type="button"
+                class="toggle-switch"
+                role="switch"
+                :aria-checked="grantDistrictRole === 'admin'"
+                aria-label="地區權限：檢視／編輯"
+                @click="grantDistrictRole = grantDistrictRole === 'view' ? 'admin' : 'view'"
+              >
+                <span class="track"><span class="knob"></span></span>
+                <span class="label">{{ grantDistrictRole === 'view' ? '檢視' : '編輯' }}</span>
+              </button>
+            </div>
+          </template>
         </template>
-        <template v-else>
-          <div>
-            <label class="fl">地區權限</label>
-            <button
-              type="button"
-              class="toggle-switch"
-              role="switch"
-              :aria-checked="grantDistrictRole === 'admin'"
-              aria-label="地區權限：檢視／編輯"
-              @click="grantDistrictRole = grantDistrictRole === 'view' ? 'admin' : 'view'"
-            >
-              <span class="track"><span class="knob"></span></span>
-              <span class="label">{{ grantDistrictRole === 'view' ? '檢視' : '編輯' }}</span>
-            </button>
-          </div>
-        </template>
+        <div v-else>
+          <label class="fl">角色</label>
+          <button
+            type="button"
+            class="toggle-switch"
+            role="switch"
+            :aria-checked="grantClubRole === 'club_secretary'"
+            aria-label="角色：檢視／編輯"
+            @click="grantClubRole = grantClubRole === 'club_member' ? 'club_secretary' : 'club_member'"
+          >
+            <span class="track"><span class="knob"></span></span>
+            <span class="label">{{ grantClubRole === 'club_member' ? '檢視' : '編輯' }}</span>
+          </button>
+        </div>
         <button class="btn btn-gold" :disabled="granting" @click="submitGrant">
           {{ granting ? '授權中…' : '授予權限' }}
         </button>
