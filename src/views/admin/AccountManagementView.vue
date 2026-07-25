@@ -15,42 +15,35 @@ const isDistrictAdminView = computed(() => auth.isDistrictAdminView)
 const isClubTier = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
 const canManagePending = computed(() => isDistrictAdminView.value || isClubTier.value)
 
-// 跟 ClubListView／RegisterView 的分區排序共用同一份順序
-const ZONE_ORDER = [
-  '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
-  '第六分區', '第七分區', '第八分區', '第九分區', '第十分區', '第十一分區',
-]
-
-function zoneRank(zone: string) {
-  const i = ZONE_ORDER.indexOf(zone)
-  return i === -1 ? ZONE_ORDER.length : i
-}
-
-const email = ref('')
-const inviteName = ref('')
-const role = ref<'club_member' | 'club_secretary'>('club_secretary')
-const clubId = ref<string | null>(isDistrictAdminView.value ? null : auth.clubId)
-const inviting = ref(false)
-const inviteError = ref<string | null>(null)
-const inviteSuccessMessage = ref<string | null>(null)
+// 授予既有帳號權限：對方一定要先自己用 RotarySSO 登入過一次（有帳號在
+// auth.users 裡）才查得到，這裡不會、也不能建立新帳號。
+const grantEmail = ref('')
+const grantType = ref<'district' | 'club'>('club')
+const grantDistrictRole = ref<'view' | 'admin'>('view')
+const grantClubId = ref<string | null>(null)
+const grantClubRole = ref<'club_member' | 'club_secretary'>('club_secretary')
+const granting = ref(false)
+const grantError = ref<string | null>(null)
+const grantSuccessMessage = ref<string | null>(null)
 const showInviteLog = ref(false)
 
-async function submitInvite() {
-  if (!email.value.trim() || !clubId.value) return
-  inviting.value = true
-  inviteError.value = null
-  inviteSuccessMessage.value = null
-  const { data, error } = await invites.inviteUser(email.value.trim(), role.value, clubId.value, inviteName.value.trim() || undefined)
+async function submitGrant() {
+  if (!grantEmail.value.trim()) return
+  if (grantType.value === 'club' && !grantClubId.value) return
+  granting.value = true
+  grantError.value = null
+  grantSuccessMessage.value = null
+  const payload = grantType.value === 'district'
+    ? { grant_type: 'district' as const, district_role: grantDistrictRole.value }
+    : { grant_type: 'club' as const, club_id: grantClubId.value!, role: grantClubRole.value }
+  const { error } = await invites.grantAccess(grantEmail.value.trim(), payload)
   if (error) {
-    inviteError.value = error.message
+    grantError.value = error.message
   } else {
-    email.value = ''
-    inviteName.value = ''
-    inviteSuccessMessage.value = data?.cross_club_grant
-      ? '此帳號已存在，已直接授予本社管理權限，請自行通知對方登入後切換社團。'
-      : '邀請已寄出。'
+    grantEmail.value = ''
+    grantSuccessMessage.value = '已授予權限。'
   }
-  inviting.value = false
+  granting.value = false
 }
 
 function clubName(id: string | null) {
@@ -112,66 +105,54 @@ watch(() => accounts.pending, (list) => {
   }
 }, { immediate: true })
 
+// RotarySSO 的「扶輪身分別」目前看到兩種申請人：「扶輪社友」（個人）跟
+// 「扶輪社」（該社自己的官方帳號申請）。後者是這個社的第一個管理帳號，
+// 沒有既有管理員可以代為審核，不能走「發送給該社自己審」那套。
+function isClubApplication(p: UserProfile) {
+  return p.sso_account_type === '扶輪社'
+}
+
 function pendingRoleChoice(p: UserProfile) {
-  const choice = pendingChoice.value[p.id] ?? p.requested_role ?? 'club_member'
+  const fallback = isClubApplication(p) ? 'club_secretary' : 'club_member'
+  const choice = pendingChoice.value[p.id] ?? p.requested_role ?? fallback
   // 申請職稱對到的 requested_role 可能是舊資料的 club_admin，角色只剩
   // 「各社管理員／一般社友」兩種，顯示上把 club_admin 併進 club_secretary
   return choice === 'club_admin' ? 'club_secretary' : choice
 }
 
-// 待審清單一鍵啟動：地區視角且尚未指派社別時，社別是必填（不然存進去
-// club_id 還是 NULL，跟沒指派一樣），其他情況（已有 club_id，或各社
-// 管理員視角只審角色）不用挑社別。
-function canActivatePending(p: UserProfile) {
-  return !(isDistrictAdminView.value && !p.club_id) || !!pendingClubChoice.value[p.id]
+// 地區視角看到全新 SSO 個人申請人（還沒指派社別）：不再由地區直接一次
+// 給權限，只負責選社別、「發送」轉給該社自己審——地區不判斷該給什麼
+// 角色，那是該社自己的事。發送後 club_id 有值、requested_role 會變成
+// club_member，這筆就會自然出現在該社自己視角的「帳號審核」（跟既有
+// 社員申請升級權限用的是同一套機制，不用另外加畫面），該社的「進階
+// 設定」也會照既有的 pendingCount 徽章機制顯示待審核數字，不用再另外
+// 做通知。
+async function forwardPendingToClub(p: UserProfile) {
+  const targetClubId = pendingClubChoice.value[p.id]
+  if (!targetClubId) return
+  const { error } = await accounts.forwardToClub(p.id, targetClubId)
+  if (error) alert(error.message)
 }
 
-async function activatePendingAccount(p: UserProfile) {
-  const targetClubId = isDistrictAdminView.value && !p.club_id ? pendingClubChoice.value[p.id] : undefined
-  if (isDistrictAdminView.value && !p.club_id && !targetClubId) return
+// 「扶輪社」申請（該社第一個管理帳號）：直接選社別＋角色（預設各社管理員）
+// 一次給權限，不走發送流程——沒有人可以代為審核這種申請。角色一旦變成
+// club_secretary/club_admin，該社的 account_notify_email 會自動被記下來。
+async function activateClubApplication(p: UserProfile) {
+  const targetClubId = pendingClubChoice.value[p.id]
+  if (!targetClubId) return
   const { error } = await accounts.activatePending(p.id, pendingRoleChoice(p), targetClubId)
+  if (error) alert(error.message)
+}
+
+// 已經有 club_id 的待審列（該社自己審角色，或地區想直接接手完成）：
+// 維持原本的角色選擇＋一鍵啟動。
+async function activatePendingAccount(p: UserProfile) {
+  const { error } = await accounts.activatePending(p.id, pendingRoleChoice(p))
   if (error) alert(error.message)
 }
 
 async function toggleActive(id: string, current: boolean) {
   await accounts.setActive(id, !current)
-}
-
-const memberName = ref('')
-const memberPhone = ref('')
-const memberZone = ref('')
-const memberClubId = ref<string | null>(isDistrictAdminView.value ? null : auth.clubId)
-const creatingMember = ref(false)
-const memberError = ref<string | null>(null)
-const memberSuccess = ref<string | null>(null)
-
-// 只有地區管理員可以幫任何社建立社員帳號，才需要先選分區再選社；
-// 各社管理員只能建本社帳號，clubId 已經固定，不需要這兩層選單
-const memberZones = computed(() => {
-  const set = new Set(club.allClubs.map(c => c.zone || '未分區'))
-  return [...set].sort((a, b) => zoneRank(a) - zoneRank(b) || a.localeCompare(b))
-})
-
-const memberClubsInZone = computed(() => club.allClubs.filter(c => (c.zone || '未分區') === memberZone.value))
-
-function onMemberZoneChange() {
-  memberClubId.value = null
-}
-
-async function submitCreateMember() {
-  if (!memberName.value.trim() || !memberPhone.value.trim() || !memberClubId.value) return
-  creatingMember.value = true
-  memberError.value = null
-  memberSuccess.value = null
-  const { error } = await accounts.createMember(memberPhone.value.trim(), memberName.value.trim(), memberClubId.value)
-  if (error) {
-    memberError.value = error.message
-  } else {
-    memberSuccess.value = `帳號已建立，初始密碼為完整手機號碼「${memberPhone.value.trim()}」`
-    memberName.value = ''
-    memberPhone.value = ''
-  }
-  creatingMember.value = false
 }
 
 async function resetMemberPassword(id: string, name: string) {
@@ -255,90 +236,76 @@ watch(isDistrictAdminView, loadAccounts)
     </div>
 
     <template v-if="isDistrictAdminView">
-    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號邀請</h2>
+    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號權限授予</h2>
 
     <div class="tw" style="padding:20px; margin-bottom:14px;">
-      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:14px;">邀請社友（Email）</h3>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-        <div>
-          <label class="fl">Email</label>
-          <input v-model="email" type="email" class="fi" placeholder="邀請對象的 Email" style="min-width:240px;" />
-        </div>
-        <div>
-          <label class="fl">姓名（選填）</label>
-          <input v-model="inviteName" type="text" class="fi" placeholder="不填則預設用 Email 前段" style="min-width:160px;" />
-        </div>
-        <div v-if="isDistrictAdminView">
-          <label class="fl">所屬社團</label>
-          <select v-model="clubId" class="fi" style="min-width:200px;">
-            <option :value="null" disabled>請選擇</option>
-            <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="fl">角色</label>
-          <button
-            type="button"
-            class="toggle-switch"
-            role="switch"
-            :aria-checked="role === 'club_secretary'"
-            aria-label="角色：檢視／編輯"
-            @click="role = role === 'club_member' ? 'club_secretary' : 'club_member'"
-          >
-            <span class="track"><span class="knob"></span></span>
-            <span class="label">{{ role === 'club_member' ? '檢視' : '編輯' }}</span>
-          </button>
-        </div>
-        <button class="btn btn-gold" :disabled="inviting" @click="submitInvite">
-          {{ inviting ? '邀請中…' : '送出邀請' }}
-        </button>
-      </div>
-      <p v-if="inviteError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ inviteError }}</p>
-      <p v-if="inviteSuccessMessage" style="margin-top:10px; font-size:12px; color:var(--green);">{{ inviteSuccessMessage }}</p>
-    </div>
-
-    <div class="tw" style="padding:20px; margin-bottom:14px;">
-      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:6px;">新增社員帳號（手機號碼）</h3>
+      <h3 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:6px;">查詢既有帳號並授權</h3>
       <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-        社員用手機號碼登入，不需要 Email，初始密碼為完整手機號碼（跟帳號一樣）。忘記密碼可由各社管理員在「帳號總覽」一鍵重設。
+        全站已改用扶輪帳號（RotarySSO）登入，這裡不會建立新帳號——對方要先自己用扶輪帳號登入過一次，才查得到。
       </p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>
-          <label class="fl">姓名</label>
-          <input v-model="memberName" type="text" class="fi" placeholder="社員姓名" style="min-width:160px;" />
+          <label class="fl">Email</label>
+          <input v-model="grantEmail" type="email" class="fi" placeholder="既有帳號的 Email" style="min-width:240px;" />
         </div>
         <div>
-          <label class="fl">手機號碼</label>
-          <input v-model="memberPhone" type="tel" class="fi" placeholder="0912345678" style="min-width:160px;" />
+          <label class="fl">授權類型</label>
+          <select v-model="grantType" class="fi" style="min-width:160px;">
+            <option value="club">加入指定社的介面</option>
+            <option value="district">地區工作人員</option>
+          </select>
         </div>
-        <template v-if="isDistrictAdminView">
-          <div>
-            <label class="fl">分區</label>
-            <select v-model="memberZone" class="fi" style="min-width:140px;" @change="onMemberZoneChange">
-              <option value="" disabled>請選擇</option>
-              <option v-for="z in memberZones" :key="z" :value="z">{{ z }}</option>
-            </select>
-          </div>
+        <template v-if="grantType === 'club'">
           <div>
             <label class="fl">所屬社團</label>
-            <select v-model="memberClubId" class="fi" style="min-width:200px;" :disabled="!memberZone">
-              <option :value="null" disabled>{{ memberZone ? '請選擇' : '請先選擇分區' }}</option>
-              <option v-for="c in memberClubsInZone" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <select v-model="grantClubId" class="fi" style="min-width:200px;">
+              <option :value="null" disabled>請選擇</option>
+              <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
+          <div>
+            <label class="fl">角色</label>
+            <button
+              type="button"
+              class="toggle-switch"
+              role="switch"
+              :aria-checked="grantClubRole === 'club_secretary'"
+              aria-label="角色：檢視／編輯"
+              @click="grantClubRole = grantClubRole === 'club_member' ? 'club_secretary' : 'club_member'"
+            >
+              <span class="track"><span class="knob"></span></span>
+              <span class="label">{{ grantClubRole === 'club_member' ? '檢視' : '編輯' }}</span>
+            </button>
+          </div>
         </template>
-        <button class="btn btn-gold" :disabled="creatingMember" @click="submitCreateMember">
-          {{ creatingMember ? '建立中…' : '建立帳號' }}
+        <template v-else>
+          <div>
+            <label class="fl">地區權限</label>
+            <button
+              type="button"
+              class="toggle-switch"
+              role="switch"
+              :aria-checked="grantDistrictRole === 'admin'"
+              aria-label="地區權限：檢視／編輯"
+              @click="grantDistrictRole = grantDistrictRole === 'view' ? 'admin' : 'view'"
+            >
+              <span class="track"><span class="knob"></span></span>
+              <span class="label">{{ grantDistrictRole === 'view' ? '檢視' : '編輯' }}</span>
+            </button>
+          </div>
+        </template>
+        <button class="btn btn-gold" :disabled="granting" @click="submitGrant">
+          {{ granting ? '授權中…' : '授予權限' }}
         </button>
       </div>
-      <p v-if="memberError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ memberError }}</p>
-      <p v-if="memberSuccess" style="margin-top:10px; font-size:12px; color:var(--green);">{{ memberSuccess }}</p>
+      <p v-if="grantError" class="login-error" style="margin-top:10px; font-size:12px; color:var(--red);">{{ grantError }}</p>
+      <p v-if="grantSuccessMessage" style="margin-top:10px; font-size:12px; color:var(--green);">{{ grantSuccessMessage }}</p>
     </div>
 
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-      <h3 style="font-size:13px; font-weight:700; color:var(--navy);">邀請紀錄</h3>
+      <h3 style="font-size:13px; font-weight:700; color:var(--navy);">授權紀錄</h3>
       <button class="btn btn-g btn-sm" @click="showInviteLog = !showInviteLog">
-        {{ showInviteLog ? '收起邀請紀錄' : '查看邀請紀錄' }}
+        {{ showInviteLog ? '收起授權紀錄' : '查看授權紀錄' }}
       </button>
     </div>
     <div v-if="showInviteLog" class="tw" style="margin-bottom:24px;">
@@ -348,8 +315,7 @@ watch(isDistrictAdminView, loadAccounts)
             <th>Email</th>
             <th>角色</th>
             <th>社團</th>
-            <th>邀請時間</th>
-            <th>接受時間</th>
+            <th>授權時間</th>
           </tr>
         </thead>
         <tbody>
@@ -357,14 +323,10 @@ watch(isDistrictAdminView, loadAccounts)
             <td data-label="Email">{{ i.invited_email }}</td>
             <td data-label="角色">{{ roleLabel(i.role) }}</td>
             <td data-label="社團">{{ clubName(i.club_id) }}</td>
-            <td data-label="邀請時間">{{ new Date(i.invited_at).toLocaleString() }}</td>
-            <td data-label="接受時間">
-              <span v-if="i.accepted_at" class="bdg b-gr">已接受</span>
-              <span v-else class="bdg b-y">待接受</span>
-            </td>
+            <td data-label="授權時間">{{ new Date(i.invited_at).toLocaleString() }}</td>
           </tr>
           <tr v-if="!invites.log.length">
-            <td colspan="5" style="text-align:center; color:var(--muted);">尚無邀請紀錄</td>
+            <td colspan="4" style="text-align:center; color:var(--muted);">尚無授權紀錄</td>
           </tr>
         </tbody>
       </table>
@@ -388,16 +350,18 @@ watch(isDistrictAdminView, loadAccounts)
           </thead>
           <tbody>
             <tr v-for="p in accounts.pending" :key="p.id">
-              <td data-label="姓名">{{ p.name }}</td>
+              <td data-label="姓名">
+                {{ p.name }}
+                <span v-if="isClubApplication(p)" class="bdg b-n" style="margin-left:6px;">社帳號</span>
+              </td>
               <td data-label="社團">{{ pendingClubLabel(p) }}</td>
               <td data-label="申請職稱">{{ pendingTitleLabel(p) }}</td>
               <td data-label="扶輪 SSO 自稱社別">{{ p.sso_rotary_club ?? '-' }}</td>
               <td data-label="扶輪地區">{{ p.sso_rotary_district ?? '-' }}</td>
               <td data-label="扶輪身分別">{{ p.sso_account_type ?? '-' }}</td>
               <td>
-                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <div v-if="isDistrictAdminView && !p.club_id && isClubApplication(p)" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                   <select
-                    v-if="isDistrictAdminView && !p.club_id"
                     class="fi"
                     :value="pendingClubChoice[p.id] ?? ''"
                     style="min-width:160px; padding:6px 8px;"
@@ -415,7 +379,31 @@ watch(isDistrictAdminView, loadAccounts)
                     <option value="club_secretary">各社管理員</option>
                     <option value="club_member">一般社友</option>
                   </select>
-                  <button class="btn btn-gold btn-sm" :disabled="!canActivatePending(p)" @click="activatePendingAccount(p)">啟動</button>
+                  <button class="btn btn-gold btn-sm" :disabled="!pendingClubChoice[p.id]" @click="activateClubApplication(p)">啟動</button>
+                </div>
+                <div v-else-if="isDistrictAdminView && !p.club_id" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <select
+                    class="fi"
+                    :value="pendingClubChoice[p.id] ?? ''"
+                    style="min-width:160px; padding:6px 8px;"
+                    @change="pendingClubChoice[p.id] = ($event.target as HTMLSelectElement).value"
+                  >
+                    <option value="" disabled>選擇社別</option>
+                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                  <button class="btn btn-gold btn-sm" :disabled="!pendingClubChoice[p.id]" @click="forwardPendingToClub(p)">發送</button>
+                </div>
+                <div v-else style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <select
+                    class="fi"
+                    :value="pendingRoleChoice(p)"
+                    style="min-width:110px; padding:6px 8px;"
+                    @change="pendingChoice[p.id] = ($event.target as HTMLSelectElement).value as UserRole"
+                  >
+                    <option value="club_secretary">各社管理員</option>
+                    <option value="club_member">一般社友</option>
+                  </select>
+                  <button class="btn btn-gold btn-sm" @click="activatePendingAccount(p)">啟動</button>
                 </div>
               </td>
             </tr>

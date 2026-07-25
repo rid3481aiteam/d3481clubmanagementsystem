@@ -9,9 +9,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const CLUB_TIER_ROLES = ['club_admin', 'club_secretary']
-const SITE_URL = 'https://d3481clubmanagementsystem.pages.dev'
-
 function errorResponse(message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -19,12 +16,13 @@ function errorResponse(message: string, status: number) {
   })
 }
 
-// 把 Supabase Auth 回傳的英文錯誤訊息轉成中文，其餘保留原文
-function translateAuthError(message: string): string {
-  if (message.includes('already been registered')) return '此 Email 已經註冊過帳號'
-  return message
-}
-
+// 全站已完全改用 RotarySSO 登入（見 051_rotarysso.sql），沒有帳密登入頁面了。
+// 這支函式原本是「邀請新 Email 建帳號」（Supabase inviteUserByEmail 寄信設密碼），
+// 但設完密碼叫使用者回 /login 用密碼登入時，/login 早就只剩 SSO 按鈕，帳號建了
+// 卻永遠登不進去。改成單純的「幫既有帳號（一定要先自己用 SSO 登入過一次）
+// 額外授權」：地區管理員用 Email 查到既有帳號，選要授予「地區工作人員」
+// （district_role）還是「加入指定社」（user_club_roles 跨社協作），不再建立
+// 任何新帳號。
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -45,47 +43,47 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile } = await callerClient
     .from('user_profiles')
-    .select('role, club_id, district_role')
+    .select('role, district_role')
     .eq('id', user.id)
     .single()
 
   if (!callerProfile) return errorResponse('找不到使用者資料', 403)
 
-  const { email, role, club_id, name } = await req.json()
-
-  if (!['club_secretary', 'club_admin', 'club_member'].includes(role))
-    return errorResponse('角色不正確', 400)
-
   const isDistrictAdmin = callerProfile.role === 'district_admin' || callerProfile.district_role === 'admin'
+  if (!isDistrictAdmin) return errorResponse('只有地區管理員可以執行此操作', 403)
 
-  // 用 current_club_id()/current_user_role() 而不是 callerProfile 的 home
-  // club_id/role，才能正確反映「現在切換檢視中的社」——跨社協作的執秘
-  // 切到被授權的社之後，也要能邀請那個社的帳號。
-  const { data: currentClubId } = await callerClient.rpc('current_club_id')
-  const { data: currentRole } = await callerClient.rpc('current_user_role')
-  const isClubTier = CLUB_TIER_ROLES.includes(currentRole)
-
-  // 地區：可為任何社邀請任何角色（新社團建立第一組帳號用）
-  // 各社（社長／執秘皆對等）：只能邀請目前檢視中的社，角色不限，由各社自行決定
-  if (!isDistrictAdmin) {
-    if (!isClubTier) return errorResponse('沒有權限執行此操作', 403)
-    if (currentClubId !== club_id)
-      return errorResponse('只能邀請目前檢視中的社的帳號', 403)
-  }
+  const { email, grant_type, district_role, club_id, role } = await req.json()
+  if (!email || typeof email !== 'string' || !email.trim()) return errorResponse('請輸入 Email', 400)
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-  // 這個 email 是否已經有帳號（可能是別的社的既有帳號）——
-  // Supabase Auth 的 email 是全域唯一鍵，inviteUserByEmail 對已註冊
-  // 的 email 一律失敗，所以已存在帳號要走「授予跨社協作權限」，
-  // 不能再走一般邀請流程。
   const { data: existingUserId, error: lookupError } = await adminClient.rpc(
     'find_user_id_by_email',
-    { p_email: email }
+    { p_email: email.trim() }
   )
   if (lookupError) return errorResponse(lookupError.message, 500)
+  if (!existingUserId) {
+    return errorResponse('此 Email 尚未使用扶輪帳號登入過，請先請對方登入本平台一次（會產生待審核帳號），再回來授權', 400)
+  }
 
-  if (existingUserId) {
+  if (grant_type === 'district') {
+    if (!['view', 'admin'].includes(district_role)) return errorResponse('地區權限不正確', 400)
+
+    const { error } = await adminClient
+      .from('user_profiles')
+      .update({ district_role })
+      .eq('id', existingUserId)
+    if (error) return errorResponse(error.message, 400)
+
+    return new Response(JSON.stringify({ success: true, grant_type: 'district' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  if (grant_type === 'club') {
+    if (!club_id) return errorResponse('請選擇社團', 400)
+    if (!['club_secretary', 'club_member'].includes(role)) return errorResponse('角色不正確', 400)
+
     const { data: existingProfile } = await adminClient
       .from('user_profiles')
       .select('club_id')
@@ -106,32 +104,16 @@ Deno.serve(async (req) => {
 
     await adminClient.from('invite_log').insert({
       invited_by: user.id,
-      invited_email: email,
+      invited_email: email.trim(),
       club_id,
       role,
       accepted_at: new Date().toISOString(),
     })
 
-    return new Response(JSON.stringify({ success: true, cross_club_grant: true, user_id: existingUserId }), {
+    return new Response(JSON.stringify({ success: true, grant_type: 'club' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: { club_id, role, name },
-    redirectTo: `${SITE_URL}/accept-invite`,
-  })
-
-  if (error) return errorResponse(translateAuthError(error.message), 400)
-
-  await adminClient.from('invite_log').insert({
-    invited_by: user.id,
-    invited_email: email,
-    club_id,
-    role
-  })
-
-  return new Response(JSON.stringify({ success: true, user_id: data.user.id }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  })
+  return errorResponse('授權類型不正確', 400)
 })

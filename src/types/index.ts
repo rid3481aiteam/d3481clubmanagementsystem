@@ -58,6 +58,9 @@ export interface Club {
   venue_tel: string | null
   note: string | null
   sort_order: number
+  // 該社第一個 club_secretary/club_admin 帳號的 Email，自動捕捉，跟公開
+  // 通訊錄用的 email 分開（見 064_club_account_notify_email.sql）
+  account_notify_email: string | null
   created_at: string
   updated_at: string
 }

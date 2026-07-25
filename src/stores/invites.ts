@@ -33,10 +33,17 @@ export const useInvitesStore = defineStore('invites', () => {
     loading.value = false
   }
 
-  async function inviteUser(email: string, role: UserRole, clubId: string | null, name?: string) {
-    const { data, error } = await supabase.functions.invoke<{ success: boolean; cross_club_grant?: boolean; user_id: string }>(
+  // 全站改用 RotarySSO 登入後，這裡不再是「邀請新帳號」，而是「幫已經自己
+  // 用 SSO 登入過的既有帳號，額外授權」——district 授予地區工作人員權限
+  // （district_role），club 授予跨社協作權限（user_club_roles）。
+  type GrantPayload =
+    | { grant_type: 'district'; district_role: 'view' | 'admin' }
+    | { grant_type: 'club'; club_id: string; role: UserRole }
+
+  async function grantAccess(email: string, payload: GrantPayload) {
+    const { data, error } = await supabase.functions.invoke<{ success: boolean; grant_type: string }>(
       'invite-user',
-      { body: { email, role, club_id: clubId, name } }
+      { body: { email, ...payload } }
     )
 
     if (error) {
@@ -56,5 +63,5 @@ export const useInvitesStore = defineStore('invites', () => {
     return { data, error: null }
   }
 
-  return { log, loading, fetchLog, inviteUser }
+  return { log, loading, fetchLog, grantAccess }
 })

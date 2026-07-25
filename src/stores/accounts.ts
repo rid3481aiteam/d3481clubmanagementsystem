@@ -79,10 +79,10 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
-  // 一鍵啟動待審帳號：指派社別（若尚未指派）＋套用角色，合併成一次寫入、
-  // 一顆按鈕（原本 assignClub／approveRole 分兩步，管理員要按兩次）。
-  // clubId 留空代表這筆待審帳號已經有 club_id（各社管理員視角只審角色），
-  // protect_user_profile_privileged_fields trigger 已經放行地區管理員改 club_id，不用另開 Edge Function。
+  // 待審帳號（已經有 club_id，等該社或地區套用角色）一鍵啟動：套用角色＋
+  // 清空 requested_role。clubId 留空代表沿用既有 club_id 不動；理論上這個
+  // 分支現在都是已經有 club_id 的列（見 forwardToClub），保留參數只是
+  // 讓地區管理員仍能直接接手完成，不用強制走轉交流程。
   async function activatePending(id: string, role: UserRole, clubId?: string) {
     const payload: Record<string, unknown> = { role, requested_role: null }
     if (clubId) payload.club_id = clubId
@@ -94,6 +94,31 @@ export const useAccountsStore = defineStore('accounts', () => {
       pending.value = pending.value.filter(u => u.id !== id)
       pendingCount.value = pending.value.length
       await Promise.all([fetchManaged(), fetchMembers()])
+    }
+    return { error }
+  }
+
+  // 地區管理員把全新 SSO 申請人「轉交」給指定的社：只指派 club_id，不直接
+  // 給角色（角色由該社自己審）。刻意把 requested_role 設成 club_member
+  // 當預設值——這樣這筆會自然符合 fetchPending() 既有的
+  // 「club_id 對得上＋requested_role 有值」條件，跟既有社員申請升級權限
+  // 用同一套審核畫面／pendingCount 徽章機制，該社「進階設定」的紅色徽章
+  // 就是保底的通知，不用另外加欄位。
+  async function forwardToClub(id: string, clubId: string) {
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ club_id: clubId, requested_role: 'club_member' })
+      .eq('id', id)
+    if (!error) {
+      await fetchPending()
+      // 額外寄信通知該社（如果地區 Gmail、M1 開關、該社 account_notify_email
+      // 都齊了才會真的寄出）。這只是錦上添花，寄不寄都不影響上面的轉交
+      // 已經成功，失敗也不用讓使用者知道，紅色徽章才是保底的通知。
+      try {
+        await supabase.functions.invoke('notify-club-pending-member', { body: { user_id: id, club_id: clubId } })
+      } catch {
+        // 忽略寄信失敗
+      }
     }
     return { error }
   }
@@ -234,7 +259,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   return {
     managed, pending, pendingCount, members, collaborators, loading,
     setScope,
-    fetchManaged, fetchPending, fetchPendingCount, approveRole, activatePending, dismissPending,
+    fetchManaged, fetchPending, fetchPendingCount, approveRole, activatePending, forwardToClub, dismissPending,
     fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictRole, deleteAccount,
     fetchClubCollaborators, updateCollaboratorRole, revokeCollaborator,
