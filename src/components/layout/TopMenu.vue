@@ -188,7 +188,7 @@ const navItems = computed<NavItem[]>(() => {
   if (isClubManager) {
     items.push({ type: 'divider' })
     const advancedItems: { to: string; icon: string; label: string; badge?: number }[] = [
-      { to: '/club/invite', icon: '👤', label: '邀請 / 管理本社帳號', badge: accounts.pendingCount || undefined },
+      { to: '/club/invite', icon: '👤', label: '管理本社帳號', badge: accounts.pendingCount || undefined },
     ]
     if (features.isEnabled('J1_line_notify')) {
       advancedItems.push({ to: '/club/line-notify', icon: '💬', label: 'LINE 通知設定（測試中）' })
