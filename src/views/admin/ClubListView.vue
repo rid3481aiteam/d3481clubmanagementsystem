@@ -14,14 +14,13 @@ const router = useRouter()
 // 「通過審核」只看該社官方管理帳號（club_secretary/club_admin）是不是至少有一筆
 // 已啟用，不含一般社友——一般社友的審核狀態改看展開後的申請/核准清單即可。
 //
-// 待審清單裡 club_id 是 NULL 的（全新 SSO 申請人，社友或社帳號皆有可能，
-// 地區管理員按「發送」/「啟動」之前都是這樣）不嘗試模糊比對到既有社——
-// 這個階段常常根本是還沒登記過的新社，硬要比對現有社名容易比對失敗
-// （見使用者截圖：同一個人「選擇社別」下拉沒有被自動帶入）或比對錯，
-// 直接用 SSO 自稱社別本身當一個獨立分組，才不會漏算也不會歸錯社。
+// 這裡的 pending 只收「已經有 club_id」的待審（既有社員申請升級權限、或
+// 已被「發送」轉交過的個人申請），只服務每一列真實社團自己的「社友申請」
+// 統計跟展開清單。「申請中的社」KPI 卡是另一個獨立、範圍更窄的統計
+// （見下面 clubsWithPendingApplications），不共用這份資料。
 const clubAccountSummary = computed(() => {
-  const map = new Map<string, { label: string; approved: boolean; officers: typeof accounts.managed; members: typeof accounts.members; pending: typeof accounts.pending }>()
-  for (const c of club.allClubs) map.set(c.id, { label: c.name, approved: false, officers: [], members: [], pending: [] })
+  const map = new Map<string, { approved: boolean; officers: typeof accounts.managed; members: typeof accounts.members; pending: typeof accounts.pending }>()
+  for (const c of club.allClubs) map.set(c.id, { approved: false, officers: [], members: [], pending: [] })
   for (const p of accounts.managed) {
     const entry = p.club_id ? map.get(p.club_id) : undefined
     if (!entry) continue
@@ -32,30 +31,29 @@ const clubAccountSummary = computed(() => {
     const entry = p.club_id ? map.get(p.club_id) : undefined
     if (entry) entry.members.push(p)
   }
-  // 只算 3481 地區的申請——SSO 是全區共用的登入系統，待審清單裡本來就
-  // 混著其他地區自稱的申請人（跟帳號審核頁的「3481 地區／非 3481 地區」
-  // 分組是同一個判斷），社團總覽是 3481 地區自己的總覽，不該把別的地區
-  // 算進「申請中的社」。
   for (const p of accounts.pending) {
     if ((p.sso_rotary_district ?? '').trim() !== '3481') continue
-    if (p.club_id) {
-      const entry = map.get(p.club_id)
-      if (entry) entry.pending.push(p)
-      continue
-    }
-    const label = (p.sso_rotary_club ?? '').trim() || '未填社別'
-    const key = `pending:${label}`
-    if (!map.has(key)) map.set(key, { label, approved: false, officers: [], members: [], pending: [] })
-    map.get(key)!.pending.push(p)
+    const entry = p.club_id ? map.get(p.club_id) : undefined
+    if (entry) entry.pending.push(p)
   }
   return map
 })
 
-// 給 KPI 卡用：目前有哪些社（含還沒正式登記過的全新申請）還有待審核
-// 申請人，點卡片直接跳到帳號管理頁的「帳號審核」區塊手動處理。
-const clubsWithPendingApplications = computed(() =>
-  [...clubAccountSummary.value.values()].filter(entry => entry.pending.length > 0)
-)
+// 「申請中的社」KPI 卡：只算「社帳號」申請（sso_account_type === '扶輪社'，
+// 該社自己的第一個管理帳號在申請這個社本身），不算一般社友想加入既有社
+// 的申請——後者是「發送」轉交給該社自己審的個人申請，不代表「這個社
+// 在申請」。這種申請 club_id 通常還是 NULL（要等地區管理員選社＋啟動
+// 才會有），所以直接用自稱社別當顯示名稱，不用比對到既有社名單。
+const clubsWithPendingApplications = computed(() => {
+  const labels = new Set<string>()
+  for (const p of accounts.pending) {
+    if ((p.sso_rotary_district ?? '').trim() !== '3481') continue
+    if (p.sso_account_type !== '扶輪社') continue
+    const matchedName = p.club_id ? club.allClubs.find(c => c.id === p.club_id)?.name : undefined
+    labels.add(matchedName || (p.sso_rotary_club ?? '').trim() || '未填社別')
+  }
+  return [...labels]
+})
 
 // 「已通過審核的社」KPI 卡：沒有對應的專屬頁面可以跳轉，改成點卡片
 // 原地展開/收合名單，跟「申請中的社」點下去導頁的行為不一樣。
@@ -183,7 +181,7 @@ onMounted(async () => {
         <div class="stat-label">申請中的社</div>
         <div class="stat-value">{{ clubsWithPendingApplications.length }}</div>
         <div v-if="clubsWithPendingApplications.length" class="kpi-sub">
-          {{ clubsWithPendingApplications.map(e => e.label).join('、') }}
+          {{ clubsWithPendingApplications.join('、') }}
         </div>
         <div v-else class="kpi-sub">目前沒有社在申請中</div>
       </div>
