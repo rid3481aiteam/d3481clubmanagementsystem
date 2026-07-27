@@ -32,7 +32,12 @@ const clubAccountSummary = computed(() => {
     const entry = p.club_id ? map.get(p.club_id) : undefined
     if (entry) entry.members.push(p)
   }
+  // 只算 3481 地區的申請——SSO 是全區共用的登入系統，待審清單裡本來就
+  // 混著其他地區自稱的申請人（跟帳號審核頁的「3481 地區／非 3481 地區」
+  // 分組是同一個判斷），社團總覽是 3481 地區自己的總覽，不該把別的地區
+  // 算進「申請中的社」。
   for (const p of accounts.pending) {
+    if ((p.sso_rotary_district ?? '').trim() !== '3481') continue
     if (p.club_id) {
       const entry = map.get(p.club_id)
       if (entry) entry.pending.push(p)
