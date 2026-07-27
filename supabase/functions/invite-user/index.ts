@@ -101,6 +101,15 @@ Deno.serve(async (req) => {
       .eq('id', existingUserId)
     if (error) return errorResponse(error.message, 400)
 
+    // invite_log 這裡是單純 insert，不像上面的 user_profiles update 會撞到
+    // 需要 auth.uid() 的 trigger，用 adminClient 沒有問題。
+    await adminClient.from('invite_log').insert({
+      invited_by: user.id,
+      invited_email: email.trim(),
+      district_role,
+      accepted_at: new Date().toISOString(),
+    })
+
     return new Response(JSON.stringify({ success: true, grant_type: 'district' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

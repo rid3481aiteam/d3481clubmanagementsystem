@@ -4,12 +4,15 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { UserRole } from '@/types'
 
+// role／district_role 互斥：社角色授權（grant_type='club'）只有 role 有值，
+// 地區權限授權（grant_type='district'）只有 district_role 有值。
 export interface InviteLogEntry {
   id: string
   invited_by: string | null
   invited_email: string
   club_id: string | null
-  role: UserRole
+  role: UserRole | null
+  district_role: 'view' | 'admin' | null
   invited_at: string
   accepted_at: string | null
 }

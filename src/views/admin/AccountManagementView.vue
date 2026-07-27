@@ -57,6 +57,10 @@ function roleLabel(r: UserRole) {
   return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' || r === 'club_admin' ? '各社管理員' : r === 'club_member' ? '一般社友' : r
 }
 
+function districtRoleLabel(r: 'view' | 'admin') {
+  return r === 'admin' ? '地區工作人員（編輯）' : '地區工作人員（唯讀）'
+}
+
 const pendingChoice = ref<Record<string, UserRole>>({})
 const pendingClubChoice = ref<Record<string, string>>({})
 
@@ -337,7 +341,7 @@ watch(isDistrictAdminView, loadAccounts)
         <tbody>
           <tr v-for="i in invites.log" :key="i.id">
             <td data-label="Email">{{ i.invited_email }}</td>
-            <td data-label="角色">{{ roleLabel(i.role) }}</td>
+            <td data-label="角色">{{ i.district_role ? districtRoleLabel(i.district_role) : roleLabel(i.role!) }}</td>
             <td data-label="社團">{{ clubName(i.club_id) }}</td>
             <td data-label="授權時間">{{ new Date(i.invited_at).toLocaleString() }}</td>
           </tr>
