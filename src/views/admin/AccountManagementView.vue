@@ -103,9 +103,13 @@ function pendingRoleChoice(p: UserProfile) {
   return choice === 'club_admin' ? 'club_secretary' : choice
 }
 
-// 帳號審核清單依「扶輪地區」分成 3481 本地區／非 3481 兩區塊，管理員一眼
-// 就能分清楚哪些是自己地區的申請人，不用逐行看「扶輪地區」欄位比對。
+// 帳號審核清單依「扶輪地區」分成 3481 本地區／非 3481 兩區塊，只在地區視角
+// 才有意義——各社視角的 accounts.pending 本來就已經限定是自己社的申請人，
+// 全部一定是同一個地區，分組只會生出兩個空區塊，沒有意義還徒增困惑。
 const pendingGroups = computed(() => {
+  if (!isDistrictAdminView.value) {
+    return [{ key: 'all', label: '', list: accounts.pending }]
+  }
   const inDistrict = accounts.pending.filter(p => (p.sso_rotary_district ?? '').trim() === '3481')
   const otherDistrict = accounts.pending.filter(p => (p.sso_rotary_district ?? '').trim() !== '3481')
   return [
@@ -359,7 +363,7 @@ watch(isDistrictAdminView, loadAccounts)
             </tr>
           </thead>
           <tbody v-for="group in pendingGroups" :key="group.key">
-            <tr>
+            <tr v-if="isDistrictAdminView">
               <td colspan="5" style="background:var(--bg); font-weight:700; color:var(--navy); padding:10px 14px;">
                 {{ group.label }}（{{ group.list.length }}）
               </td>
@@ -421,7 +425,7 @@ watch(isDistrictAdminView, loadAccounts)
               </td>
             </tr>
             <tr v-if="!group.list.length">
-              <td colspan="5" style="text-align:center; color:var(--muted);">尚無{{ group.label }}待審核</td>
+              <td colspan="5" style="text-align:center; color:var(--muted);">尚無{{ isDistrictAdminView ? group.label : '' }}待審核</td>
             </tr>
           </tbody>
         </table>
