@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useInvitesStore } from '@/stores/invites'
 import { useAccountsStore } from '@/stores/accounts'
 import { useClubStore } from '@/stores/club'
+import { suggestClubId as suggestClubIdFor } from '@/lib/clubMatch'
 import type { UserProfile, UserRole } from '@/types'
 
 const auth = useAuthStore()
@@ -64,30 +65,12 @@ function districtRoleLabel(r: 'view' | 'admin') {
 const pendingChoice = ref<Record<string, UserRole>>({})
 const pendingClubChoice = ref<Record<string, string>>({})
 
-// SSO 帶回來的自稱社別通常是簡稱（例如「忠孝社」），跟社團目錄的正式全名
-// （「台北忠孝扶輪社」）對不上，去掉「扶輪社／扶輪／社」這類共同字樣後
-// 再比對，只有唯一命中才自動帶入，避免同名分社猜錯（例如兩個社都叫「XX社」）。
-function normalizeClubName(name: string) {
-  return name.replace(/扶輪社|扶輪|社$/g, '').trim()
-}
-
-function suggestClubId(p: UserProfile): string | null {
-  if (!p.sso_rotary_club) return null
-  const target = normalizeClubName(p.sso_rotary_club)
-  if (!target) return null
-  const matches = club.allClubs.filter(c => {
-    const n = normalizeClubName(c.name)
-    return n === target || n.includes(target) || target.includes(n)
-  })
-  return matches.length === 1 ? matches[0].id : null
-}
-
 // 待審清單一到，就把猜得出來的社別預先帶進選單，管理員看到的就已經是
 // 建議值，不對再自己改，不用每筆都手動選一次。
 watch(() => accounts.pending, (list) => {
   for (const p of list) {
     if (p.club_id || pendingClubChoice.value[p.id]) continue
-    const guess = suggestClubId(p)
+    const guess = suggestClubIdFor(p.sso_rotary_club, club.allClubs)
     if (guess) pendingClubChoice.value[p.id] = guess
   }
 }, { immediate: true })

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useClubStore } from '@/stores/club'
 import { useAccountsStore } from '@/stores/accounts'
+import { suggestClubId } from '@/lib/clubMatch'
 import type { Club } from '@/types'
 
 const auth = useAuthStore()
@@ -27,7 +28,11 @@ const clubAccountSummary = computed(() => {
     if (entry) entry.members.push(p)
   }
   for (const p of accounts.pending) {
-    const entry = p.club_id ? map.get(p.club_id) : undefined
+    // 全新 SSO 申請人（社友或社帳號）在地區管理員「發送」/「啟動」之前
+    // club_id 都還是 NULL，只能靠自稱社別（sso_rotary_club）猜——不然這裡
+    // 完全看不到剛進來、還沒指派社別的申請人，KPI 卡永遠是 0。
+    const clubId = p.club_id ?? suggestClubId(p.sso_rotary_club, club.allClubs)
+    const entry = clubId ? map.get(clubId) : undefined
     if (entry) entry.pending.push(p)
   }
   return map
@@ -276,7 +281,9 @@ onMounted(async () => {
                   <div>
                     <strong>待審核申請</strong>
                     <span v-if="!clubAccountSummary.get(c.id)?.pending.length" style="color:var(--muted);">尚無</span>
-                    <span v-for="p in clubAccountSummary.get(c.id)?.pending" :key="p.id" class="bdg b-n">{{ p.name }}</span>
+                    <span v-for="p in clubAccountSummary.get(c.id)?.pending" :key="p.id" class="bdg b-n">
+                      {{ p.name }}{{ p.club_id ? '' : '（未指派，依自稱社別推測）' }}
+                    </span>
                   </div>
                 </div>
               </td>
