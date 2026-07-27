@@ -4,13 +4,27 @@ import * as XLSX from 'xlsx'
 import { useAuthStore } from '@/stores/auth'
 import { useFeaturesStore } from '@/stores/features'
 import { useClubStore } from '@/stores/club'
+import { useOfficersStore, currentYearTerm } from '@/stores/officers'
+import { buildOfficersByClub, resolveClubLeaders } from '@/lib/clubOfficers'
 import type { Club } from '@/types'
 
 const auth = useAuthStore()
 const features = useFeaturesStore()
 const club = useClubStore()
+const officers = useOfficersStore()
 
 const keyword = ref('')
+
+// 社長/執秘同時看 clubs.pres_name/sec_name 跟 club_officers 當年度紀錄，
+// 用 updated_at 比較新舊——跟 ClubListView.vue（社團總覽）共用同一套
+// 判斷，兩頁資料才會一致，不會一邊顯示舊社長一邊顯示新社長。
+const officersByClub = computed(() => buildOfficersByClub(officers.districtByTerm))
+const enrichedClubs = computed(() =>
+  club.allClubs.map(c => {
+    const { presName, secName } = resolveClubLeaders(c, officersByClub.value)
+    return { ...c, pres_name: presName, sec_name: secName }
+  })
+)
 
 const ZONE_ORDER = [
   '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
@@ -23,10 +37,10 @@ function zoneRank(zone: string) {
 }
 
 const filtered = computed(() => {
-  if (!features.isEnabled('H2_directory_search')) return club.allClubs
+  if (!features.isEnabled('H2_directory_search')) return enrichedClubs.value
   const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return club.allClubs
-  return club.allClubs.filter(c =>
+  if (!kw) return enrichedClubs.value
+  return enrichedClubs.value.filter(c =>
     [c.name, c.zone, c.addr, c.venue, c.phone, c.sec_name, c.email].some(v =>
       v?.toLowerCase().includes(kw)
     )
@@ -78,6 +92,7 @@ function handleExport() {
 
 onMounted(() => {
   club.fetchAll()
+  officers.fetchDistrictYearTerm(currentYearTerm())
 })
 </script>
 
