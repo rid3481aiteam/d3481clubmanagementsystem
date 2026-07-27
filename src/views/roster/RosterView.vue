@@ -86,6 +86,13 @@ const CLASSIFICATIONS = [
 ]
 
 const CLUB_POSITIONS: RosterClubPosition[] = ['PP', 'IPP', 'P', 'VP', 'PE', 'S', '社友']
+// 匯入 Excel 認得的欄位名稱，跟「下載範本」產生的欄位一致——各社自己的
+// 名冊格式不一定跟範本一樣，欄名對不上時要能明確告訴使用者哪裡不對，
+// 不能只是悄悄漏掉資料、不出任何提示。
+const ROSTER_EXCEL_HEADERS = [
+  '姓名', '英文名', '社內職稱', '狀態', '職稱', '職業分類',
+  '公司', 'Email', '電話', '個人電話', '公司電話', '入社日期',
+]
 const MEMBER_STATUS_LABEL: Record<RosterMemberStatus, string> = {
   normal: '正常',
   leave: '請假',
@@ -365,12 +372,39 @@ async function handleImport(e: Event) {
   const wb = XLSX.read(buf, { type: 'array' })
   const sheet = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<RosterExcelRow>(sheet)
+  if (fileInput.value) fileInput.value.value = ''
+
+  if (!rows.length) {
+    const otherSheets = wb.SheetNames.slice(1)
+    alert(
+      `這個 Excel 檔案的第一個分頁（「${wb.SheetNames[0] ?? ''}」）沒有讀到任何資料列。` +
+      (otherSheets.length ? `\n\n偵測到還有其他分頁：${otherSheets.join('、')}——系統只讀第一個分頁，如果社友資料在其他分頁，請搬到第一個分頁再重新匯入。` : '')
+    )
+    return
+  }
+
+  // 各社自己的名冊格式不一定跟「下載範本」一樣，欄名對不上時要明確告訴
+  // 使用者哪裡不對，不能只是靜默漏資料、匯入預覽卻空空如也。
+  const actualHeaders = Object.keys(rows[0])
+  if (!actualHeaders.includes('姓名')) {
+    alert(
+      `找不到「姓名」欄位，無法判斷每一列是誰，這次匯入沒有任何一列會被讀取。\n\n` +
+      `這個檔案偵測到的欄位名稱：${actualHeaders.join('、') || '（無）'}\n\n` +
+      `請確認 Excel 第一列裡有一欄完全叫做「姓名」（可以先點「下載範本」比對正確格式），修正後再重新匯入。`
+    )
+    return
+  }
+  const unknownHeaders = actualHeaders.filter(h => !ROSTER_EXCEL_HEADERS.includes(h))
+
   const existingByName = new Map(roster.members.map(m => [m.name.trim(), m]))
   const seen = new Set<string>()
+  let blankNameCount = 0
+  let duplicateInFileCount = 0
 
   importPreview.value = rows.flatMap((row, index) => {
     const name = String(row.姓名 ?? '').trim()
-    if (!name || seen.has(name)) return []
+    if (!name) { blankNameCount++; return [] }
+    if (seen.has(name)) { duplicateInFileCount++; return [] }
     seen.add(name)
     const status = normalizeStatus(row.狀態)
     const personalPhone = row.個人電話 ?? row.電話 ?? null
@@ -404,7 +438,18 @@ async function handleImport(e: Event) {
   })
 
   showImportPreview.value = true
-  if (fileInput.value) fileInput.value.value = ''
+
+  const warnings: string[] = []
+  if (unknownHeaders.length) {
+    warnings.push(`系統無法辨識以下欄位，這些欄位的資料不會被匯入：${unknownHeaders.join('、')}`)
+  }
+  if (blankNameCount) {
+    warnings.push(`有 ${blankNameCount} 列因為「姓名」是空白被跳過，沒有出現在下面的匯入預覽裡`)
+  }
+  if (duplicateInFileCount) {
+    warnings.push(`有 ${duplicateInFileCount} 列的姓名跟檔案裡前面某一列重複，只保留第一筆`)
+  }
+  if (warnings.length) alert(warnings.join('\n\n'))
 }
 
 async function confirmImport() {
