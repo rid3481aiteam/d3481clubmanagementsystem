@@ -88,7 +88,14 @@ Deno.serve(async (req) => {
   if (grant_type === 'district') {
     if (!['view', 'admin'].includes(district_role)) return errorResponse('地區權限不正確', 400)
 
-    const { error } = await adminClient
+    // 這裡刻意用 callerClient（呼叫者本人的身分）而不是 adminClient：
+    // user_profiles 上的 protect_user_profile_privileged_fields trigger
+    // 靠 auth.uid() 判斷「是不是地區管理員」，service_role 連線沒有
+    // auth.uid()，trigger 一律當作沒有權限、擋下這個更新——即使前面
+    // isDistrictAdmin 已經驗證過呼叫者真的是地區管理員。改用 callerClient
+    // 才能讓 trigger 正確辨識出真正的操作者（RLS 的
+    // profiles_district_admin_manage 政策本來就放行地區管理員更新任何帳號）。
+    const { error } = await callerClient
       .from('user_profiles')
       .update({ district_role })
       .eq('id', existingUserId)
