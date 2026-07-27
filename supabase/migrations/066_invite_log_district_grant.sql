@@ -17,6 +17,7 @@ ALTER TABLE invite_log ALTER COLUMN role DROP NOT NULL;
 ALTER TABLE invite_log
   ADD COLUMN IF NOT EXISTS district_role text CHECK (district_role IN ('view', 'admin'));
 
+ALTER TABLE invite_log DROP CONSTRAINT IF EXISTS invite_log_grant_kind_check;
 ALTER TABLE invite_log
   ADD CONSTRAINT invite_log_grant_kind_check
   CHECK ((role IS NOT NULL) <> (district_role IS NOT NULL));
