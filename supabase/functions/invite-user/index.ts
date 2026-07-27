@@ -129,6 +129,22 @@ Deno.serve(async (req) => {
       return errorResponse('此帳號已經是本社成員', 400)
     }
 
+    // 這支函式的「加入本社」只處理跨社協作（對方已經有自己的 home club，
+    // 額外授權管理另一社）——寫進 user_club_roles，不會動 user_profiles.club_id。
+    // 如果對方根本還沒有 home club（club_id 是 NULL，代表還是 SSO 首登、還沒
+    // 被指派社別的待審核帳號），這裡繼續 upsert 只會留下一筆永遠生效不了的
+    // 協作授權：isPendingApproval 判斷式只看 profile.club_id 是否有值，這裡
+    // 沒有寫入 club_id，對方登入後還是會卡在「待審核」畫面，且這個 club_id
+    // 欄位依 protect_user_profile_privileged_fields trigger 只有地區管理員
+    // 能改，club_secretary/club_admin 呼叫這支函式也沒辦法代為指派——不能
+    // 假裝授權成功，要在這裡就擋下並給出正確的下一步。
+    if (!existingProfile?.club_id) {
+      return errorResponse(
+        '此帳號還沒有所屬社別（尚待地區指派），不能用「授予權限」加入本社。請聯繫地區管理員到「帳號審核」把這筆申請轉交給貴社，轉交後就會出現在貴社自己的「帳號審核」清單可以直接啟動。',
+        400
+      )
+    }
+
     const { error: grantError } = await adminClient
       .from('user_club_roles')
       .upsert(

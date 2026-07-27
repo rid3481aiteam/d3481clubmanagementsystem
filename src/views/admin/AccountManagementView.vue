@@ -228,7 +228,8 @@ watch(isDistrictAdminView, loadAccounts)
         {{ isDistrictAdminView ? '查詢既有帳號並授權' : '邀請已申請 SSO 的帳號加入本社' }}
       </h3>
       <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-        全站已改用扶輪帳號（RotarySSO）登入，這裡不會建立新帳號——對方要先自己用扶輪帳號登入過一次，才查得到。
+        全站已改用扶輪帳號（RotarySSO）登入，這裡不會建立新帳號——對方要先自己用扶輪帳號登入過一次，才查得到。<br />
+        這裡只適用「對方已經有所屬社別，額外加入本社協作」的情況；如果對方是全新申請、還沒有所屬社別，請改到下方「帳號審核」處理（還沒出現在清單裡，代表還在等地區指派社別）。
       </p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
         <div>
