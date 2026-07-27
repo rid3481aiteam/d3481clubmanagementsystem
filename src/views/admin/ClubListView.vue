@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useClubStore } from '@/stores/club'
 import { useAccountsStore } from '@/stores/accounts'
-import { suggestClubId } from '@/lib/clubMatch'
 import type { Club } from '@/types'
 
 const auth = useAuthStore()
@@ -14,9 +13,15 @@ const router = useRouter()
 
 // 「通過審核」只看該社官方管理帳號（club_secretary/club_admin）是不是至少有一筆
 // 已啟用，不含一般社友——一般社友的審核狀態改看展開後的申請/核准清單即可。
+//
+// 待審清單裡 club_id 是 NULL 的（全新 SSO 申請人，社友或社帳號皆有可能，
+// 地區管理員按「發送」/「啟動」之前都是這樣）不嘗試模糊比對到既有社——
+// 這個階段常常根本是還沒登記過的新社，硬要比對現有社名容易比對失敗
+// （見使用者截圖：同一個人「選擇社別」下拉沒有被自動帶入）或比對錯，
+// 直接用 SSO 自稱社別本身當一個獨立分組，才不會漏算也不會歸錯社。
 const clubAccountSummary = computed(() => {
-  const map = new Map<string, { approved: boolean; officers: typeof accounts.managed; members: typeof accounts.members; pending: typeof accounts.pending }>()
-  for (const c of club.allClubs) map.set(c.id, { approved: false, officers: [], members: [], pending: [] })
+  const map = new Map<string, { label: string; approved: boolean; officers: typeof accounts.managed; members: typeof accounts.members; pending: typeof accounts.pending }>()
+  for (const c of club.allClubs) map.set(c.id, { label: c.name, approved: false, officers: [], members: [], pending: [] })
   for (const p of accounts.managed) {
     const entry = p.club_id ? map.get(p.club_id) : undefined
     if (!entry) continue
@@ -28,20 +33,23 @@ const clubAccountSummary = computed(() => {
     if (entry) entry.members.push(p)
   }
   for (const p of accounts.pending) {
-    // 全新 SSO 申請人（社友或社帳號）在地區管理員「發送」/「啟動」之前
-    // club_id 都還是 NULL，只能靠自稱社別（sso_rotary_club）猜——不然這裡
-    // 完全看不到剛進來、還沒指派社別的申請人，KPI 卡永遠是 0。
-    const clubId = p.club_id ?? suggestClubId(p.sso_rotary_club, club.allClubs)
-    const entry = clubId ? map.get(clubId) : undefined
-    if (entry) entry.pending.push(p)
+    if (p.club_id) {
+      const entry = map.get(p.club_id)
+      if (entry) entry.pending.push(p)
+      continue
+    }
+    const label = (p.sso_rotary_club ?? '').trim() || '未填社別'
+    const key = `pending:${label}`
+    if (!map.has(key)) map.set(key, { label, approved: false, officers: [], members: [], pending: [] })
+    map.get(key)!.pending.push(p)
   }
   return map
 })
 
-// 給 KPI 卡用：目前哪些社還有待審核申請人（不分社帳號/社友），點卡片直接
-// 跳到帳號管理頁的「帳號審核」區塊，不用先進某一社的詳情頁才找得到入口。
+// 給 KPI 卡用：目前有哪些社（含還沒正式登記過的全新申請）還有待審核
+// 申請人，點卡片直接跳到帳號管理頁的「帳號審核」區塊手動處理。
 const clubsWithPendingApplications = computed(() =>
-  club.allClubs.filter(c => (clubAccountSummary.value.get(c.id)?.pending.length ?? 0) > 0)
+  [...clubAccountSummary.value.values()].filter(entry => entry.pending.length > 0)
 )
 
 // 「已通過審核的社」KPI 卡：沒有對應的專屬頁面可以跳轉，改成點卡片
@@ -170,7 +178,7 @@ onMounted(async () => {
         <div class="stat-label">申請中的社</div>
         <div class="stat-value">{{ clubsWithPendingApplications.length }}</div>
         <div v-if="clubsWithPendingApplications.length" class="kpi-sub">
-          {{ clubsWithPendingApplications.map(c => c.name).join('、') }}
+          {{ clubsWithPendingApplications.map(e => e.label).join('、') }}
         </div>
         <div v-else class="kpi-sub">目前沒有社在申請中</div>
       </div>
@@ -281,9 +289,7 @@ onMounted(async () => {
                   <div>
                     <strong>待審核申請</strong>
                     <span v-if="!clubAccountSummary.get(c.id)?.pending.length" style="color:var(--muted);">尚無</span>
-                    <span v-for="p in clubAccountSummary.get(c.id)?.pending" :key="p.id" class="bdg b-n">
-                      {{ p.name }}{{ p.club_id ? '' : '（未指派，依自稱社別推測）' }}
-                    </span>
+                    <span v-for="p in clubAccountSummary.get(c.id)?.pending" :key="p.id" class="bdg b-n">{{ p.name }}</span>
                   </div>
                 </div>
               </td>
