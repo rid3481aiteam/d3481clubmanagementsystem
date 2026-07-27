@@ -1,5 +1,19 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百一十七輪，**修掉「授予地區工作人員權限」一律被擋下的 bug——待部署**）：使用者截圖回報「帳號權限授予」填了 Email、選「地區工作人員」、開啟編輯，送出後跳錯誤「沒有權限變更帳號所屬社團或地區權限」，就算操作者本人明明是地區管理員也一樣被擋。
+
+> **根因**：[`invite-user`](supabase/functions/invite-user/index.ts) 的 `grant_type === 'district'` 分支，寫入 `user_profiles.district_role` 用的是 `adminClient`（service role 連線）。保護這個欄位的 `protect_user_profile_privileged_fields` trigger（033 輪最後一次改的版本）靠 `auth.uid()` 判斷操作者是不是地區管理員——**但 service role 連線沒有 `auth.uid()`**（會是 NULL），trigger 內部的 `is_district_admin()` 查 `WHERE id = auth.uid()` 永遠查不到列，一律判定「沒有權限」擋下來。API 層其實已經在前面驗證過呼叫者真的是地區管理員（第 70-72 行），只是最後落地寫入那一步用錯了連線身分，導致這個驗證形同虛設。「加入指定社」（`grant_type: club`）那條路沒有這個問題，因為寫入的是 `user_club_roles` 表，那張表沒有這個 trigger。
+
+> **修法**：把這個特定的 UPDATE 改用 `callerClient`（呼叫者本人的連線）而不是 `adminClient`。資料庫本來就有一條 RLS 政策 `profiles_district_admin_manage`（011 輪）放行地區管理員更新任何一筆 `user_profiles`，改用本人連線後 `auth.uid()` 能正確解析，RLS 政策跟 trigger 都會判斷正確。**沒有動 migration，純粹是 Edge Function 程式碼一行的連線物件換掉**。
+
+> **待使用者部署（唯一需要重新部署的地方）：**
+
+```bash
+supabase functions deploy invite-user
+```
+
+> 部署後請直接重新測一次原本失敗的操作（Email＋「地區工作人員」＋編輯權限＋授予權限），確認不再跳錯誤、且該帳號真的拿到 `district_role='admin'`。**這台機器的 Supabase CLI 帳號目前連不到這個專案**（`xdwqrgthsxyzclnjlmvy`，`supabase projects list` 只看得到 WOWCasa/AICasa/Homerepair 跟兩個 `Eric Rotary`/`3481Rotary`（皆 INACTIVE、ref 對不上），第八十九輪就發現的老問題，這輪還是一樣，沒辦法自己部署）。
+
 > 最後更新：2026-07-27（第一百一十六輪，**社團總覽新增「申請中的社」KPI 卡，點選跳到帳號審核**——延續上一輪統整表的需求，使用者這輪要求在地區介面的社團總覽加一張互動式 KPI 卡，顯示目前有哪些社正在申請中，點下去直接跳到帳號審核分頁：
 
 > **1. [`ClubListView.vue`](src/views/admin/ClubListView.vue) 頁面頂部新增 KPI 卡**：新增 `clubsWithPendingApplications` computed（沿用上一輪已經有的 `clubAccountSummary`，過濾出 `pending.length > 0` 的社），卡片沿用 `DashboardView.vue` 既有的 `stat-card clickable` 樣式慣例（有申請中時套 `c-gold` 邊色），顯示社數＋社名清單（例如「三義扶輪社、台北圓通社」），沒有申請中時顯示「目前沒有社在申請中」。**卡片只給 `auth.isDistrictAdminView` 顯示，不是 `isDistrictAdminView` 上一輪其他欄位用的 `isDistrictView`**——因為點卡片會導到 `/club/invite`，這條路由 `meta.roles` 只放行地區管理員（`auth.isDistrictAdmin`），地區唯讀角色點了會被 router guard 導回首頁，卡片顯示範圍要跟目的地路由權限一致，不能沿用單純顯示用的 `isDistrictView`。
