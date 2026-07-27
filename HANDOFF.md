@@ -1,5 +1,13 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百二十二輪，**修掉「申請中的社」KPI 卡永遠顯示 0 的落差**）：使用者截圖回報「帳號審核」明明看得到 4 筆待審（3481 地區），但「社團總覽」的「申請中的社」KPI 卡卻是 0。
+
+> **根因**：截圖裡兩筆待審（Cindy Chang、台北老松社）畫面上都還顯示「選擇社別＋發送/啟動」的操作列，代表這兩筆的 `club_id` 都還是 `NULL`——全新 RotarySSO 申請人（不管是個人社友還是社的第一個管理帳號）在地區管理員按下「發送」或「啟動」之前，`club_id` 本來就是空的，只有 `sso_rotary_club`（自稱社別，例如「永福社」）這個未經確認的文字欄位。但 [`ClubListView.vue`](src/views/admin/ClubListView.vue) 的 `clubAccountSummary` 一開始只認已經有 `club_id` 的待審記錄去分組——這正好是最不常見的情況，最常見的「剛登入、還沒指派社別」完全被漏算，KPI 卡因此幾乎永遠是 0，不是這幾輪才壞的，是 KPI 卡從一開始的定義就沒考慮到這個大宗情況。
+
+> **修法**：`club_id` 是 `NULL` 時，比照 [`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue) 待審清單本來就有的「自稱社別模糊比對」邏輯去猜屬於哪個社（去掉「扶輪社／扶輪／社」共同字樣後比對，只有唯一命中才採用，避免同名分社猜錯）。這份比對邏輯原本內嵌在 `AccountManagementView.vue` 裡，這次抽成共用模組 [`src/lib/clubMatch.ts`](src/lib/clubMatch.ts)（`normalizeClubName`／`suggestClubId`），兩個檔案都改成呼叫共用版本——原本兩處各自維護一份幾乎一樣的邏輯，這次順便清掉這個重複，之後要調整比對規則只要改一個地方。展開清單裡用「猜的」歸類的申請人會多一句「（未指派，依自稱社別推測）」，跟已經正式指派 `club_id` 的區分開來，不會讓管理員誤以為這個人已經確定歸屬這個社了。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**純前端邏輯，沒有 migration、沒有 Edge Function 改動，不用部署，重新整理頁面就會生效**。
+
 > 最後更新：2026-07-27（第一百二十一輪，**「授予地區工作人員權限」也補記到授權紀錄——待部署**）：上一輪修完「帳號審核」核准落差後，順便提到「地區工作人員」授權也沒被記錄，這輪使用者確認要一起補齊，先討論了架構（不要硬塞進現有 `role` enum、不要另開新 enum 值、也不用做到通用 jsonb log 那麼重），選定「加一個互斥的獨立欄位」。
 
 > **實作**：新增 [`066_invite_log_district_grant.sql`](supabase/migrations/066_invite_log_district_grant.sql)——`invite_log.role` 放寬成可為 NULL，新增 `district_role text CHECK (IN ('view','admin'))`，加一條 `CHECK ((role IS NOT NULL) <> (district_role IS NOT NULL))` 確保每筆紀錄剛好一種授權類型有值。[`invite-user`](supabase/functions/invite-user/index.ts) 的 `grant_type='district'` 分支補上 `invite_log` insert（這裡是單純 insert 到 `invite_log`，不像上一輪那個 update `user_profiles` 會撞到 `protect_user_profile_privileged_fields` trigger，繼续用 `adminClient` 沒問題，不用像上一輪那樣改用 `callerClient`）。[`invites.ts`](src/stores/invites.ts) 的 `InviteLogEntry` 型別跟著改（`role` 變 `UserRole | null`，新增 `district_role`），[`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue) 新增 `districtRoleLabel()`，「授權紀錄」表格的「角色」欄改成 `i.district_role ? districtRoleLabel(...) : roleLabel(i.role!)` 分支顯示「地區工作人員（唯讀/編輯）」。
