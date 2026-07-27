@@ -1,5 +1,15 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百一十六輪，**社團總覽新增「申請中的社」KPI 卡，點選跳到帳號審核**——延續上一輪統整表的需求，使用者這輪要求在地區介面的社團總覽加一張互動式 KPI 卡，顯示目前有哪些社正在申請中，點下去直接跳到帳號審核分頁：
+
+> **1. [`ClubListView.vue`](src/views/admin/ClubListView.vue) 頁面頂部新增 KPI 卡**：新增 `clubsWithPendingApplications` computed（沿用上一輪已經有的 `clubAccountSummary`，過濾出 `pending.length > 0` 的社），卡片沿用 `DashboardView.vue` 既有的 `stat-card clickable` 樣式慣例（有申請中時套 `c-gold` 邊色），顯示社數＋社名清單（例如「三義扶輪社、台北圓通社」），沒有申請中時顯示「目前沒有社在申請中」。**卡片只給 `auth.isDistrictAdminView` 顯示，不是 `isDistrictAdminView` 上一輪其他欄位用的 `isDistrictView`**——因為點卡片會導到 `/club/invite`，這條路由 `meta.roles` 只放行地區管理員（`auth.isDistrictAdmin`），地區唯讀角色點了會被 router guard 導回首頁，卡片顯示範圍要跟目的地路由權限一致，不能沿用單純顯示用的 `isDistrictView`。
+
+> **2. 點卡片跳轉到「帳號審核」區塊**：[`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue) 的「帳號審核」`<h2>` 加上 `id="account-review"`，[`router/index.ts`](src/router/index.ts) 新增 `scrollBehavior`（原本完全沒有設定），`to.hash` 有值時捲到該錨點、扣掉頂部固定雙層導覽列高度（`top: 120`，實際 `--topnav-h`(56px)+`--topmenu-h`(50px)=106px，抓 120 留一點呼吸空間）。這是全站第一次加 `scrollBehavior`，之後其他頁面要做「跳到某個區塊」的錨點連結都可以直接沿用，不用再各自處理捲動。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**這輪沒有實機截圖驗證**——需要登入 Supabase 真實帳號才能測互動流程，這台機器沒有現成的登入憑證，只能驗證型別/建置過關，跳轉/捲動的實際手感要使用者自己上站測。
+
+> **待使用者：** 上正式站確認①KPI 卡數字/社名跟實際待審清單一致；②點卡片後有正確捲動到「帳號審核」標題，沒有被頂部導覽列蓋住；③用地區唯讀帳號登入確認看不到這張 KPI 卡（本來就進不了 `/club/invite`，卡片顯示範圍要跟著收斂，不然點了會白導回首頁）。
+
 > 最後更新：2026-07-27（第一百一十五輪，**帳號審核依扶輪地區分組＋隱藏尚未啟用的社團/申請職稱欄位**——使用者從 3481 地區管理平台的帳號審核畫面截圖出發，提三項要求：
 
 > **(1)(2) [`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue) 帳號審核清單改成「3481 地區／非 3481 地區」兩區塊**：新增 `pendingGroups` computed，依 `sso_rotary_district === '3481'` 把 `accounts.pending` 分成兩組，各自一個 `<tbody>`，組間插入一列灰底（`var(--bg)`）的分組標題列（社名＋人數），管理員不用逐行比對「扶輪地區」欄位判斷是不是自己地區的申請人。沒有做成可收合（跟 `DashboardView.vue` 的 `zone-row` 展開/收合不同），因為待審清單本來就是要「全部看到才能處理」，收合反而容易漏審。
