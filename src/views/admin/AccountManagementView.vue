@@ -426,7 +426,6 @@ watch(isDistrictAdminView, loadAccounts)
           <tr>
             <th>姓名</th>
             <th v-if="isDistrictAdminView">社團</th>
-            <th>手機號碼</th>
             <th>權限</th>
             <th>狀態</th>
             <th></th>
@@ -436,7 +435,6 @@ watch(isDistrictAdminView, loadAccounts)
           <tr v-for="a in allAccounts" :key="a.id">
             <td data-label="姓名">{{ a.name }}</td>
             <td v-if="isDistrictAdminView" data-label="社團">{{ clubName(a.club_id) }}</td>
-            <td data-label="手機號碼">{{ a.phone ?? '-' }}</td>
             <td data-label="權限">
               <button
                 v-if="isDistrictAdminView"
@@ -479,7 +477,7 @@ watch(isDistrictAdminView, loadAccounts)
             </td>
           </tr>
           <tr v-if="!allAccounts.length">
-            <td :colspan="isDistrictAdminView ? 6 : 5" style="text-align:center; color:var(--muted);">尚無帳號</td>
+            <td :colspan="isDistrictAdminView ? 5 : 4" style="text-align:center; color:var(--muted);">尚無帳號</td>
           </tr>
         </tbody>
       </table>
