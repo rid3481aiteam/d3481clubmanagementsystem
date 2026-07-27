@@ -142,7 +142,7 @@ const navItems = computed<NavItem[]>(() => {
     if (features.isEnabled('D1_roster')) {
       memberItems.push({ to: '/roster', icon: '📋', label: '社友名冊' })
     }
-    if (features.isEnabled('D3_prospective') && auth.role !== 'club_member') {
+    if (features.isEnabled('D3_prospective')) {
       memberItems.push({ to: '/roster/prospective', icon: '🔍', label: '潛在社友' })
     }
     if (features.isEnabled('D4_care')) {

@@ -182,6 +182,32 @@ function cancelEdit() {
   editing.value = false
 }
 
+// 年度不是獨立的表，只是 club_officers.year_term 這欄的自由文字值——「新增
+// 年度」不用寫任何資料，純粹是切換到一個目前還沒有任何幹部紀錄的年度，讓
+// 使用者可以往前補歷史年度、或往後預先建立下一年度，畫面上先看到空白的
+// 幹部名單，實際存進資料庫要等使用者透過「編輯年度成員」儲存第一筆資料。
+// yearTermOptions 一定會把目前選中的 yearTerm 併進選項，所以這裡只要切換
+// yearTerm 就會讓新年度出現在下拉選單，不用另外維護 availableYearTerms。
+function addYearTerm() {
+  const input = prompt('請輸入要新增的年度（格式：YYYY-YYYY，例如 2027-2028）', currentYearTerm())
+  if (!input) return
+  const trimmed = input.trim()
+  if (!/^\d{4}-\d{4}$/.test(trimmed)) {
+    alert('格式不正確，請輸入類似「2027-2028」的格式')
+    return
+  }
+  const [startYear, endYear] = trimmed.split('-').map(Number)
+  if (endYear !== startYear + 1) {
+    alert('年度應該是連續的兩年，例如「2027-2028」')
+    return
+  }
+  if (yearTermOptions.value.includes(trimmed)) {
+    alert('這個年度已經存在，請直接從上面選單選擇')
+    return
+  }
+  yearTerm.value = trimmed
+}
+
 async function load() {
   if (!auth.clubId) return
   await roster.fetchAll(auth.clubId)
@@ -359,6 +385,7 @@ watch(yearTerm, load)
           <option v-for="t in yearTermOptions" :key="t" :value="t">{{ t }}{{ t === currentYearTerm() ? '（本年度）' : '' }}</option>
         </select>
         <template v-if="canManage">
+          <button v-if="!editing" class="btn btn-g btn-sm" @click="addYearTerm">+ 新增年度</button>
           <button v-if="!editing" class="btn btn-gold" @click="startEdit">編輯年度成員</button>
           <template v-else>
             <button class="btn btn-g btn-sm" :disabled="saving" @click="cancelEdit">取消</button>
