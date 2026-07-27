@@ -1,5 +1,15 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百二十六輪，**社團總覽的社長/執秘改抓當年度 club_officers，不再顯示舊資料**）：使用者問「社團總覽的社長資訊是寫死的還是會抓最新年份」，順藤摸瓜發現這正是已經有人反映過「社長資訊不對」的根因——確認後直接修掉。
+
+> **根因**：[`clubs.pres_name`/`sec_name`](supabase/migrations/001_clubs_auth.sql:19) 是 019/020 輪從 Excel 匯入時期填的靜態文字欄位，只有透過「編輯社團」表單手動改才會變，不會跟著扶輪年度換屆自動更新。系統裡另外有一張真正按年度記錄的 `club_officers`（各社透過「本社歷程」自己維護每屆的社長/社長當選人/副社長/秘書），但社團總覽的「社長」「執秘」欄位從頭到尾都只讀 `clubs` 表那個靜態欄位，跟 `club_officers` 完全沒接上——換屆後只要沒人手動回頭改 `clubs.pres_name`，社團總覽看到的就是舊社長。
+
+> **修法**：[`officers.ts`](src/stores/officers.ts) 新增 `fetchDistrictYearTerm(yearTerm)`，一次撈全地區當年度（`currentYearTerm()`，扶輪年度以 7 月切）所有社的 `club_officers`（RLS 本來就放行 `is_district_viewer()` 看全部，不用逐社查）。[`ClubListView.vue`](src/views/admin/ClubListView.vue) 新增 `currentOfficersByClub` computed 依 `club_id` 分組出每社當年度的 `president`/`secretary`，`clubPresName(c)`/`clubSecName(c)` 兩個函式優先回傳這份資料，**沒有當年度資料才 fallback 回 `c.pres_name`/`c.sec_name`**（還沒開始用「本社歷程」功能的社，至少還能看到匯入時的舊資料，不會整欄空白）。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純前端，不用部署，重新整理頁面就會生效。
+
+> **順便發現、這輪沒有動的相關落差**：[`DirectoryView.vue`](src/views/directory/DirectoryView.vue)（地區通訊錄）一樣直接讀 `c.pres_name`/`c.sec_name`，有同樣的「換屆後顯示舊社長」問題，這輪使用者只反映社團總覽，沒有動通訊錄，如果那邊也要一起修，之後跟我說一聲。
+
 > 最後更新：2026-07-27（第一百二十五輪，**「申請中的社」KPI 只算社帳號申請，社友申請不算**）：使用者截圖回報上一輪修完後數字還是不對（5 個，含「永福社」這種其實是社友個人申請加入既有社的案例），指出這張 KPI 卡的語意應該是「這個社本身在申請」，不是「有社友想加入的社」。
 
 > **釐清兩種申請的差異**：SSO 帶回來的 `sso_account_type` 分兩種——「扶輪社」＝**社帳號申請**（該社自己的第一個管理帳號在申請，例如「台北老松社」）；「扶輪社友」＝**個人申請**（某人想加入/已加入某個既有社，例如「永福社」的 Cindy Chang）。後者走「發送」轉交給該社自己審，不代表這個社本身在申請什麼，混進「申請中的社」的計數是語意錯誤，不只是資料層面的落差。
