@@ -24,9 +24,13 @@ async function handleSignOut() {
       </div>
 
       <h1 class="page-title">帳號審核中</h1>
-      <p class="login-hint" style="margin-top:0;">
+      <p v-if="!auth.profile?.club_id" class="login-hint" style="margin-top:0;">
         您的扶輪帳號（{{ auth.profile?.name }}）已透過 RotarySSO 建立成功，
         目前正在等待地區管理員指派所屬社別，指派完成後即可登入使用。請稍後再重新登入查看。
+      </p>
+      <p v-else class="login-hint" style="margin-top:0;">
+        您的扶輪帳號（{{ auth.profile?.name }}）已由地區轉交給貴社，
+        目前正在等待貴社管理員確認權限，確認完成後即可登入使用。請稍後再重新登入查看。
       </p>
 
       <button type="button" class="btn btn-g login-btn" @click="handleSignOut">登出</button>

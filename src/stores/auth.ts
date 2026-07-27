@@ -67,10 +67,18 @@ export const useAuthStore = defineStore('auth', () => {
   // 目前是不是「地區視角 + 有編輯權限」，畫面上的編輯/新增/刪除按鈕要用這個判斷，不能只看 isDistrictView
   const isDistrictAdminView = computed(() => isDistrictView.value && isDistrictAdmin.value)
 
-  // SSO 首次登入、還沒被地區管理員指派社別的帳號：club_id 是 NULL 且不是地區管理員，
-  // 全站畫面都應該擋下來只顯示「待審核」提示（router guard 用這個判斷）。
+  // 待審核涵蓋兩種情況（地區管理員都不受此限）：
+  // ① club_id 是 NULL——SSO 首次登入，還沒被地區管理員指派社別；
+  // ② requested_role 有值——已經被地區「發送」轉交給某社（club_id 有值了），
+  //    但該社自己還沒在「帳號審核」按下「啟動」決定角色。forwardToClub()
+  //    只指派 club_id、刻意不動 role，如果這裡不擋，對方在②的狀態下 role
+  //    早就是預設的 club_member，會直接拿到完整社端存取權限，該社的「帳號
+  //    審核」變成純粹的裝飾——不是通知「有人在等你決定」，而是「已經自動
+  //    生效，你只是還沒點確認」。這裡跟 fetchPending()/activatePending()
+  //    判斷「還沒審完」用同一個 requested_role 欄位，維持單一事實來源。
   const isPendingApproval = computed(() =>
-    isLoggedIn.value && !profile.value?.club_id && !isDistrictAdmin.value
+    isLoggedIn.value && !isDistrictAdmin.value &&
+    (!profile.value?.club_id || !!profile.value?.requested_role)
   )
 
   // 首次登入導覽：只給看得到「儀表板／例會管理／社友名冊」這組社端選單的人看

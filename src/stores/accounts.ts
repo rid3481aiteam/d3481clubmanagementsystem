@@ -135,12 +135,16 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
+  // 已轉交但該社還沒按「啟動」的申請人（requested_role 有值）不算「已經是
+  // 本社成員」，不能出現在帳號總覽——那張表只該列本社已經審完的正式帳號，
+  // 這些人還在等該社決定要給編輯還是檢視權限，只該出現在「帳號審核」。
   async function fetchMembers() {
     loading.value = true
     let query = supabase
       .from('user_profiles')
       .select('*')
       .eq('role', 'club_member')
+      .is('requested_role', null)
       .order('name')
     if (scopeClubId.value) query = query.eq('club_id', scopeClubId.value)
     const { data } = await query
