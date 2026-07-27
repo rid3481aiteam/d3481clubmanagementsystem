@@ -1,6 +1,23 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-27（第一百三十六輪，**新增「操作紀錄」功能（地區/各社進階設定）——待部署**）：使用者反映 SSO 審核完成後 D3481 沒有主動通知（見上一則的分析：兩系統獨立、只靠使用者回登串接，已整理成交接筆記給 RotarySSO 那邊），順勢提出要在地區/各社「進階設定」加一個操作紀錄，記錄「哪個帳號在何時做了哪些事」。動工前先討論架構，使用者確認：①不要只做帳號相關，行事曆/活動編輯這類也要涵蓋，理由是日後活動被刪除、資料被改掉要查得到是誰做的；②各社只看自己社的紀錄，看不到地區層級操作。
+> 最後更新：2026-07-28（第一百三十七輪，**規劃決策存檔：開放社端資料匯入 API（AI/爬蟲代入名冊）**）：使用者提出「社務平台能不能開放 API 讓其他社透過 AI 自動匯入資料，或抓取資料後填入」。這輪只做架構討論、沒有寫程式碼/migration，決策記錄如下,待使用者下指令才開工。
+
+> **核心原則**：外部/AI 匯入的資料一律不直接寫入正式表（`roster` 等），全部先落地在新的 staging 表,由社管理員/執秘人工核准後才真正寫入——避免 AI 抓錯資料或格式對不上時直接污染正式名冊（現有 `roster` 匯入功能只認固定欄名,格式錯就整批不匯入,見第一百二十九輪；AI 匯入的來源更不可控,需要比現有 Excel 匯入更嚴格的把關）。
+
+> **資料模型草圖（尚未寫成 migration,接續現有 068 之後排 069）**：
+> - `club_api_tokens`：`club_id`／`token_hash`（sha256,不存明碼）／`label`／`scopes[]`（先開 `roster:import`）／`created_by`／`expires_at`／`revoked_at`／`last_used_at`,各社自己產生/撤銷,不共用金鑰
+> - `import_batches`：`club_id`／`target_table`（v1 只開 `roster`）／`source`（`api`/`ai_scrape`/`csv_upload`）／`submitted_by_token`／`status`（`pending_review`/`approved`/`rejected`/`partially_approved`）
+> - `import_items`：`batch_id`／`raw_data` jsonb／`mapped_data` jsonb（對應到 roster 欄位後）／`match_roster_id`（疑似對應到既有社友時指過去）／`action`（`create`/`update`）／`status`（`pending`/`approved`/`rejected`/`merged`）／`issues[]`（驗證出的問題）
+
+> **Edge Function 草圖**：新增 `import-roster`（比照 `invite-user` 的 Bearer token 驗證寫法）,驗證 `club_api_tokens` 未撤銷未過期、有 `roster:import` scope,收一批 raw records 做基本驗證＋姓名/email 模糊比對現有 `roster` 判斷 create/update,**只寫進 `import_items`,絕不直接寫 `roster`**。
+
+> **前端草圖**：新增 `/club/imports` review 頁（逐筆核准/駁回/修改後核准,核准動作走既有 `stores/roster.ts` 的 insert/update,跟手動輸入同一條路徑）＋ `/club/settings/api-tokens` token 管理頁（產生當下明碼只顯示一次）。
+
+> **分期**：Phase 1 名冊匯入、每筆都要人工核准（不管有沒有 issues）→ Phase 2 活動匯入 → Phase 3（選配）社自己設定「零 issues 自動核准」但保留 batch 紀錄可回溯。
+
+> **下一步**：使用者尚未下指令開工,待之後排一輪單獨做（規模比照當初 LINE 通知 demo,2 張表＋1 支 Edge Function＋2 個前端頁面）。
+
+> 最後更新（上一輪）：2026-07-27（第一百三十六輪，**新增「操作紀錄」功能（地區/各社進階設定）——待部署**）：使用者反映 SSO 審核完成後 D3481 沒有主動通知（見上一則的分析：兩系統獨立、只靠使用者回登串接，已整理成交接筆記給 RotarySSO 那邊），順勢提出要在地區/各社「進階設定」加一個操作紀錄，記錄「哪個帳號在何時做了哪些事」。動工前先討論架構，使用者確認：①不要只做帳號相關，行事曆/活動編輯這類也要涵蓋，理由是日後活動被刪除、資料被改掉要查得到是誰做的；②各社只看自己社的紀錄，看不到地區層級操作。
 
 > **架構決策**：一張共用 `activity_log` 表，**不用 trigger 全面盯著每一張表**（工作量巨大要動幾十張表、會把「改個電話」這種瑣碎異動也列進去、trigger 只看得到欄位變化寫不出「核准了謝宗廷的社友申請」這種人看得懂的描述），改在關鍵操作的程式碼裡明確呼叫一個共用的 `log_activity()` RPC（`SECURITY DEFINER`，內部驗證呼叫者能不能宣告這個 `club_id` 範圍——地區層級要求 `is_district_admin()`，指定社範圍要求 `current_club_id()` 或地區管理員，前端沒辦法冒充操作者或宣告別的社）。
 
