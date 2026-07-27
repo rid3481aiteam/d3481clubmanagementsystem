@@ -5,6 +5,12 @@ import type { FeatureKey } from '@/types'
 
 const router = createRouter({
   history: createWebHistory(),
+  // 固定的頂部雙層導覽列（--topnav-h + --topmenu-h = 106px）會擋住錨點，
+  // 用 hash 跳頁時要扣掉這個高度，不然目標區塊上緣會被蓋住。
+  scrollBehavior(to) {
+    if (to.hash) return { el: to.hash, top: 120 }
+    return { top: 0 }
+  },
   routes: [
     {
       path: '/login',

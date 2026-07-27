@@ -350,7 +350,7 @@ watch(isDistrictAdminView, loadAccounts)
     </template>
 
     <template v-if="canManagePending">
-      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號審核</h2>
+      <h2 id="account-review" style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">帳號審核</h2>
       <div class="tw" style="margin-bottom:24px;">
         <table class="card-table">
           <thead class="th">

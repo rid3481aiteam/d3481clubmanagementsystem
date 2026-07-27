@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useClubStore } from '@/stores/club'
 import { useAccountsStore } from '@/stores/accounts'
@@ -8,6 +9,7 @@ import type { Club } from '@/types'
 const auth = useAuthStore()
 const club = useClubStore()
 const accounts = useAccountsStore()
+const router = useRouter()
 
 // 「通過審核」只看該社官方管理帳號（club_secretary/club_admin）是不是至少有一筆
 // 已啟用，不含一般社友——一般社友的審核狀態改看展開後的申請/核准清單即可。
@@ -30,6 +32,12 @@ const clubAccountSummary = computed(() => {
   }
   return map
 })
+
+// 給 KPI 卡用：目前哪些社還有待審核申請人（不分社帳號/社友），點卡片直接
+// 跳到帳號管理頁的「帳號審核」區塊，不用先進某一社的詳情頁才找得到入口。
+const clubsWithPendingApplications = computed(() =>
+  club.allClubs.filter(c => (clubAccountSummary.value.get(c.id)?.pending.length ?? 0) > 0)
+)
 
 const expandedClubs = ref(new Set<string>())
 function toggleClubDetail(id: string) {
@@ -116,6 +124,23 @@ onMounted(async () => {
     <div class="ph">
       <h1>社團總覽</h1>
       <button v-if="auth.isDistrictAdminView" class="btn btn-gold" @click="openAdd">+ 新增社團</button>
+    </div>
+
+    <!-- /club/invite（帳號審核）路由只放行地區管理員，唯讀角色點了會被導回首頁，
+         KPI 卡要跟著只給 isDistrictAdminView，不能沿用其他區塊的 isDistrictView -->
+    <div v-if="auth.isDistrictAdminView" class="stat-grid" style="margin-bottom:16px;">
+      <div
+        class="stat-card clickable"
+        :class="clubsWithPendingApplications.length ? 'c-gold' : ''"
+        @click="router.push('/club/invite#account-review')"
+      >
+        <div class="stat-label">申請中的社</div>
+        <div class="stat-value">{{ clubsWithPendingApplications.length }}</div>
+        <div v-if="clubsWithPendingApplications.length" class="kpi-sub">
+          {{ clubsWithPendingApplications.map(c => c.name).join('、') }}
+        </div>
+        <div v-else class="kpi-sub">目前沒有社在申請中</div>
+      </div>
     </div>
 
     <div class="tw">
@@ -331,5 +356,18 @@ onMounted(async () => {
   width: 100%;
   font-size: 13px;
   color: var(--navy);
+}
+.stat-card.clickable {
+  cursor: pointer;
+  transition: transform .1s, box-shadow .15s;
+}
+.stat-card.clickable:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.kpi-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
 }
 </style>
