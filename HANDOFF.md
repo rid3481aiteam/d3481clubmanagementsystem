@@ -1,5 +1,13 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百二十七輪，**社團總覽/地區通訊錄的社長資訊改比較 updated_at、兩頁串連**）：使用者要求「地區通訊錄/社團總覽應該都要連動，如果有不同，以最後更新日為最新的資訊為主」，並確認資料庫兩張表都有 `updated_at` 可以比較。
+
+> **修正上一輪的簡化判斷**：上一輪（126）讓社團總覽無條件優先讀 `club_officers`、次選 `clubs.pres_name`，這輪使用者指出不能這樣一刀切——`clubs.pres_name`（「編輯社團」表單）也可能是使用者最後更新資料的地方（例如社長任期中途異動，直接在編輯社團表單改掉，沒有動 `club_officers`），這種情況下 `clubs.pres_name` 才是新的，硬性優先 `club_officers` 反而會顯示舊資料。改成**比較 `clubs.updated_at` 跟對應 `club_officers` 那筆的 `updated_at`，時間新的那筆才是準的**（`pickNewer()`，兩邊都有值才比較時間，只有一邊有值就直接採用那邊，都沒有就是 `null`）。
+
+> **兩頁串連**：抽成共用模組 [`src/lib/clubOfficers.ts`](src/lib/clubOfficers.ts)（`buildOfficersByClub`／`resolveClubLeaders`），[`ClubListView.vue`](src/views/admin/ClubListView.vue)（社團總覽）跟 [`DirectoryView.vue`](src/views/directory/DirectoryView.vue)（地區通訊錄，**這輪第一次接上 `club_officers`**，之前完全沒有連動、只讀靜態欄位）共用同一套判斷邏輯跟同一份 `officers.districtByTerm` 查詢（`officers.ts` 上一輪已加的 `fetchDistrictYearTerm`），確保兩個頁面看到的社長/執秘資料完全一致，不會一邊新一邊舊。地區通訊錄的卡片顯示、搜尋比對、匯出 Excel 都改吃 `enrichedClubs`（已套用 resolve 邏辯的社團清單），不是原始 `club.allClubs`。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純前端，不用部署，重新整理頁面就會生效。
+
 > 最後更新：2026-07-27（第一百二十六輪，**社團總覽的社長/執秘改抓當年度 club_officers，不再顯示舊資料**）：使用者問「社團總覽的社長資訊是寫死的還是會抓最新年份」，順藤摸瓜發現這正是已經有人反映過「社長資訊不對」的根因——確認後直接修掉。
 
 > **根因**：[`clubs.pres_name`/`sec_name`](supabase/migrations/001_clubs_auth.sql:19) 是 019/020 輪從 Excel 匯入時期填的靜態文字欄位，只有透過「編輯社團」表單手動改才會變，不會跟著扶輪年度換屆自動更新。系統裡另外有一張真正按年度記錄的 `club_officers`（各社透過「本社歷程」自己維護每屆的社長/社長當選人/副社長/秘書），但社團總覽的「社長」「執秘」欄位從頭到尾都只讀 `clubs` 表那個靜態欄位，跟 `club_officers` 完全沒接上——換屆後只要沒人手動回頭改 `clubs.pres_name`，社團總覽看到的就是舊社長。
