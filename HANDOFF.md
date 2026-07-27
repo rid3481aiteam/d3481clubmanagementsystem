@@ -1,5 +1,11 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百一十八輪，**社團總覽新增搜尋（社名關鍵字＋分區），以利快速查閱**）：[`ClubListView.vue`](src/views/admin/ClubListView.vue) 表格上方新增即時篩選列——文字輸入框比對社名（`includes`，不分大小寫沒特別處理，目前社名都是中文用不到）、下拉選單選分區（選項從既有 `club.allClubs` 動態收集，依 `ZONE_ORDER` 排序），兩者可同時套用。`groupedClubs` computed 改成先篩選 `club.allClubs` 再分組，篩選後完全沒有 hit 的分區不會出現（不用特地顯示「0 社」的空分區）。
+
+> **有篩選時的三個連動細節**：①符合條件的分區自動展開，不受使用者之前手動收合的 `collapsedZones` 狀態影響（不然篩到的社可能剛好在一個被收合的分區裡，畫面上完全看不到，還以為搜尋沒結果）；②篩選時隱藏排序用的上下箭頭（`order-btns`）——這兩顆按鈕是拿「篩選後清單裡的相鄰兩筆」去對調 `sort_order`，如果清單被篩過，畫面上相鄰的兩筆在完整分區順序裡可能根本不相鄰，亂點會把 sort_order 弄亂，所以乾脆篩選中不給點；③找不到符合條件時顯示「找不到符合條件的社團」，跟原本「尚無社團資料」（真的一筆都沒有）分開，避免使用者誤以為系統整個社團資料是空的。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純前端 computed／template 邏輯，沒有 Supabase migration、沒有 Edge Function 改動。**這輪一樣沒有實機截圖驗證**——這台機器沒有登入這個系統的 Supabase 帳號憑證，沒辦法實際跑起來測互動，只能驗證型別/建置過關，麻煩使用者自己上站測搜尋＋展開＋清除搜尋的手感。
+
 > 最後更新：2026-07-27（第一百一十七輪，**修掉「授予地區工作人員權限」一律被擋下的 bug——待部署**）：使用者截圖回報「帳號權限授予」填了 Email、選「地區工作人員」、開啟編輯，送出後跳錯誤「沒有權限變更帳號所屬社團或地區權限」，就算操作者本人明明是地區管理員也一樣被擋。
 
 > **根因**：[`invite-user`](supabase/functions/invite-user/index.ts) 的 `grant_type === 'district'` 分支，寫入 `user_profiles.district_role` 用的是 `adminClient`（service role 連線）。保護這個欄位的 `protect_user_profile_privileged_fields` trigger（033 輪最後一次改的版本）靠 `auth.uid()` 判斷操作者是不是地區管理員——**但 service role 連線沒有 `auth.uid()`**（會是 NULL），trigger 內部的 `is_district_admin()` 查 `WHERE id = auth.uid()` 永遠查不到列，一律判定「沒有權限」擋下來。API 層其實已經在前面驗證過呼叫者真的是地區管理員（第 70-72 行），只是最後落地寫入那一步用錯了連線身分，導致這個驗證形同虛設。「加入指定社」（`grant_type: club`）那條路沒有這個問題，因為寫入的是 `user_club_roles` 表，那張表沒有這個 trigger。
