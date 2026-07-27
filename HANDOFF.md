@@ -1,6 +1,29 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-28（第一百三十七輪，**規劃決策存檔：開放社端資料匯入 API（AI/爬蟲代入名冊）**）：使用者提出「社務平台能不能開放 API 讓其他社透過 AI 自動匯入資料，或抓取資料後填入」。這輪只做架構討論、沒有寫程式碼/migration，決策記錄如下,待使用者下指令才開工。
+> 最後更新：2026-07-28（第一百三十八輪，**新增 SSO 帳戶事件通知（account.registered/approved/rejected）接收端——待部署**）：延續第一百三十六輪「SSO 審核完成後 D3481 沒有主動通知」的分析，使用者實際跟 RotarySSO 對接、取得規格文件（v1）與共用金鑰／client_id，這輪落地接收端。
+
+> **範圍界定（使用者明確拍板，避免過度延伸）**：①`account.approved` 帶來的「已驗證」扶輪社/地區資料**不**用來自動比對指派 `club_id`——沿用既有人工比對社別流程（`clubMatch.ts` 那套，前後迭代很多輪，不隨便動）；②`account.registered`（申請中、還沒被 SSO 核准）**不**在 D3481 介面上顯示——反正這個人現在還不能完成 OAuth 登入，提前顯示價值有限。這兩點界定了這輪只做「補資訊、標記已驗證」，不碰社別/角色指派邏輯。
+
+> **架構**：新增 [`069_sso_account_notifications.sql`](supabase/migrations/069_sso_account_notifications.sql)：`sso_pending_account`（以 `sso_sub` 為主鍵 upsert，欄位含 status/last_event_id/last_occurred_at/rotary_district/rotary_club/account_type/consumed_at）＋`sso_event_log`（event_id 去重表，兩層去重都比照規格 4.2 節）。`user_profiles` 新增 `sso_verified_at`。兩張新表都不開放 authenticated INSERT/UPDATE，只能透過 service role 寫入，比照 `invite_log`/`activity_log` 既有慣例。
+
+> 新增 Edge Function [`sso-account-webhook`](supabase/functions/sso-account-webhook/index.ts)：HMAC-SHA256 驗簽（timestamp+body，300 秒時間窗，常數時間比較）——用規格 3.4 節三組固定範例離線驗算過，三組簽章逐位元吻合；`client_id` 比對；未知 version/event 回 200 不擋；事件順序依 `occurred_at` 判斷新舊（規格 4.3 節）；`account.approved` 到達時回頭查 `user_profiles`（6.2 節補套）。因為 SSO 端自動重試排程尚未上線、且明確建議下游別回 5xx，這支函式設計成「先落地事件、驗簽通過就處理完直接回 200」，沒有做非同步佇列（目前的寫入都是單純 DB upsert，失敗機率低，暫時不需要更複雜的架構）。
+
+> [`sso-login`](supabase/functions/sso-login/index.ts) 補上 6.1 節邏輯：登入時查 `sso_pending_account`，`status='approved'` 且未套用過（`consumed_at` 為 NULL）就把驗證過的社別/地區/身分別資料覆蓋進 `user_profiles`，標記 `sso_verified_at`。三種既有登入分支（已連結／email 銜接既有帳號／全新帳號）共用同一段，失敗不擋登入（比照既有 `notifyDistrictAdminsOfPendingAccount` 的 try/catch 慣例）。
+
+> **UI**：[`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue)「帳號審核」表格姓名欄，`sso_verified_at` 有值時多顯示一顆綠色「SSO 已核准」徽章（跟既有「社帳號」徽章並排），純粹是資訊提示，不影響任何審核操作本身。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。Edge Function 本身沒有本機 Deno 可以直接跑（這台機器沒裝 Deno），改用 Node 的 Web Crypto API 重新實作同一段簽章演算法，對規格 3.4 節三組固定範例（registered/approved/rejected）逐一驗算，簽章值完全吻合，確認 HMAC 邏輯正確；業務邏輯（去重/排序/套用）沒有本機環境可以端對端測試，比照這個 repo 一貫的做法交給使用者上真實環境測。
+
+> **待使用者部署（三步驟，缺一不可）：**
+> 1. 到 SQL Editor 執行 [`069_sso_account_notifications.sql`](supabase/migrations/069_sso_account_notifications.sql)
+> 2. `supabase functions deploy sso-account-webhook --no-verify-jwt`（**一定要加這個旗標**，SSO 呼叫不會帶 Supabase JWT，沒加會被 401 擋掉，比照 `line-webhook` 的既有先例）
+> 3. 到 Supabase 專案的 Edge Function 環境變數設定 `ROTARYSSO_WEBHOOK_SECRET`（SSO 端已提供的共用金鑰）與 `ROTARYSSO_CLIENT_ID`（值：`F1z2S113VsnSJE9Xzn8cu`，SSO 端說這個不是機密，可直接放環境變數）
+>
+> 另外 `sso-login` 這支既有函式這輪也有改動（補 6.1 邏輯），要重新部署：`supabase functions deploy sso-login`
+
+> 部署完成後，接收端網址要提供給 SSO 管理者登記（`https://<專案>.supabase.co/functions/v1/sso-account-webhook`），登記前 SSO 不會送任何通知。登記完成後可以依 SSO 端提供的驗收方式（測試帳號走一次「申請→核准→登入」）確認：①`sso_pending_account` 出現對應列且 `status` 隨事件正確變化；②該測試帳號登入後，「帳號審核」清單的姓名旁出現「SSO 已核准」徽章；③`sso_pending_account.consumed_at` 有被填上。
+
+> 最後更新（上一輪）：2026-07-28（第一百三十七輪，**規劃決策存檔：開放社端資料匯入 API（AI/爬蟲代入名冊）**）：使用者提出「社務平台能不能開放 API 讓其他社透過 AI 自動匯入資料，或抓取資料後填入」。這輪只做架構討論、沒有寫程式碼/migration，決策記錄如下,待使用者下指令才開工。
 
 > **核心原則**：外部/AI 匯入的資料一律不直接寫入正式表（`roster` 等），全部先落地在新的 staging 表,由社管理員/執秘人工核准後才真正寫入——避免 AI 抓錯資料或格式對不上時直接污染正式名冊（現有 `roster` 匯入功能只認固定欄名,格式錯就整批不匯入,見第一百二十九輪；AI 匯入的來源更不可控,需要比現有 Excel 匯入更嚴格的把關）。
 

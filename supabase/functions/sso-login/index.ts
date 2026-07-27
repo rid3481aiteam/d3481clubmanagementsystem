@@ -312,6 +312,40 @@ Deno.serve(async (req) => {
     }
   }
 
+  // 6.1 節：查 SSO 帳戶事件通知留下的核准記錄，若已核准且尚未套用過，
+  // 把「已通過 SSO 管理者查驗」的扶輪社／地區／身分別資料覆蓋進
+  // user_profiles，並標記已套用。只補資訊欄位，不動 club_id／role——
+  // 那兩個仍走既有的人工比對社別流程（見 069 migration 說明）。每次
+  // 登入都查，但 consumed_at 有值時是單純查詢不會真的動到資料，所以
+  // case 1/2/3 三種情況都適用同一段邏輯，不用各自處理。失敗不能擋到
+  // 使用者本人的登入，比照 notifyDistrictAdminsOfPendingAccount 整包
+  // 包在 try/catch 裡。
+  try {
+    const { data: pendingAccount } = await adminClient
+      .from('sso_pending_account')
+      .select('status, consumed_at, rotary_district, rotary_club, account_type')
+      .eq('sso_sub', info.sub)
+      .maybeSingle()
+
+    if (pendingAccount?.status === 'approved' && !pendingAccount.consumed_at) {
+      const appliedAt = new Date().toISOString()
+      const { error: verifyError } = await adminClient
+        .from('user_profiles')
+        .update({
+          sso_account_type: pendingAccount.account_type,
+          sso_rotary_club: pendingAccount.rotary_club,
+          sso_rotary_district: pendingAccount.rotary_district,
+          sso_verified_at: appliedAt,
+        })
+        .eq('id', targetUserId)
+      if (!verifyError) {
+        await adminClient.from('sso_pending_account').update({ consumed_at: appliedAt }).eq('sso_sub', info.sub)
+      }
+    }
+  } catch (applyErr) {
+    console.error('apply sso_pending_account failed:', applyErr)
+  }
+
   const { data: link, error: linkError } = await adminClient.auth.admin.generateLink({
     type: 'magiclink',
     email: info.email,

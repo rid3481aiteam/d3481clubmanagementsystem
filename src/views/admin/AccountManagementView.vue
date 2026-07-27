@@ -375,6 +375,7 @@ watch(isDistrictAdminView, loadAccounts)
               <td data-label="姓名">
                 {{ p.name }}
                 <span v-if="isClubApplication(p)" class="bdg b-n" style="margin-left:6px;">社帳號</span>
+                <span v-if="p.sso_verified_at" class="bdg b-gr" style="margin-left:6px;" title="扶輪社/地區/身分別資料已通過 SSO 管理者查驗">SSO 已核准</span>
               </td>
               <td data-label="扶輪 SSO 自稱社別">{{ p.sso_rotary_club ?? '-' }}</td>
               <td data-label="扶輪地區">{{ p.sso_rotary_district ?? '-' }}</td>
