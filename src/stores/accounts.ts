@@ -43,14 +43,17 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = false
   }
 
-  // 「待審核」涵蓋兩種人：自助註冊填了 requested_title/requested_role 等管理員
-  // 升級角色的人，以及 RotarySSO 首次登入、club_id 還是 NULL 等管理員指派社別的人。
-  // 社端視角只可能碰到前者（後者一定要地區管理員才能指派社別，見 assignClub）。
+  // 「待審核」涵蓋兩種人，責任歸屬不同：①club_id 還是 NULL 的全新申請人，
+  // 只有地區能處理（指派社別／社帳號直接啟動）；②已經被地區轉交到某社
+  // （club_id 有值＋requested_role 有值），只有收到轉交的那個社能處理。
+  // 地區的清單只能查①——如果也把②抓進來，地區會多一顆一樣能按的「啟動」，
+  // 等於「發送」形同虛設，該社的審核直接被跳過（forwardToClub() 之後這筆
+  // 還留在地區自己的待審清單就是這樣被誤按啟動的）。
   async function fetchPending() {
     let query = supabase.from('user_profiles').select('*')
     query = scopeClubId.value
       ? query.eq('club_id', scopeClubId.value).not('requested_role', 'is', null)
-      : query.or('requested_role.not.is.null,club_id.is.null')
+      : query.is('club_id', null)
     const { data } = await query
     pending.value = data ?? []
     pendingCount.value = pending.value.length
@@ -58,11 +61,12 @@ export const useAccountsStore = defineStore('accounts', () => {
 
   // 給導覽列徽章用的輕量版：不用 SSO 待審整包資料（含姓名/職稱等），
   // 只查數量，讓管理員不用點進帳號管理頁就能在導覽列看到「有人在等審核」。
+  // 範圍規則跟 fetchPending() 一致，見上方註解。
   async function fetchPendingCount(scopeId: string | null) {
     let query = supabase.from('user_profiles').select('id', { count: 'exact', head: true })
     query = scopeId
       ? query.eq('club_id', scopeId).not('requested_role', 'is', null)
-      : query.or('requested_role.not.is.null,club_id.is.null')
+      : query.is('club_id', null)
     const { count } = await query
     pendingCount.value = count ?? 0
   }
