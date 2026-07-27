@@ -1,6 +1,27 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-27（第一百三十五輪，**社的歷程、友好社新增匯出 Excel**）：使用者要求這兩頁比照其他頁面加上匯出功能，方便各社自己備份資料。沿用 [`IouView.vue`](src/views/club/IouView.vue) 既有的 xlsx（SheetJS）匯出寫法，前端直接用畫面上已載入的資料組表下載，不用另外打 API；比照該頁的既有慣例，匯出按鈕**不綁 `canManage`**，任何看得到頁面的人（含一般社友，這兩頁本來就對三種角色都開放檢視）都能匯出備份，只有新增/編輯/刪除才需要編輯權限。[`ClubHistoryView.vue`](src/views/club/ClubHistoryView.vue) 匯出年份/社長/重要記事，檔名帶社名（例如「台北市和平扶輪社的歷程.xlsx」）；[`SisterClubsView.vue`](src/views/club/SisterClubsView.vue) 匯出社名/結盟時間/當屆社長/兩社情誼說明，結盟時間沿用畫面上的日期格式化函式，不是原始 ISO 字串。本機瀏覽器用假資料驗證過兩頁的匯出按鈕都能正常觸發下載、主控台無錯誤。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過，純前端功能，不需要新 migration。
+> 最後更新：2026-07-27（第一百三十六輪，**新增「操作紀錄」功能（地區/各社進階設定）——待部署**）：使用者反映 SSO 審核完成後 D3481 沒有主動通知（見上一則的分析：兩系統獨立、只靠使用者回登串接，已整理成交接筆記給 RotarySSO 那邊），順勢提出要在地區/各社「進階設定」加一個操作紀錄，記錄「哪個帳號在何時做了哪些事」。動工前先討論架構，使用者確認：①不要只做帳號相關，行事曆/活動編輯這類也要涵蓋，理由是日後活動被刪除、資料被改掉要查得到是誰做的；②各社只看自己社的紀錄，看不到地區層級操作。
+
+> **架構決策**：一張共用 `activity_log` 表，**不用 trigger 全面盯著每一張表**（工作量巨大要動幾十張表、會把「改個電話」這種瑣碎異動也列進去、trigger 只看得到欄位變化寫不出「核准了謝宗廷的社友申請」這種人看得懂的描述），改在關鍵操作的程式碼裡明確呼叫一個共用的 `log_activity()` RPC（`SECURITY DEFINER`，內部驗證呼叫者能不能宣告這個 `club_id` 範圍——地區層級要求 `is_district_admin()`，指定社範圍要求 `current_club_id()` 或地區管理員，前端沒辦法冒充操作者或宣告別的社）。
+
+> **[`068_activity_log.sql`](supabase/migrations/068_activity_log.sql)**：`activity_log(id, actor_id, actor_name, club_id, action, description, created_at)`，`actor_name` 存快照（帳號之後被刪除還看得懂是誰）。RLS SELECT：`is_district_admin() OR (club_id = current_club_id() AND is_club_tier())`——地區管理員看全部（含地區層級跟所有社），各社只看自己社，`club_id` 是 NULL 的地區層級紀錄天生就不會匹配任何社的 `current_club_id()`，不用額外判斷就自然擋掉。表本身不開放 `authenticated` 直接 INSERT，只能透過 `log_activity()` 這支 RPC 寫入（比照 `invite_log` 既有的「寫入只透過受控管道」慣例）。**編號原本排 067，跟並行 session 這輪推上來的 `067_activity_registrations_club_visibility.sql` 撞號，rebase 時改成 068。**
+
+> **這輪涵蓋的動作範圍**（不是全站所有動作，是這輪優先做的高價值部分）：
+> - [`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue)：核准（一般/社帳號）、轉交、啟用/停用、永久刪除、權限變更、地區權限調整、重設密碼——七個函式全部改成先看 `{ error }`、成功才寫 log，順便把幾個函式簽名從 `(id, name)` 改成直接傳整個 `UserProfile`（這樣才拿得到 `club_id` 寫進 log，也讓程式碼更好讀）。**跟並行 session 這輪對同一個檔案的多處修復（發送轉交/授予權限防呆等）自動合併成功，沒有衝突**，rebase 後有重新跑過 `vue-tsc`＋`build` 確認。
+> - [`ActivityListView.vue`](src/views/activities/ActivityListView.vue)：活動／例會的新增、編輯、刪除。
+> - [`RosterView.vue`](src/views/roster/RosterView.vue)：社友新增、編輯；批次編輯跟 Excel 匯入**各自統計成一筆摘要**（例如「批次編輯社友名冊，共更新 5 筆」），不是一筆一筆記，不然一次匯入 50 人會洗版。
+> - [`ClubListView.vue`](src/views/admin/ClubListView.vue)／[`ClubEditView.vue`](src/views/admin/ClubEditView.vue)：社團新增、編輯、刪除（刪除故意記成地區層級 `club_id=null`，因為 `activity_log.club_id` 是 `REFERENCES clubs(id)`，社團都刪掉了不能再指那筆已經不存在的 `club_id`，會撞 FK 違規）。
+> - [`OfficersView.vue`](src/views/club/OfficersView.vue)：本社歷程的幹部整批儲存，同樣統計成一筆摘要——**跟並行 session 這輪新增的「+ 新增年度」功能也自動合併成功**。
+
+> **這輪刻意沒做的部分**：地區行事曆（`district_calendar_events`）完全是外部同步寫入（[`sync-district-calendar`](supabase/functions/sync-district-calendar/index.ts)），沒有任何使用者可編輯的路徑，這輪沒有東西可記，不是漏掉。其他還沒涵蓋到的功能（公告、GG案、總監獎項、知識庫等）之後有需要再個別加，模式已經確立（在對應 View 的成功分支後呼叫 `activityLog.log(action, description, clubId)` 即可）。
+
+> **UI**：新增 [`ActivityLogView.vue`](src/views/admin/ActivityLogView.vue)（路由 `/club/activity-log`，跟 `/club/invite` 一樣單一元件同時服務地區跟各社視角），放進地區跟各社的「進階設定」選單。查詢範圍在 `fetchLog()` 這層就限定（地區傳 null 看全部，各社傳 `auth.clubId`），跟既有 `accounts`/`invites` store 的既有慣例一致，不只靠畫面過濾。只保留最近 200 筆，沒有做分頁/篩選（v1 先求有，之後真的紀錄量大再加）。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過（rebase 到並行 session 的最新程式碼之後重新跑過一次）。
+
+> **待使用者：** 到 SQL Editor 執行 [`068_activity_log.sql`](supabase/migrations/068_activity_log.sql)（這台機器連不到 D3481 的 Supabase 專案，**注意編號是 068 不是 067**，067 這次被並行 session 的 `067_activity_registrations_club_visibility.sql` 用掉了）。跑完後測幾個動作（核准帳號、編輯社友、新增活動），確認「操作紀錄」頁面有正確出現對應的中文描述，且切到各社視角看不到地區層級的紀錄。
+
+> 最後更新（上一輪）：2026-07-27（第一百三十五輪，**社的歷程、友好社新增匯出 Excel**）：使用者要求這兩頁比照其他頁面加上匯出功能，方便各社自己備份資料。沿用 [`IouView.vue`](src/views/club/IouView.vue) 既有的 xlsx（SheetJS）匯出寫法，前端直接用畫面上已載入的資料組表下載，不用另外打 API；比照該頁的既有慣例，匯出按鈕**不綁 `canManage`**，任何看得到頁面的人（含一般社友，這兩頁本來就對三種角色都開放檢視）都能匯出備份，只有新增/編輯/刪除才需要編輯權限。[`ClubHistoryView.vue`](src/views/club/ClubHistoryView.vue) 匯出年份/社長/重要記事，檔名帶社名（例如「台北市和平扶輪社的歷程.xlsx」）；[`SisterClubsView.vue`](src/views/club/SisterClubsView.vue) 匯出社名/結盟時間/當屆社長/兩社情誼說明，結盟時間沿用畫面上的日期格式化函式，不是原始 ISO 字串。本機瀏覽器用假資料驗證過兩頁的匯出按鈕都能正常觸發下載、主控台無錯誤。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過，純前端功能，不需要新 migration。
 
 > 最後更新（上一輪）：2026-07-27（第一百三十四輪，**一般社友可看潛在社友選單 + 社的年度成員可新增年度**）：使用者提出兩個修改需求。① 「社的成員」下拉選單裡的「潛在社友」原本用 `auth.role !== 'club_member'` 擋掉一般社友，但查證 [`010_role_permissions.sql`](supabase/migrations/010_role_permissions.sql) 才發現 `club_member` 對 `prospective_members` 本來就已經開放 view+edit 權限（註解寫「沿用既有可編輯權限」），純粹是 [`TopMenu.vue`](src/components/layout/TopMenu.vue) 選單漏開，拿掉這條多餘的角色限制即可，底層權限完全不用動。② 「社的年度成員」原本只能在既有年度（有幹部紀錄的）跟本年度之間切換，沒辦法回頭補歷史年度或預先建立下一年度。年度本來就不是獨立資料表，只是 [`club_officers.year_term`](src/stores/officers.ts) 這欄的自由文字值，「新增年度」因此不用寫任何資料——[`OfficersView.vue`](src/views/club/OfficersView.vue) 新增一顆「+ 新增年度」按鈕（`canManage` 才顯示），跳出輸入框讓使用者填年度（格式驗證＋防重複），確認後直接切換過去顯示空白幹部名單，使用者透過既有的「編輯年度成員」存下第一筆資料就會正式產生這個年度；預設顯示維持本年度不變，符合使用者「預設顯示都是當年度就好」的要求。本機瀏覽器驗證過：一般社友帳號選單正確看到「潛在社友」；「+ 新增年度」輸入 2027-2028 後正確切換並顯示空白表單，格式錯誤（如「2027」）跟重複年度都有擋下並跳出對應提示。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過，純前端功能，不需要新 migration。
 
