@@ -2,10 +2,42 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useClubStore } from '@/stores/club'
+import { useAccountsStore } from '@/stores/accounts'
 import type { Club } from '@/types'
 
 const auth = useAuthStore()
 const club = useClubStore()
+const accounts = useAccountsStore()
+
+// 「通過審核」只看該社官方管理帳號（club_secretary/club_admin）是不是至少有一筆
+// 已啟用，不含一般社友——一般社友的審核狀態改看展開後的申請/核准清單即可。
+const clubAccountSummary = computed(() => {
+  const map = new Map<string, { approved: boolean; officers: typeof accounts.managed; members: typeof accounts.members; pending: typeof accounts.pending }>()
+  for (const c of club.allClubs) map.set(c.id, { approved: false, officers: [], members: [], pending: [] })
+  for (const p of accounts.managed) {
+    const entry = p.club_id ? map.get(p.club_id) : undefined
+    if (!entry) continue
+    entry.officers.push(p)
+    if (p.is_active) entry.approved = true
+  }
+  for (const p of accounts.members) {
+    const entry = p.club_id ? map.get(p.club_id) : undefined
+    if (entry) entry.members.push(p)
+  }
+  for (const p of accounts.pending) {
+    const entry = p.club_id ? map.get(p.club_id) : undefined
+    if (entry) entry.pending.push(p)
+  }
+  return map
+})
+
+const expandedClubs = ref(new Set<string>())
+function toggleClubDetail(id: string) {
+  const s = new Set(expandedClubs.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  expandedClubs.value = s
+}
 
 const ZONE_ORDER = [
   '第一分區', '第二分區', '第三分區', '第四分區', '第五分區',
@@ -70,8 +102,12 @@ async function save() {
   showModal.value = false
 }
 
-onMounted(() => {
-  club.fetchAll()
+onMounted(async () => {
+  await club.fetchAll()
+  if (auth.isDistrictView) {
+    accounts.setScope(null)
+    await Promise.all([accounts.fetchManaged(), accounts.fetchPending(), accounts.fetchMembers()])
+  }
 })
 </script>
 
@@ -92,19 +128,22 @@ onMounted(() => {
             <th>執秘</th>
             <th>Email</th>
             <th>電話</th>
+            <th v-if="auth.isDistrictView">審核狀態</th>
+            <th v-if="auth.isDistrictView">社友申請</th>
             <th></th>
           </tr>
         </thead>
         <tbody v-for="g in groupedClubs" :key="g.zone">
           <tr class="zone-row" @click="toggleZone(g.zone)">
-            <td colspan="7">
+            <td :colspan="auth.isDistrictView ? 9 : 7">
               <span class="zone-chevron">{{ collapsedZones.has(g.zone) ? '▸' : '▾' }}</span>
               <strong>{{ g.zone }}</strong>
               <span style="color:var(--muted); font-weight:400;">（{{ g.clubs.length }} 社）</span>
             </td>
           </tr>
           <template v-if="!collapsedZones.has(g.zone)">
-            <tr v-for="(c, i) in g.clubs" :key="c.id">
+            <template v-for="(c, i) in g.clubs" :key="c.id">
+            <tr>
               <td data-label="社名">
                 <span v-if="auth.isDistrictAdminView" class="order-btns">
                   <button class="order-btn" :disabled="i === 0" @click="moveClub(g.clubs, i, -1)">▲</button>
@@ -117,6 +156,18 @@ onMounted(() => {
               <td data-label="執秘">{{ c.sec_name || '-' }}</td>
               <td data-label="Email">{{ c.email || '-' }}</td>
               <td data-label="電話">{{ c.phone || '-' }}</td>
+              <td v-if="auth.isDistrictView" data-label="審核狀態">
+                <span class="bdg" :class="clubAccountSummary.get(c.id)?.approved ? 'b-gr' : 'b-g'">
+                  {{ clubAccountSummary.get(c.id)?.approved ? '已通過審核' : '尚未通過' }}
+                </span>
+              </td>
+              <td v-if="auth.isDistrictView" data-label="社友申請">
+                <button class="btn btn-g btn-sm" @click="toggleClubDetail(c.id)">
+                  {{ (clubAccountSummary.get(c.id)?.members.length ?? 0) }} 位已核准
+                  · {{ (clubAccountSummary.get(c.id)?.pending.length ?? 0) }} 位待審
+                  {{ expandedClubs.has(c.id) ? '▴' : '▾' }}
+                </button>
+              </td>
               <td>
                 <div style="display:flex; gap:6px;">
                   <RouterLink :to="`/admin/clubs/${c.id}`" class="btn btn-g btn-sm">查看社團資訊</RouterLink>
@@ -124,11 +175,33 @@ onMounted(() => {
                 </div>
               </td>
             </tr>
+            <tr v-if="auth.isDistrictView && expandedClubs.has(c.id)">
+              <td :colspan="9" style="background:var(--bg);">
+                <div class="club-detail-grid">
+                  <div>
+                    <strong>管理帳號</strong>
+                    <span v-if="!clubAccountSummary.get(c.id)?.officers.length" style="color:var(--muted);">尚無</span>
+                    <span v-for="o in clubAccountSummary.get(c.id)?.officers" :key="o.id" class="bdg" :class="o.is_active ? 'b-gr' : 'b-g'">{{ o.name }}</span>
+                  </div>
+                  <div>
+                    <strong>已核准社友</strong>
+                    <span v-if="!clubAccountSummary.get(c.id)?.members.length" style="color:var(--muted);">尚無</span>
+                    <span v-for="m in clubAccountSummary.get(c.id)?.members" :key="m.id" class="bdg b-gr">{{ m.name }}</span>
+                  </div>
+                  <div>
+                    <strong>待審核申請</strong>
+                    <span v-if="!clubAccountSummary.get(c.id)?.pending.length" style="color:var(--muted);">尚無</span>
+                    <span v-for="p in clubAccountSummary.get(c.id)?.pending" :key="p.id" class="bdg b-n">{{ p.name }}</span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            </template>
           </template>
         </tbody>
         <tbody v-if="!club.allClubs.length">
           <tr>
-            <td colspan="7" style="text-align:center; color:var(--muted);">尚無社團資料</td>
+            <td :colspan="auth.isDistrictView ? 9 : 7" style="text-align:center; color:var(--muted);">尚無社團資料</td>
           </tr>
         </tbody>
       </table>
@@ -241,5 +314,22 @@ onMounted(() => {
 .order-btn:disabled {
   opacity: .3;
   cursor: default;
+}
+.club-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  padding: 12px 4px;
+}
+.club-detail-grid > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.club-detail-grid strong {
+  width: 100%;
+  font-size: 13px;
+  color: var(--navy);
 }
 </style>
