@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import * as XLSX from 'xlsx'
 import { useAuthStore } from '@/stores/auth'
 import { useClubHistoryStore } from '@/stores/clubHistory'
 import type { ClubHistoryRecord } from '@/types'
@@ -67,6 +68,18 @@ async function remove(item: ClubHistoryRecord) {
   if (error) alert(error.message)
 }
 
+function handleExport() {
+  const rows = clubHistory.list.map(item => ({
+    年份: item.year_term,
+    社長: item.president_name || '',
+    重要記事: item.notable_events || '',
+  }))
+  const sheet = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, sheet, '社的歷程')
+  XLSX.writeFile(wb, `${auth.clubName || '社'}的歷程.xlsx`)
+}
+
 onMounted(() => {
   if (auth.clubId) clubHistory.fetchAll(auth.clubId)
 })
@@ -76,7 +89,10 @@ onMounted(() => {
   <div class="page">
     <div class="ph">
       <h1>社的歷程</h1>
-      <button v-if="canManage" class="btn btn-gold" @click="openAdd">+ 新增年度紀錄</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-g" @click="handleExport">📤 匯出 Excel</button>
+        <button v-if="canManage" class="btn btn-gold" @click="openAdd">+ 新增年度紀錄</button>
+      </div>
     </div>
 
     <div class="tw">

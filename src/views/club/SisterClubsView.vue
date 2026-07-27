@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import * as XLSX from 'xlsx'
 import { useAuthStore } from '@/stores/auth'
 import { useSisterClubsStore } from '@/stores/sisterClubs'
 import type { SisterClub } from '@/types'
@@ -74,6 +75,19 @@ async function remove(item: SisterClub) {
   if (error) alert(error.message)
 }
 
+function handleExport() {
+  const rows = sisterClubs.list.map(item => ({
+    社名: item.partner_name,
+    結盟時間: formatDate(item.established_date),
+    當屆社長: item.president_name || '',
+    兩社情誼說明: item.relationship_note || '',
+  }))
+  const sheet = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, sheet, '友好社')
+  XLSX.writeFile(wb, `${auth.clubName || '社'}的友好社.xlsx`)
+}
+
 onMounted(() => {
   if (auth.clubId) sisterClubs.fetchAll(auth.clubId)
 })
@@ -83,7 +97,10 @@ onMounted(() => {
   <div class="page">
     <div class="ph">
       <h1>友好社</h1>
-      <button v-if="canManage" class="btn btn-gold" @click="openAdd">+ 新增友好社</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-g" @click="handleExport">📤 匯出 Excel</button>
+        <button v-if="canManage" class="btn btn-gold" @click="openAdd">+ 新增友好社</button>
+      </div>
     </div>
 
     <div class="tw">
