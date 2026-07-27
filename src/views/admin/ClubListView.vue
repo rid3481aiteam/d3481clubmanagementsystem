@@ -39,6 +39,13 @@ const clubsWithPendingApplications = computed(() =>
   club.allClubs.filter(c => (clubAccountSummary.value.get(c.id)?.pending.length ?? 0) > 0)
 )
 
+// 「已通過審核的社」KPI 卡：沒有對應的專屬頁面可以跳轉，改成點卡片
+// 原地展開/收合名單，跟「申請中的社」點下去導頁的行為不一樣。
+const approvedClubs = computed(() =>
+  club.allClubs.filter(c => clubAccountSummary.value.get(c.id)?.approved)
+)
+const showApprovedClubs = ref(false)
+
 const expandedClubs = ref(new Set<string>())
 function toggleClubDetail(id: string) {
   const s = new Set(expandedClubs.value)
@@ -161,6 +168,23 @@ onMounted(async () => {
           {{ clubsWithPendingApplications.map(c => c.name).join('、') }}
         </div>
         <div v-else class="kpi-sub">目前沒有社在申請中</div>
+      </div>
+      <div
+        class="stat-card clickable"
+        :class="approvedClubs.length ? 'c-green' : ''"
+        @click="showApprovedClubs = !showApprovedClubs"
+      >
+        <div class="stat-label">已通過審核的社</div>
+        <div class="stat-value">{{ approvedClubs.length }}</div>
+        <div class="kpi-sub">{{ showApprovedClubs ? '收起名單 ▴' : '點選查看名單 ▾' }}</div>
+      </div>
+    </div>
+
+    <div v-if="auth.isDistrictAdminView && showApprovedClubs" class="tw" style="padding:16px; margin-bottom:16px;">
+      <strong style="font-size:13px; color:var(--navy);">已通過審核的社（{{ approvedClubs.length }}）</strong>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+        <span v-if="!approvedClubs.length" style="color:var(--muted); font-size:13px;">目前還沒有社通過審核</span>
+        <span v-for="c in approvedClubs" :key="c.id" class="bdg b-gr">{{ c.name }}</span>
       </div>
     </div>
 
