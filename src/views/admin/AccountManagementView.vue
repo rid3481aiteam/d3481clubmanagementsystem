@@ -57,25 +57,6 @@ function roleLabel(r: UserRole) {
   return r === 'district_admin' ? '地區管理員' : r === 'club_secretary' || r === 'club_admin' ? '各社管理員' : r === 'club_member' ? '一般社友' : r
 }
 
-// 跟 RegisterView 的職稱代碼共用同一份對照表，審核名單才看得懂使用者實際填的職稱
-const TITLE_LABELS: Record<string, string> = {
-  DG: '總監 DG', DS: '地區秘書 DS', DA: '地區助理 DA', VDS: '副地區秘書 VDS',
-  AG: '分區助理總監 AG', VAG: '副分區助理總監 VAG', CP: '創社社長 CP', PP: '前社長 PP',
-  P: '社長 P', PE: '社長當選人 PE', VP: '副社長 VP', S: '秘書 S', RTN: '社友 RTN',
-}
-
-function pendingTitleLabel(p: UserProfile) {
-  if (p.requested_title) return TITLE_LABELS[p.requested_title] ?? p.requested_title
-  return p.requested_role ? roleLabel(p.requested_role) : '-'
-}
-
-// club_id 是 NULL 有兩種意思：clubName() 原本把它當「3481地區辦公室」（地區管理員
-// 自己的 home club 就是 NULL），但在待審核清單裡 NULL 是「RotarySSO 首登、還沒
-// 指派社別」，不能沿用同一個字樣，會誤導管理員以為已經歸屬地區辦公室。
-function pendingClubLabel(p: UserProfile) {
-  return p.club_id ? clubName(p.club_id) : '尚未指派'
-}
-
 const pendingChoice = ref<Record<string, UserRole>>({})
 const pendingClubChoice = ref<Record<string, string>>({})
 
@@ -121,6 +102,17 @@ function pendingRoleChoice(p: UserProfile) {
   // 「各社管理員／一般社友」兩種，顯示上把 club_admin 併進 club_secretary
   return choice === 'club_admin' ? 'club_secretary' : choice
 }
+
+// 帳號審核清單依「扶輪地區」分成 3481 本地區／非 3481 兩區塊，管理員一眼
+// 就能分清楚哪些是自己地區的申請人，不用逐行看「扶輪地區」欄位比對。
+const pendingGroups = computed(() => {
+  const inDistrict = accounts.pending.filter(p => (p.sso_rotary_district ?? '').trim() === '3481')
+  const otherDistrict = accounts.pending.filter(p => (p.sso_rotary_district ?? '').trim() !== '3481')
+  return [
+    { key: 'in', label: '3481 地區', list: inDistrict },
+    { key: 'other', label: '非 3481 地區', list: otherDistrict },
+  ]
+})
 
 // 地區視角看到全新 SSO 個人申請人（還沒指派社別）：不再由地區直接一次
 // 給權限，只負責選社別、「發送」轉給該社自己審——地區不判斷該給什麼
@@ -360,22 +352,23 @@ watch(isDistrictAdminView, loadAccounts)
           <thead class="th">
             <tr>
               <th>姓名</th>
-              <th>社團</th>
-              <th>申請職稱</th>
               <th>扶輪 SSO 自稱社別</th>
               <th>扶輪地區</th>
               <th>扶輪身分別</th>
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="p in accounts.pending" :key="p.id">
+          <tbody v-for="group in pendingGroups" :key="group.key">
+            <tr>
+              <td colspan="5" style="background:var(--bg); font-weight:700; color:var(--navy); padding:10px 14px;">
+                {{ group.label }}（{{ group.list.length }}）
+              </td>
+            </tr>
+            <tr v-for="p in group.list" :key="p.id">
               <td data-label="姓名">
                 {{ p.name }}
                 <span v-if="isClubApplication(p)" class="bdg b-n" style="margin-left:6px;">社帳號</span>
               </td>
-              <td data-label="社團">{{ pendingClubLabel(p) }}</td>
-              <td data-label="申請職稱">{{ pendingTitleLabel(p) }}</td>
               <td data-label="扶輪 SSO 自稱社別">{{ p.sso_rotary_club ?? '-' }}</td>
               <td data-label="扶輪地區">{{ p.sso_rotary_district ?? '-' }}</td>
               <td data-label="扶輪身分別">{{ p.sso_account_type ?? '-' }}</td>
@@ -427,8 +420,8 @@ watch(isDistrictAdminView, loadAccounts)
                 </div>
               </td>
             </tr>
-            <tr v-if="!accounts.pending.length">
-              <td colspan="7" style="text-align:center; color:var(--muted);">尚無待審核註冊</td>
+            <tr v-if="!group.list.length">
+              <td colspan="5" style="text-align:center; color:var(--muted);">尚無{{ group.label }}待審核</td>
             </tr>
           </tbody>
         </table>
