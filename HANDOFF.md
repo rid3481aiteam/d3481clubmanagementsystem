@@ -8,9 +8,11 @@
 
 > `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過（`AccountManagementView` chunk 14.87kB）。沒有 Supabase migration、沒有 Edge Function 改動，純前端。這輪一樣沒有實機截圖驗證（比照使用者一貫偏好）。
 
-> **待使用者：** 上正式站確認分組邏輯符合預期（尤其如果 `sso_rotary_district` 實際資料格式不是乾淨的 `"3481"` 純數字字串，例如帶了空白或後綴文字，分組會抓不到，跟我說要調整比對方式）。
+> **(4) 第四項統整表也做完了**：先給架構評估後，使用者當場確認兩個判斷點——①「通過審核」只看官方管理帳號（不含一般社友）；②放進既有 [`ClubListView.vue`](src/views/admin/ClubListView.vue)（社團總覽），不另開新頁。實作：`onMounted` 在 `auth.isDistrictView` 時額外 `setScope(null)` 撈 `accounts.managed`／`pending`／`members`（全地區不分社），新增 `clubAccountSummary` computed 依 `club_id` 分組成 `{approved, officers, members, pending}`；每列新增「審核狀態」徽章（該社至少一筆啟用中的 `club_secretary`/`club_admin` ＝已通過審核）跟「社友申請」按鈕（顯示已核准/待審人數，點開展開一列列出三種身分的姓名 chip）。**兩個新欄位跟展開列都包在 `v-if="auth.isDistrictView"`**，因為 club 端視角（`club_secretary`/`club_member`）本來就進不了 `/admin/clubs` 這條路（router `districtViewer` guard），但地區唯讀身分若切到「本社」視角時 `isDistrictView` 會變 false，這時也不該看到跨社彙整資料。**沒有新增資料表/migration**，純前端 aggregate 既有 store 資料。
 
-> **第四項待評估（統整表：已通過審核的社＋各社已申請社友）尚未動工**，這輪先給架構評估、沒有寫程式，詳見下方「未解決問題／待規劃」。
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過（`ClubListView` chunk 9.41kB）。
+
+> **待使用者：** 上正式站確認①分組邏輯符合預期（尤其如果 `sso_rotary_district` 實際資料格式不是乾淨的 `"3481"` 純數字字串，例如帶了空白或後綴文字，分組會抓不到，跟我說要調整比對方式）；②社團總覽頁的「審核狀態」「社友申請」欄位跟展開清單顯示正確，且切到「本社」視角時這兩欄會消失（不會看到別社資料）。
 
 > 最後更新：2026-07-26（第一百一十四輪，**地區／各社導覽選單依使用者給的精確清單重排＋刪減，社團總覽詳情頁瘦身，「帳號權限授予」開放給各社使用**——使用者這輪直接給出地區、各社（有/無編輯權限）三份完整的選單清單，逐條對照重排：
 
@@ -204,15 +206,6 @@ supabase functions deploy notify-club-pending-member
 ---
 
 ## ⚠️ 待辦
-
-**【第一百一十五輪，待規劃】「已通過審核的社＋各社已申請社友」統整表——只給架構評估，還沒動工**：
-
-使用者要一個統整表：目前有哪些社已經通過審核，以及每社底下有哪些已申請（含待審／已核准）的社友。架構評估結論：
-
-- **不用新增資料表/migration**：地區管理員視角下 `accounts.managed`／`accounts.members`／`accounts.pending`（`AccountManagementView.vue`）本來就是 `scopeClubId=null` 撈全地區資料，`club.allClubs` 也有全部社清單，純前端 aggregate 就夠。
-- **待使用者決定 (1)「通過審核」怎麼定義**：用「該社是否有至少一筆 `role ∈ (club_secretary, club_admin)` 且 `is_active` 的帳號」判斷，等同 `clubs.account_notify_email IS NOT NULL`（064 輪加的欄位，第一次核准社帳號時自動捕捉）——這只看「官方管理帳號」有沒有審過，不含一般社友；如果使用者要的「通過審核」也把社友算進去，定義要改。
-- **待使用者決定 (2) 放哪裡**：傾向擴充既有 [`ClubListView.vue`](src/views/admin/ClubListView.vue)（社團總覽）每列加審核狀態徽章＋人數統計，可展開看社友清單（沿用 `DashboardView.vue` 的 `zone-row` 收合展開慣例），不另開新頁面——但也可以做成獨立頁面，兩者都不需要 migration，純粹是要不要跟既有頁面混在一起的取捨，待使用者選。
-- 提醒：**上一輪（114）才把 `ClubDetailView.vue`（社團總覽→單一社）的「已註冊帳號」「社員名單」整段刪掉**，這次統整表是「地區視角看全部社的聚合總覽」，跟被刪掉的「單一社詳情頁列出帳號明細」不是同一種東西、用途不同，不是走回頭路。
 
 **【第一百零五輪，優先】地區知識庫——待使用者完成部署＋實際上傳兩份測試 PDF（Claude 這輪還是連不到這個專案的 Supabase CLI，沒辦法自己來）**：
 
