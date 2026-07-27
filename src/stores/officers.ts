@@ -44,5 +44,13 @@ export const useOfficersStore = defineStore('officers', () => {
     return [...terms].sort((a, b) => b.localeCompare(a))
   }
 
-  return { list, loading, fetchAll, insert, update, remove, fetchYearTerms }
+  // 給地區視角的「社團總覽」用：一次撈全地區當年度的社長/執秘，不分社
+  // （RLS 的 club_officers_select 本來就放行 is_district_viewer() 看全部）。
+  const districtByTerm = ref<ClubOfficer[]>([])
+  async function fetchDistrictYearTerm(yearTerm: string) {
+    const { data } = await supabase.from('club_officers').select('*').eq('year_term', yearTerm)
+    districtByTerm.value = data ?? []
+  }
+
+  return { list, loading, fetchAll, insert, update, remove, fetchYearTerms, districtByTerm, fetchDistrictYearTerm }
 })

@@ -4,12 +4,38 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useClubStore } from '@/stores/club'
 import { useAccountsStore } from '@/stores/accounts'
+import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import type { Club } from '@/types'
 
 const auth = useAuthStore()
 const club = useClubStore()
 const accounts = useAccountsStore()
+const officers = useOfficersStore()
 const router = useRouter()
+
+// 社長/執秘優先顯示當前扶輪年度 club_officers 的資料（各社在「本社歷程」
+// 自己維護，換屆才會準），沒有當年度資料才 fallback 回 clubs.pres_name/
+// sec_name（Excel 匯入時期的靜態文字，換屆後沒人回頭改就會顯示舊社長——
+// 這正是使用者反映「社長資訊不對」的根因）。
+const currentOfficersByClub = computed(() => {
+  const map = new Map<string, { president?: string; secretary?: string }>()
+  for (const o of officers.districtByTerm) {
+    if (o.role !== 'president' && o.role !== 'secretary') continue
+    const entry = map.get(o.club_id) ?? {}
+    if (o.role === 'president') entry.president = o.name
+    else entry.secretary = o.name
+    map.set(o.club_id, entry)
+  }
+  return map
+})
+
+function clubPresName(c: Club) {
+  return currentOfficersByClub.value.get(c.id)?.president ?? c.pres_name
+}
+
+function clubSecName(c: Club) {
+  return currentOfficersByClub.value.get(c.id)?.secretary ?? c.sec_name
+}
 
 // 「通過審核」只看該社官方管理帳號（club_secretary/club_admin）是不是至少有一筆
 // 已啟用，不含一般社友——一般社友的審核狀態改看展開後的申請/核准清單即可。
@@ -156,6 +182,7 @@ async function save() {
 
 onMounted(async () => {
   await club.fetchAll()
+  await officers.fetchDistrictYearTerm(currentYearTerm())
   if (auth.isDistrictView) {
     accounts.setScope(null)
     await Promise.all([accounts.fetchManaged(), accounts.fetchPending(), accounts.fetchMembers()])
@@ -253,8 +280,8 @@ onMounted(async () => {
                 {{ c.name }}
               </td>
               <td data-label="分區">{{ c.zone }}</td>
-              <td data-label="社長">{{ c.pres_name || '-' }}</td>
-              <td data-label="執秘">{{ c.sec_name || '-' }}</td>
+              <td data-label="社長">{{ clubPresName(c) || '-' }}</td>
+              <td data-label="執秘">{{ clubSecName(c) || '-' }}</td>
               <td data-label="Email">{{ c.email || '-' }}</td>
               <td data-label="電話">{{ c.phone || '-' }}</td>
               <td v-if="auth.isDistrictView" data-label="審核狀態">
