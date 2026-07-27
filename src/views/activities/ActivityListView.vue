@@ -7,6 +7,7 @@ import { useRosterStore } from '@/stores/roster'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useFeaturesStore } from '@/stores/features'
 import { useToastStore } from '@/stores/toast'
+import { useActivityLogStore } from '@/stores/activityLog'
 import PageHelp from '@/components/help/PageHelp.vue'
 import type { Activity, ActivityCategory, ActivityInsert, ActivityStatus, MeetingInsert } from '@/types'
 
@@ -17,6 +18,7 @@ const rosterStore = useRosterStore()
 const permissions = usePermissionsStore()
 const features = useFeaturesStore()
 const toast = useToastStore()
+const activityLog = useActivityLogStore()
 
 const canManage = computed(() => permissions.can('activities', 'edit'))
 const canManageMeetings = computed(() => permissions.can('meetings', 'edit'))
@@ -177,11 +179,13 @@ async function save() {
       const { error } = await meetingsStore.update(editingMeetingId.value, meetingForm.value)
       saving.value = false
       if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+      await activityLog.log('meeting.update', `編輯例會「${meetingForm.value.title || ''}」（${meetingForm.value.date}）`, meetingForm.value.club_id)
     } else {
       const { data, error } = await meetingsStore.insert(meetingForm.value)
       saving.value = false
       if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
       newMeetingId = data?.id ?? null
+      await activityLog.log('meeting.create', `新增例會「${meetingForm.value.title || ''}」（${meetingForm.value.date}）`, meetingForm.value.club_id)
     }
   } else {
     if (!activityForm.value.title.trim() || !startLocal.value) { saving.value = false; return }
@@ -201,6 +205,11 @@ async function save() {
       : await activitiesStore.insert(payload)
     saving.value = false
     if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
+    await activityLog.log(
+      editingActivity.value ? 'activity.update' : 'activity.create',
+      `${editingActivity.value ? '編輯' : '新增'}活動「${payload.title}」（${payload.category}）`,
+      payload.organizing_club_id
+    )
   }
   showModal.value = false
   toast.show(isEditing.value ? '已更新' : '已新增')
@@ -228,6 +237,7 @@ async function removeMeeting(a: Activity) {
   const { error } = await meetingsStore.remove(a.meeting_id)
   if (error) { toast.show('刪除失敗：' + error.message, 'err'); return }
   toast.show('已刪除')
+  await activityLog.log('meeting.delete', `刪除例會「${a.title}」`, a.organizing_club_id)
   await loadActivities()
 }
 

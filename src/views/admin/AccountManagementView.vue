@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useInvitesStore } from '@/stores/invites'
 import { useAccountsStore } from '@/stores/accounts'
 import { useClubStore } from '@/stores/club'
+import { useActivityLogStore } from '@/stores/activityLog'
 import { suggestClubId as suggestClubIdFor } from '@/lib/clubMatch'
 import type { UserProfile, UserRole } from '@/types'
 
@@ -11,6 +12,7 @@ const auth = useAuthStore()
 const invites = useInvitesStore()
 const accounts = useAccountsStore()
 const club = useClubStore()
+const activityLog = useActivityLogStore()
 
 const isDistrictAdminView = computed(() => auth.isDistrictAdminView)
 const isClubTier = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
@@ -116,7 +118,8 @@ async function forwardPendingToClub(p: UserProfile) {
   const targetClubId = pendingClubChoice.value[p.id]
   if (!targetClubId) return
   const { error } = await accounts.forwardToClub(p.id, targetClubId)
-  if (error) alert(error.message)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.forward', `將「${p.name}」的申請轉交給「${clubName(targetClubId)}」審核`, targetClubId)
 }
 
 // 「扶輪社」申請（該社第一個管理帳號）：直接選社別＋角色（預設各社管理員）
@@ -125,35 +128,45 @@ async function forwardPendingToClub(p: UserProfile) {
 async function activateClubApplication(p: UserProfile) {
   const targetClubId = pendingClubChoice.value[p.id]
   if (!targetClubId) return
-  const { error } = await accounts.activatePending(p.id, pendingRoleChoice(p), targetClubId)
-  if (error) alert(error.message)
+  const role = pendingRoleChoice(p)
+  const { error } = await accounts.activatePending(p.id, role, targetClubId)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.approve_club', `核准「${p.name}」的社帳號申請，指派到「${clubName(targetClubId)}」，角色：${roleLabel(role)}`, targetClubId)
 }
 
 // 已經有 club_id 的待審列（該社自己審角色，或地區想直接接手完成）：
 // 維持原本的角色選擇＋一鍵啟動。
 async function activatePendingAccount(p: UserProfile) {
-  const { error } = await accounts.activatePending(p.id, pendingRoleChoice(p))
-  if (error) alert(error.message)
+  const role = pendingRoleChoice(p)
+  const { error } = await accounts.activatePending(p.id, role)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.approve', `核准「${p.name}」的帳號申請，角色：${roleLabel(role)}`, p.club_id)
 }
 
-async function toggleActive(id: string, current: boolean) {
-  await accounts.setActive(id, !current)
+async function toggleActive(a: UserProfile) {
+  const nextActive = !a.is_active
+  const { error } = await accounts.setActive(a.id, nextActive)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.toggle_active', `將「${a.name}」的帳號${nextActive ? '啟用' : '停用'}`, a.club_id)
 }
 
-async function resetMemberPassword(id: string, name: string) {
-  if (!confirm(`確定要把「${name}」的密碼重設回完整手機號碼嗎？`)) return
-  const { data, error } = await accounts.resetMemberPassword(id)
+async function resetMemberPassword(a: UserProfile) {
+  if (!confirm(`確定要把「${a.name}」的密碼重設回完整手機號碼嗎？`)) return
+  const { data, error } = await accounts.resetMemberPassword(a.id)
   if (error) {
     alert(error.message)
-  } else {
-    alert(`已重設，新密碼為「${data?.new_password}」`)
+    return
   }
+  alert(`已重設，新密碼為「${data?.new_password}」`)
+  await activityLog.log('account.reset_password', `重設「${a.name}」的密碼`, a.club_id)
 }
 
-async function changeDistrictRole(id: string, value: string) {
+async function changeDistrictRole(a: UserProfile, value: string) {
   const districtRole = value === 'view' || value === 'admin' ? value : null
-  const { error } = await accounts.setDistrictRole(id, districtRole)
-  if (error) alert(error.message)
+  const { error } = await accounts.setDistrictRole(a.id, districtRole)
+  if (error) { alert(error.message); return }
+  const label = districtRole ? districtRoleLabel(districtRole) : '無地區權限'
+  await activityLog.log('account.district_role', `調整「${a.name}」的地區權限為「${label}」`, null)
 }
 
 // 帳號總覽：各社管理員/一般社友合併成一張表，用同一個開關雙向切換
@@ -183,13 +196,15 @@ async function togglePermission(a: UserProfile) {
     : `確定要把「${a.name}」的權限從「編輯」改回「檢視」嗎？`
   if (!confirm(msg)) return
   const { error } = await accounts.approveRole(a.id, nextRole)
-  if (error) alert(error.message)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.role_change', `將「${a.name}」的權限改為「${roleLabel(nextRole)}」`, a.club_id)
 }
 
-async function removeAccount(id: string, name: string) {
-  if (!confirm(`確定要永久刪除「${name}」的帳號嗎？此動作無法復原，該 Email 之後可以重新邀請。`)) return
-  const { error } = await accounts.deleteAccount(id)
-  if (error) alert(error.message)
+async function removeAccount(a: UserProfile) {
+  if (!confirm(`確定要永久刪除「${a.name}」的帳號嗎？此動作無法復原，該 Email 之後可以重新邀請。`)) return
+  const { error } = await accounts.deleteAccount(a.id)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.delete', `永久刪除「${a.name}」的帳號`, a.club_id)
 }
 
 // 查詢範圍要跟著目前視角走：地區管理員即使 RLS 放行看全地區，
@@ -444,7 +459,7 @@ watch(isDistrictAdminView, loadAccounts)
                 role="switch"
                 :aria-checked="a.district_role === 'admin'"
                 aria-label="地區權限：檢視／編輯"
-                @click="changeDistrictRole(a.id, a.district_role === 'admin' ? 'view' : 'admin')"
+                @click="changeDistrictRole(a, a.district_role === 'admin' ? 'view' : 'admin')"
               >
                 <span class="track"><span class="knob"></span></span>
                 <span class="label">{{ a.district_role === 'admin' ? '編輯' : '檢視' }}</span>
@@ -465,13 +480,13 @@ watch(isDistrictAdminView, loadAccounts)
             <td data-label="狀態"><span class="bdg" :class="a.is_active ? 'b-gr' : 'b-g'">{{ a.is_active ? '啟用中' : '已停用' }}</span></td>
             <td>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button v-if="a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a.id, a.name)">
+                <button v-if="a.phone" class="btn btn-g btn-sm" @click="resetMemberPassword(a)">
                   重設密碼
                 </button>
-                <button class="btn btn-g btn-sm" @click="toggleActive(a.id, a.is_active)">
+                <button class="btn btn-g btn-sm" @click="toggleActive(a)">
                   {{ a.is_active ? '停用' : '啟用' }}
                 </button>
-                <button class="btn btn-red btn-sm" @click="removeAccount(a.id, a.name)">
+                <button class="btn btn-red btn-sm" @click="removeAccount(a)">
                   永久刪除
                 </button>
               </div>

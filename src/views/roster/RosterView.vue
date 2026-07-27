@@ -6,6 +6,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useFeaturesStore } from '@/stores/features'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
+import { useActivityLogStore } from '@/stores/activityLog'
 import PageHelp from '@/components/help/PageHelp.vue'
 import type {
   RosterMember,
@@ -21,6 +22,7 @@ const roster = useRosterStore()
 const features = useFeaturesStore()
 const permissions = usePermissionsStore()
 const officersStore = useOfficersStore()
+const activityLog = useActivityLogStore()
 const canManage = computed(() => permissions.can('roster', 'edit'))
 
 const rosterHelpItems = [
@@ -293,6 +295,7 @@ async function saveBulkEdit() {
 
   bulkSaving.value = true
   const original = new Map(roster.members.map(m => [m.id, m]))
+  let changedCount = 0
   for (const row of draftRows.value) {
     const before = original.get(row.id)
     if (!before) continue
@@ -304,12 +307,14 @@ async function saveBulkEdit() {
         bulkSaving.value = false
         return
       }
+      changedCount++
     }
   }
   await roster.fetchAll(auth.clubId)
   bulkSaving.value = false
   bulkEditing.value = false
   draftRows.value = []
+  if (changedCount) await activityLog.log('roster.bulk_update', `批次編輯社友名冊，共更新 ${changedCount} 筆`, auth.clubId)
 }
 
 const showModal = ref(false)
@@ -345,6 +350,7 @@ function openAdd() {
 async function save() {
   if (!form.value.name.trim()) return
   const payload = withDerivedStatus(form.value)
+  const isEditingMember = !!editing.value
   const { error } = editing.value
     ? await roster.update(editing.value.id, payload)
     : await roster.insert(payload)
@@ -354,6 +360,11 @@ async function save() {
   }
   showModal.value = false
   await roster.fetchAll(auth.clubId)
+  await activityLog.log(
+    isEditingMember ? 'roster.update' : 'roster.create',
+    `${isEditingMember ? '編輯' : '新增'}社友「${payload.name}」`,
+    auth.clubId
+  )
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -455,6 +466,8 @@ async function handleImport(e: Event) {
 async function confirmImport() {
   if (!importPreview.value.length || importing.value) return
   importing.value = true
+  let insertCount = 0
+  let updateCount = 0
   for (const item of importPreview.value) {
     const { error } = item.action === 'update' && item.existingId
       ? await roster.update(item.existingId, item.payload)
@@ -464,11 +477,14 @@ async function confirmImport() {
       importing.value = false
       return
     }
+    if (item.action === 'update') updateCount++
+    else insertCount++
   }
   await roster.fetchAll(auth.clubId)
   importing.value = false
   showImportPreview.value = false
   importPreview.value = []
+  await activityLog.log('roster.import', `透過 Excel 匯入社友名冊：新增 ${insertCount} 筆、更新 ${updateCount} 筆`, auth.clubId)
 }
 
 function downloadTemplate() {

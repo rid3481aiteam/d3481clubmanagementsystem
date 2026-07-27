@@ -3,11 +3,13 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
+import { useActivityLogStore } from '@/stores/activityLog'
 import type { ClubOfficer, ClubOfficerRole, RosterMember } from '@/types'
 
 const auth = useAuthStore()
 const roster = useRosterStore()
 const officers = useOfficersStore()
+const activityLog = useActivityLogStore()
 
 const canManage = computed(() => auth.role === 'club_admin' || auth.role === 'club_secretary')
 
@@ -264,6 +266,7 @@ async function saveSingleRoles() {
   await syncRosterAnnualPositions()
   saving.value = false
   editing.value = false
+  await activityLog.log('officers.update', `編輯本社 ${yearTerm.value} 年度的幹部名單`, auth.clubId)
   await load()
 }
 

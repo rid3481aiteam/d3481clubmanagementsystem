@@ -675,6 +675,17 @@ export interface KnowledgeArticle {
 
 export type KnowledgeArticleInsert = Omit<KnowledgeArticle, 'id' | 'created_at' | 'updated_at'>
 
+// ── 操作紀錄 ──────────────────────────────────────────
+export interface ActivityLogEntry {
+  id: string
+  actor_id: string | null
+  actor_name: string
+  club_id: string | null
+  action: string
+  description: string
+  created_at: string
+}
+
 // ── Pinia Store 型別 ──────────────────────────────────
 export interface AuthState {
   user: import('@supabase/supabase-js').User | null

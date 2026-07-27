@@ -251,6 +251,12 @@ const router = createRouter({
       meta: { roles: ['district_admin', 'club_secretary', 'club_admin'] },
     },
     {
+      path: '/club/activity-log',
+      name: 'activity-log',
+      component: () => import('@/views/admin/ActivityLogView.vue'),
+      meta: { roles: ['district_admin', 'club_secretary', 'club_admin'] },
+    },
+    {
       path: '/club/line-notify',
       name: 'club-line-notify',
       component: () => import('@/views/club/LineNotifyView.vue'),

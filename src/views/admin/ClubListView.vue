@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useClubStore } from '@/stores/club'
 import { useAccountsStore } from '@/stores/accounts'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
+import { useActivityLogStore } from '@/stores/activityLog'
 import { buildOfficersByClub, resolveClubLeaders } from '@/lib/clubOfficers'
 import type { Club } from '@/types'
 
@@ -12,6 +13,7 @@ const auth = useAuthStore()
 const club = useClubStore()
 const accounts = useAccountsStore()
 const officers = useOfficersStore()
+const activityLog = useActivityLogStore()
 const router = useRouter()
 
 // 社長/執秘同時看 clubs.pres_name/sec_name（「編輯社團」表單維護）跟
@@ -167,7 +169,10 @@ async function save() {
   if (!form.value.name?.trim() || !form.value.zone?.trim()) return
   const inZone = club.allClubs.filter(c => c.zone === form.value.zone)
   form.value.sort_order = inZone.length ? Math.max(...inZone.map(c => c.sort_order)) + 1 : 1
-  await club.upsertClub(form.value)
+  const { error } = await club.upsertClub(form.value)
+  if (error) { alert(error.message); return }
+  const created = club.allClubs.find(c => c.name === form.value.name && c.zone === form.value.zone)
+  await activityLog.log('club.create', `新增社團「${form.value.name}」`, created?.id ?? null)
   showModal.value = false
 }
 

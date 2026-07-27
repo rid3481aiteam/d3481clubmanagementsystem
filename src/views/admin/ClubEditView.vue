@@ -2,11 +2,13 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useClubStore } from '@/stores/club'
+import { useActivityLogStore } from '@/stores/activityLog'
 import type { Club } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const club = useClubStore()
+const activityLog = useActivityLogStore()
 
 const form = ref<Partial<Club>>({})
 const saving = ref(false)
@@ -20,9 +22,11 @@ async function load() {
 async function save() {
   if (!form.value.name?.trim() || !form.value.zone?.trim()) return
   saving.value = true
+  const clubId = form.value.id
   const { error } = await club.upsertClub(form.value)
   saving.value = false
   if (error) { alert(error.message); return }
+  await activityLog.log('club.edit', `編輯社團資料「${form.value.name}」`, clubId ?? null)
   router.push('/admin/clubs')
 }
 
@@ -37,8 +41,10 @@ async function removeClub() {
     ? `「${club.current.name}」已有 ${rosterCount} 筆社友名冊資料，刪除社團會一併清除該社的名冊／例會／出席紀錄，且無法復原。`
     : `「${club.current.name}」目前沒有任何名冊資料。`
   if (!confirm(`${warn}\n\n確定要刪除這個社團嗎？`)) return
+  const clubName = club.current.name
   const { error } = await club.deleteClub(club.current.id)
   if (error) { alert(error.message); return }
+  await activityLog.log('club.delete', `刪除社團「${clubName}」`, null)
   router.push('/admin/clubs')
 }
 

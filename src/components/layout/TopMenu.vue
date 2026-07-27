@@ -111,6 +111,7 @@ const navItems = computed<NavItem[]>(() => {
         { to: '/admin/features', icon: '⚙️', label: '功能開關' },
         { to: '/admin/permissions', icon: '🔐', label: '權限矩陣' },
         { to: '/admin/bug-reports', icon: '🐞', label: '錯誤回報' },
+        { to: '/club/activity-log', icon: '🕘', label: '操作紀錄' },
       ]
       if (features.isEnabled('M1_pending_account_notify')) {
         districtAdvancedItems.push({ to: '/admin/pending-notify', icon: '📧', label: '帳號審核 Email 通知設定（測試中）' })
@@ -179,6 +180,7 @@ const navItems = computed<NavItem[]>(() => {
     items.push({ type: 'divider' })
     const advancedItems: { to: string; icon: string; label: string; badge?: number }[] = [
       { to: '/club/invite', icon: '👤', label: '管理本社帳號', badge: accounts.pendingCount || undefined },
+      { to: '/club/activity-log', icon: '🕘', label: '操作紀錄' },
     ]
     if (features.isEnabled('J1_line_notify')) {
       advancedItems.push({ to: '/club/line-notify', icon: '💬', label: 'LINE 通知設定（測試中）' })
