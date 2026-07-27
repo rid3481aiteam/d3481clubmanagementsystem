@@ -57,9 +57,30 @@ function zoneRank(zone: string) {
   return i === -1 ? ZONE_ORDER.length : i
 }
 
+const searchKeyword = ref('')
+const searchZone = ref('')
+const isFiltering = computed(() => !!searchKeyword.value.trim() || !!searchZone.value)
+
+function clearSearch() {
+  searchKeyword.value = ''
+  searchZone.value = ''
+}
+
+const zoneOptions = computed(() => {
+  const zones = new Set(club.allClubs.map(c => c.zone || '未分區'))
+  return [...zones].sort((a, b) => zoneRank(a) - zoneRank(b) || a.localeCompare(b))
+})
+
+// 有輸入關鍵字/選分區時直接篩過 allClubs 再分組——分組完全沒有 hit 的
+// 區塊就整個不出現，不用特地顯示「0 社」的空分區標題列。
 const groupedClubs = computed(() => {
+  const keyword = searchKeyword.value.trim()
+  const filtered = club.allClubs.filter(c =>
+    (!searchZone.value || (c.zone || '未分區') === searchZone.value)
+    && (!keyword || c.name.includes(keyword))
+  )
   const groups = new Map<string, Club[]>()
-  for (const c of club.allClubs) {
+  for (const c of filtered) {
     const key = c.zone || '未分區'
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(c)
@@ -143,6 +164,21 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div class="tw" style="padding:16px; margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <div>
+        <label class="fl">搜尋社名</label>
+        <input v-model="searchKeyword" class="fi" placeholder="輸入社名關鍵字" style="min-width:200px;" />
+      </div>
+      <div>
+        <label class="fl">分區</label>
+        <select v-model="searchZone" class="fi" style="min-width:160px;">
+          <option value="">全部分區</option>
+          <option v-for="z in zoneOptions" :key="z" :value="z">{{ z }}</option>
+        </select>
+      </div>
+      <button v-if="isFiltering" class="btn btn-g btn-sm" @click="clearSearch">清除搜尋</button>
+    </div>
+
     <div class="tw">
       <table class="card-table">
         <thead class="th">
@@ -161,16 +197,16 @@ onMounted(async () => {
         <tbody v-for="g in groupedClubs" :key="g.zone">
           <tr class="zone-row" @click="toggleZone(g.zone)">
             <td :colspan="auth.isDistrictView ? 9 : 7">
-              <span class="zone-chevron">{{ collapsedZones.has(g.zone) ? '▸' : '▾' }}</span>
+              <span class="zone-chevron">{{ (!isFiltering && collapsedZones.has(g.zone)) ? '▸' : '▾' }}</span>
               <strong>{{ g.zone }}</strong>
               <span style="color:var(--muted); font-weight:400;">（{{ g.clubs.length }} 社）</span>
             </td>
           </tr>
-          <template v-if="!collapsedZones.has(g.zone)">
+          <template v-if="isFiltering || !collapsedZones.has(g.zone)">
             <template v-for="(c, i) in g.clubs" :key="c.id">
             <tr>
               <td data-label="社名">
-                <span v-if="auth.isDistrictAdminView" class="order-btns">
+                <span v-if="auth.isDistrictAdminView && !isFiltering" class="order-btns">
                   <button class="order-btn" :disabled="i === 0" @click="moveClub(g.clubs, i, -1)">▲</button>
                   <button class="order-btn" :disabled="i === g.clubs.length - 1" @click="moveClub(g.clubs, i, 1)">▼</button>
                 </span>
@@ -227,6 +263,11 @@ onMounted(async () => {
         <tbody v-if="!club.allClubs.length">
           <tr>
             <td :colspan="auth.isDistrictView ? 9 : 7" style="text-align:center; color:var(--muted);">尚無社團資料</td>
+          </tr>
+        </tbody>
+        <tbody v-else-if="!groupedClubs.length">
+          <tr>
+            <td :colspan="auth.isDistrictView ? 9 : 7" style="text-align:center; color:var(--muted);">找不到符合條件的社團</td>
           </tr>
         </tbody>
       </table>
