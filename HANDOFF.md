@@ -1,5 +1,19 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百二十一輪，**「授予地區工作人員權限」也補記到授權紀錄——待部署**）：上一輪修完「帳號審核」核准落差後，順便提到「地區工作人員」授權也沒被記錄，這輪使用者確認要一起補齊，先討論了架構（不要硬塞進現有 `role` enum、不要另開新 enum 值、也不用做到通用 jsonb log 那麼重），選定「加一個互斥的獨立欄位」。
+
+> **實作**：新增 [`066_invite_log_district_grant.sql`](supabase/migrations/066_invite_log_district_grant.sql)——`invite_log.role` 放寬成可為 NULL，新增 `district_role text CHECK (IN ('view','admin'))`，加一條 `CHECK ((role IS NOT NULL) <> (district_role IS NOT NULL))` 確保每筆紀錄剛好一種授權類型有值。[`invite-user`](supabase/functions/invite-user/index.ts) 的 `grant_type='district'` 分支補上 `invite_log` insert（這裡是單純 insert 到 `invite_log`，不像上一輪那個 update `user_profiles` 會撞到 `protect_user_profile_privileged_fields` trigger，繼续用 `adminClient` 沒問題，不用像上一輪那樣改用 `callerClient`）。[`invites.ts`](src/stores/invites.ts) 的 `InviteLogEntry` 型別跟著改（`role` 變 `UserRole | null`，新增 `district_role`），[`AccountManagementView.vue`](src/views/admin/AccountManagementView.vue) 新增 `districtRoleLabel()`，「授權紀錄」表格的「角色」欄改成 `i.district_role ? districtRoleLabel(...) : roleLabel(i.role!)` 分支顯示「地區工作人員（唯讀/編輯）」。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。Edge Function 本身沒有本機 Deno 可以型別檢查，比對既有函式（尤其上一輪剛改過的同一支）的寫法確認語法一致。
+
+> **待使用者部署（兩個都要，缺一不可）：**
+
+```bash
+supabase functions deploy invite-user
+```
+
+> 加上到 SQL Editor 執行 [`066_invite_log_district_grant.sql`](supabase/migrations/066_invite_log_district_grant.sql)（**在上一輪的 `065_log_pending_approval.sql` 之後**，如果那份還沒跑要先跑）。跑完後測一次「帳號權限授予」授予地區工作人員（唯讀或編輯都測一次），確認「授權紀錄」的「角色」欄正確顯示「地區工作人員（唯讀）」/「地區工作人員（編輯）」，「社團」欄顯示「3481地區辦公室」（`clubName(null)` 既有的 fallback，這條路徑 `club_id` 本來就是 NULL，不用另外處理）。
+
 > 最後更新：2026-07-27（第一百二十輪，**修掉「授權紀錄」看不到最新核准的落差——待部署**）：使用者反映帳號管理頁的「授權紀錄」只看得到之前的舊紀錄，最近用「帳號審核」核准的都沒進去。
 
 > **根因**：`invite_log` 這張表原本只在 [`invite-user`](supabase/functions/invite-user/index.ts) Edge Function 的 `grant_type='club'` 分支手動 insert 一筆（113 輪做的「帳號權限授予」功能）。但「帳號審核」表格的核准動作（`accounts.ts` 的 `activatePending()`，`activatePendingAccount()`／`activateClubApplication()` 都呼叫這個）完全是另一條路徑，直接 update `user_profiles.role`，從頭到尾都沒有寫進 `invite_log`——這是最常用的核准入口，卻是最沒被記錄的一個，是本來架構上的落差，不是這幾輪才生成的新 bug。
