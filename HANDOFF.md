@@ -1,5 +1,15 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百二十輪，**修掉「授權紀錄」看不到最新核准的落差——待部署**）：使用者反映帳號管理頁的「授權紀錄」只看得到之前的舊紀錄，最近用「帳號審核」核准的都沒進去。
+
+> **根因**：`invite_log` 這張表原本只在 [`invite-user`](supabase/functions/invite-user/index.ts) Edge Function 的 `grant_type='club'` 分支手動 insert 一筆（113 輪做的「帳號權限授予」功能）。但「帳號審核」表格的核准動作（`accounts.ts` 的 `activatePending()`，`activatePendingAccount()`／`activateClubApplication()` 都呼叫這個）完全是另一條路徑，直接 update `user_profiles.role`，從頭到尾都沒有寫進 `invite_log`——這是最常用的核准入口，卻是最沒被記錄的一個，是本來架構上的落差，不是這幾輪才生成的新 bug。
+
+> **修法**：新增 [`065_log_pending_approval.sql`](supabase/migrations/065_log_pending_approval.sql)，用 trigger 而不是在每個呼叫端各自補寫入邏輯（`activatePendingAccount`／`activateClubApplication` 分散在不同分支，各自加容易漏，這次的落差就是證明）。Trigger 認一個轉換：`OLD.requested_role` 有值、`NEW.requested_role` 被清空——這正是 `activatePending()` 唯一會做的事，不會誤觸「帳號總覽」單純切換權限（`approveRole`，這個路徑 `requested_role` 本來就是 NULL，不會誤判）。`SECURITY DEFINER` 跨 schema 查 `auth.users.email`（沿用 064 輪 `capture_club_notify_email` 一樣的手法）。**只往前生效，不回填歷史**——已經核准過的舊帳號沒有可靠的「核准當下」時間點可以回填（`updated_at` 會被其他操作一起更新，回填會失真，跟使用者說清楚就好，不用假裝補得回來）。
+
+> **待使用者：** 到 SQL Editor 執行 [`065_log_pending_approval.sql`](supabase/migrations/065_log_pending_approval.sql)（這台機器連不到 D3481 的 Supabase 專案，沒辦法自己跑）。跑完後找一筆待審核的申請人核准看看，「授權紀錄」應該馬上多一筆。
+
+> **順便發現、這輪沒有動的相關落差**：上一輪剛修好的「授予地區工作人員權限」（`invite-user` 的 `grant_type='district'` 分支）本身也沒有寫 `invite_log`——這條路徑改的是 `district_role`（view/admin），而 `invite_log.role` 欄位是 `user_role` 這個 enum（`district_admin`/`club_admin`/`club_secretary`/`club_member`），沒有對應「地區唯讀」這個值，直接塞會不準確，需要另外決定怎麼記（例如加一個獨立的 log 表，或是把 `role` 欄位放寬）。使用者這輪沒有反映這個，先不動，等之後真的要用再處理。
+
 > 最後更新：2026-07-27（第一百一十九輪，**社團總覽新增「已通過審核的社」KPI 卡**）：延續上上輪「申請中的社」KPI 卡的需求，使用者這輪要求同步加一張「已通過審核的社」，點下去顯示哪些社通過。[`ClubListView.vue`](src/views/admin/ClubListView.vue) 新增 `approvedClubs` computed（沿用既有「審核狀態」欄位同一套判斷：該社至少一筆啟用中的 `club_secretary`/`club_admin`），第二張 KPI 卡跟第一張並排（`c-green` 邊色），**點擊行為刻意跟第一張不一樣**——「申請中的社」點下去是導頁到帳號審核（因為那個審核動作有專屬頁面可以跳），「已通過審核的社」沒有對應的專屬頁面，改成點卡片原地展開/收合一個列出社名 chip 的清單（`showApprovedClubs` 布林 toggle）。兩張卡跟展開清單都還是包在 `auth.isDistrictAdminView`（沿用第一張卡的權限範圍，沒有另外放寬給地區唯讀角色）。
 
 > `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純前端，沒有 migration/Edge Function 改動。同樣沒有實機截圖驗證（這台機器沒有登入憑證）。
