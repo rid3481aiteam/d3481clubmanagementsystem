@@ -1,5 +1,9 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-27（第一百二十四輪，**「申請中的社」KPI 只算 3481 地區**）：使用者接著指出這張 KPI 卡應該只統計 3481 地區的申請人，不該把其他地區也算進去——SSO 是全區共用登入系統，`accounts.pending` 本來就會混到其他地區自稱的申請人（跟這幾輪一直提到的「帳號審核」頁「3481 地區／非 3481 地區」分組是同一個資料來源、同一個判斷條件）。[`ClubListView.vue`](src/views/admin/ClubListView.vue) 的 `clubAccountSummary` 在分組 `accounts.pending` 前先加一道過濾：`(p.sso_rotary_district ?? '').trim() !== '3481'` 就整筆跳過，不分是已經有 `club_id` 還是走 SSO 自稱社別分組那條路，兩種情況都套用同一個地區過濾。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純前端，不用部署，重新整理頁面就會生效。
+
 > 最後更新：2026-07-27（第一百二十三輪，**「申請中的社」KPI 改用 SSO 自稱社別直接分組，不再模糊比對**）：上一輪用模糊比對（`suggestClubId`）猜還沒指派 `club_id` 的申請人屬於哪個社，使用者馬上截圖回報同一個「台北老松社」申請案，「選擇社別」下拉根本沒有被自動帶入——代表比對沒中，KPI 卡又漏算了。使用者提出更簡單直接的做法：既然 SSO 資料本身就帶了自稱社別（甚至能判斷是不是「社帳號」申請），社團總覽的計算應該直接抓這個標籤來算，不用比對到既有社。
 
 > **改法**：[`ClubListView.vue`](src/views/admin/ClubListView.vue) 的 `clubAccountSummary` 拿掉 `suggestClubId` 模糊比對，`club_id` 是 NULL 的待審申請人改成直接用 `sso_rotary_club`（trim 過，空值 fallback「未填社別」）當一個獨立的分組 key（例如 `pending:台北老松社`），不嘗試對應到 `club.allClubs` 裡的哪一筆。`clubsWithPendingApplications` 跟著改成直接從整個 `clubAccountSummary` 的 values 裡篩 `pending.length > 0`，不再只篩 `club.allClubs`——這樣才抓得到這些「可能還沒登記過的全新社」。**點 KPI 卡片的行為沒有變**（本來就是導頁到帳號審核讓管理員手動處理，這輪只是把「算」的部分改簡單、改準）。順手把上一輪加的「（未指派，依自稱社別推測）」提示字清掉——新設計下這句話已經不會出現了（真實社的 `pending` 陣列現在只會收到 `club_id` 完全對得上的申請人）。
