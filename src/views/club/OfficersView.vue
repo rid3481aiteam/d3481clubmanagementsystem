@@ -473,9 +473,14 @@ watch(yearTerm, load)
             </div>
           </div>
           <label class="fl">勾選要加入這個職位的成員（可多選）</label>
-          <div style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin:8px 0 12px; border:1px solid var(--border); border-radius:var(--r); padding:10px;">
+          <p v-if="!newPrimaryPositionName.trim()" class="hint-warn">請先填寫上方的「職位名稱」，才能勾選成員</p>
+          <div
+            class="checkbox-grid"
+            :class="{ 'checkbox-grid-disabled': !newPrimaryPositionName.trim() }"
+            style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin:8px 0 12px; border:1px solid var(--border); border-radius:var(--r); padding:10px;"
+          >
             <label v-for="n in activeMemberKeys" :key="n" style="display:flex; align-items:center; gap:6px; font-size:13px;">
-              <input type="checkbox" :value="n" v-model="newPrimaryOfficerValues" />
+              <input type="checkbox" :value="n" v-model="newPrimaryOfficerValues" :disabled="!newPrimaryPositionName.trim()" />
               {{ memberOptionLabel(n) }}
             </label>
           </div>
@@ -565,9 +570,14 @@ watch(yearTerm, load)
         </div>
       </div>
       <label class="fl">勾選要加入這個委員會的成員（可多選）</label>
-      <div style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin:8px 0 12px; border:1px solid var(--border); border-radius:var(--r); padding:10px;">
+      <p v-if="!newCommitteeName.trim()" class="hint-warn">請先填寫上方的「委員會名稱」，才能勾選成員</p>
+      <div
+        class="checkbox-grid"
+        :class="{ 'checkbox-grid-disabled': !newCommitteeName.trim() }"
+        style="max-height:180px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin:8px 0 12px; border:1px solid var(--border); border-radius:var(--r); padding:10px;"
+      >
         <label v-for="n in activeMemberKeys" :key="n" style="display:flex; align-items:center; gap:6px; font-size:13px;">
-          <input type="checkbox" :value="n" v-model="newMemberValues" />
+          <input type="checkbox" :value="n" v-model="newMemberValues" :disabled="!newCommitteeName.trim()" />
           {{ memberOptionLabel(n) }}
         </label>
       </div>
@@ -610,5 +620,19 @@ watch(yearTerm, load)
   display: inline-block;
   width: 14px;
   color: var(--muted);
+}
+
+.hint-warn {
+  font-size: 12.5px;
+  color: #8a5800;
+  background: var(--gold-p);
+  border: 1px solid rgba(247, 168, 27, .35);
+  border-radius: var(--r);
+  padding: 6px 10px;
+  margin: 6px 0;
+}
+
+.checkbox-grid-disabled {
+  opacity: .55;
 }
 </style>
