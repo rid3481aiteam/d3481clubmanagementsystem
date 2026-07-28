@@ -188,6 +188,16 @@ async function provisionForwardToClub(p: SsoPendingAccount) {
   await activityLog.log('account.sso_provision_forward', `預先把「${p.name ?? p.email}」的 SSO 申請轉交給「${clubName(targetClubId)}」`, targetClubId)
 }
 
+// 整筆取消（測試/誤觸記錄卡住時可以直接清掉，或指派錯了整筆重來）。
+// 硬刪除但先跳確認——這張表只是登入前的暫存資料，不是稽核紀錄，
+// 刪掉後如果對方之後真的登入，會走原本「丟進待審核」的正常流程。
+async function dismissSsoPendingAccount(p: SsoPendingAccount) {
+  if (!confirm(`確定要取消「${p.name ?? p.email}」這筆 SSO 已核准申請嗎？取消後如果對方之後登入，會回到一般待審核流程。`)) return
+  const { error } = await accounts.dismissSsoPendingAccount(p.sso_sub)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.sso_dismiss', `取消「${p.name ?? p.email}」的 SSO 已核准待登入記錄`, null)
+}
+
 async function toggleActive(a: UserProfile) {
   const nextActive = !a.is_active
   const { error } = await accounts.setActive(a.id, nextActive)
@@ -424,45 +434,57 @@ watch(isDistrictAdminView, loadAccounts)
               <td data-label="扶輪地區">{{ p.rotary_district ?? '-' }}</td>
               <td data-label="扶輪身分別">{{ p.account_type ?? '-' }}</td>
               <td>
-                <span v-if="isSsoDistrictAdminType(p)" style="font-size:12px; color:var(--muted);">
-                  SSO 判定為地區管理員，登入後自動取得地區管理權限，不需指派社別
-                </span>
-                <div v-else-if="isSsoClubApplication(p)" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                  <select
-                    class="fi"
-                    :value="provisionClubChoice[p.sso_sub] ?? ''"
-                    style="min-width:160px; padding:6px 8px;"
-                    @change="provisionClubChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value"
-                  >
-                    <option value="" disabled>選擇社別</option>
-                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
-                  </select>
-                  <select
-                    class="fi"
-                    :value="provisionRoleChoice[p.sso_sub] ?? 'club_secretary'"
-                    style="min-width:110px; padding:6px 8px;"
-                    @change="provisionRoleChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value as 'club_secretary' | 'club_member'"
-                  >
-                    <option value="club_secretary">各社管理員</option>
-                    <option value="club_member">一般社友</option>
-                  </select>
-                  <button class="btn btn-gold btn-sm" :disabled="!provisionClubChoice[p.sso_sub]" @click="provisionClubApplication(p)">
-                    {{ p.provisioned_club_id ? '重新指派' : '指派' }}
-                  </button>
+                <div v-if="isSsoDistrictAdminType(p)" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                  <span style="font-size:12px; color:var(--muted);">
+                    SSO 判定為地區管理員，登入後自動取得地區管理權限，不需指派社別
+                  </span>
+                  <button class="btn btn-g btn-sm" @click="dismissSsoPendingAccount(p)">取消</button>
                 </div>
-                <div v-else style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                  <select
-                    class="fi"
-                    :value="provisionClubChoice[p.sso_sub] ?? ''"
-                    style="min-width:160px; padding:6px 8px;"
-                    @change="provisionClubChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value"
-                  >
-                    <option value="" disabled>選擇社別</option>
-                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
-                  </select>
-                  <button class="btn btn-gold btn-sm" :disabled="!provisionClubChoice[p.sso_sub]" @click="provisionForwardToClub(p)">
-                    {{ p.provisioned_club_id ? '重新轉交' : '轉交' }}
-                  </button>
+                <div v-else style="display:flex; flex-direction:column; gap:4px;">
+                  <p v-if="p.provisioned_club_id" style="font-size:12px; color:var(--green,#2a6b48); margin:0;">
+                    ✓ 已完成{{ isSsoClubApplication(p) ? '指派' : '轉交' }}：{{ clubName(p.provisioned_club_id) }}
+                    <template v-if="p.provisioned_role">（{{ roleLabel(p.provisioned_role) }}）</template>
+                    <template v-else>（等該社決定角色）</template>
+                  </p>
+                  <div v-if="isSsoClubApplication(p)" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <select
+                      class="fi"
+                      :value="provisionClubChoice[p.sso_sub] ?? ''"
+                      style="min-width:160px; padding:6px 8px;"
+                      @change="provisionClubChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value"
+                    >
+                      <option value="" disabled>選擇社別</option>
+                      <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                    <select
+                      class="fi"
+                      :value="provisionRoleChoice[p.sso_sub] ?? 'club_secretary'"
+                      style="min-width:110px; padding:6px 8px;"
+                      @change="provisionRoleChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value as 'club_secretary' | 'club_member'"
+                    >
+                      <option value="club_secretary">各社管理員</option>
+                      <option value="club_member">一般社友</option>
+                    </select>
+                    <button class="btn btn-gold btn-sm" :disabled="!provisionClubChoice[p.sso_sub]" @click="provisionClubApplication(p)">
+                      {{ p.provisioned_club_id ? '重新指派' : '指派' }}
+                    </button>
+                    <button class="btn btn-g btn-sm" @click="dismissSsoPendingAccount(p)">取消</button>
+                  </div>
+                  <div v-else style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <select
+                      class="fi"
+                      :value="provisionClubChoice[p.sso_sub] ?? ''"
+                      style="min-width:160px; padding:6px 8px;"
+                      @change="provisionClubChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value"
+                    >
+                      <option value="" disabled>選擇社別</option>
+                      <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                    <button class="btn btn-gold btn-sm" :disabled="!provisionClubChoice[p.sso_sub]" @click="provisionForwardToClub(p)">
+                      {{ p.provisioned_club_id ? '重新轉交' : '轉交' }}
+                    </button>
+                    <button class="btn btn-g btn-sm" @click="dismissSsoPendingAccount(p)">取消</button>
+                  </div>
                 </div>
               </td>
             </tr>

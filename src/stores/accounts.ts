@@ -163,6 +163,18 @@ export const useAccountsStore = defineStore('accounts', () => {
     return { error }
   }
 
+  // 整筆移除一個 SSO 已核准、尚未登入的申請（071 migration）：不管有沒有
+  // 指派過社別都能取消，卡住的測試/誤觸記錄可以直接清掉。刪掉後如果
+  // 這個人之後真的登入，會走原本「club_id 留空丟進待審核」的正常流程。
+  async function dismissSsoPendingAccount(sub: string) {
+    const { error } = await supabase
+      .from('sso_pending_account')
+      .delete()
+      .eq('sso_sub', sub)
+    if (!error) ssoApprovedWaiting.value = ssoApprovedWaiting.value.filter(p => p.sso_sub !== sub)
+    return { error }
+  }
+
   async function dismissPending(id: string) {
     const { error } = await supabase
       .from('user_profiles')
@@ -304,7 +316,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     managed, pending, pendingCount, members, collaborators, ssoApprovedWaiting, loading,
     setScope,
     fetchManaged, fetchPending, fetchPendingCount, approveRole, activatePending, forwardToClub, dismissPending,
-    fetchSsoApprovedWaiting, provisionSsoPendingAccount,
+    fetchSsoApprovedWaiting, provisionSsoPendingAccount, dismissSsoPendingAccount,
     fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictRole, deleteAccount,
     fetchClubCollaborators, updateCollaboratorRole, revokeCollaborator,

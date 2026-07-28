@@ -1,6 +1,20 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-28（第一百四十一輪，**SSO 已核准的申請人可在登入前就先指派社別/角色——待部署**）：接續上一輪部署測試，使用者實測發現：即使 SSO 核准、webhook 也正確收到資料，這個人在「帳號審核」還是完全看不到，因為 D3481 只有等對方真的登入過一次才會建立 `user_profiles`。使用者提出明確需求：希望地區管理員能在對方登入之前就先看到 SSO 已核准的申請、先指派好社別/角色，讓對方第一次登入就直接可用，不用再卡一次待審核。
+> 最後更新：2026-07-28（第一百四十二輪，**「SSO 已核准，尚未登入」清單補上完成狀態與取消——待部署**）：使用者實測上一輪功能，回報兩個問題：①按下「轉交」後畫面沒有明顯變化，不確定有沒有送出成功；②先前測試留下的記錄（`erichuang@wowcasa.com.tw`，「SSO測試中」那筆）一直卡在清單裡，沒有辦法清掉。
+
+> **[071_sso_pending_dismiss.sql](supabase/migrations/071_sso_pending_dismiss.sql)**：新增 DELETE policy，讓地區管理員可以整筆刪除 `sso_pending_account` 的記錄。刪除這張表是安全的——它只是登入前的暫存資料不是稽核紀錄，之後如果這個人真的登入，查無記錄就會走原本「`club_id` 留空丟進待審核」的正常流程，不會出錯（對應規格文件 7.2 節「孤兒記錄可以刪除」的既有結論，這裡只是提前讓地區管理員手動觸發，不用等 180 天自動清理）。
+
+> **UI**：[AccountManagementView.vue](src/views/admin/AccountManagementView.vue)「SSO 已核准，尚未登入」每一列都新增「取消」按鈕（呼叫新的 `dismissSsoPendingAccount()`，跳 `confirm()` 二次確認再刪除，符合「硬刪除+二次確認」慣例）——不管有沒有指派過都能取消，直接解決卡住的測試記錄問題。指派/轉交成功後，`provisioned_club_id` 有值時會在操作區上方多一行綠色狀態文字「✓ 已完成指派/轉交：OO社（角色／等該社決定角色）」，取代原本只靠按鈕文字從「指派」變「重新指派」這種不明顯的提示。[accounts.ts](src/stores/accounts.ts) 新增 `dismissSsoPendingAccount()`。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純資料庫 policy＋前端調整，沒有動到 Edge Function，風險低。
+
+> **待使用者部署：**
+> 1. SQL Editor 執行 [071_sso_pending_dismiss.sql](supabase/migrations/071_sso_pending_dismiss.sql)
+> 2. 前端照常走 Cloudflare 部署流程
+
+> 部署完成後：先用「取消」把卡住的 `erichuang@wowcasa.com.tw` 測試記錄清掉；之後再測試一次指派/轉交，確認按下後畫面立刻出現綠色「✓ 已完成…」的狀態文字。
+
+> 最後更新（上一輪）：2026-07-28（第一百四十一輪，**SSO 已核准的申請人可在登入前就先指派社別/角色——待部署**）：接續上一輪部署測試，使用者實測發現：即使 SSO 核准、webhook 也正確收到資料，這個人在「帳號審核」還是完全看不到，因為 D3481 只有等對方真的登入過一次才會建立 `user_profiles`。使用者提出明確需求：希望地區管理員能在對方登入之前就先看到 SSO 已核准的申請、先指派好社別/角色，讓對方第一次登入就直接可用，不用再卡一次待審核。
 
 > **確認現況（不用改）**：SSO 帳戶類型是「管理者」的人，登入當下就會自動拿到地區管理員權限（`districtRolePatch`／`handle_new_user()` trigger 本來就會處理），不受 `club_id` 是否為空限制（`isPendingApproval` 明確排除地區管理員）——這部分本來就符合使用者要的效果，這輪沒有改動。缺口只在一般社友／社帳號申請人。
 
