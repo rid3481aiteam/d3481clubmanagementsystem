@@ -1,5 +1,15 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-28（第一百四十四輪，**操作紀錄改成真的最多保留 30 天，超過自動清除——待部署**）：延續上一輪（143）「先確認保留7天是不是只是畫面篩選」的討論，使用者接著問「以目前 Supabase 後台規模，如果所有社都上傳資料（含操作紀錄）撐得住嗎」——確認是免費方案（500MB 上限、超過一週無連線會自動暫停、無每日備份）後，我原本擔心的知識庫、自動暫停兩點被使用者指正：知識庫由地區統一維護不是各社自己上傳、全區共用系統不太可能真的一週沒人連線，這兩個風險比我原本判斷的小。**但操作紀錄本身持續累積這件事沒有被反駁**，使用者最後決定：「應該定義，操作紀錄最多就是保留30天而已」——這次是真的要資料庫刪除，不是像上一輪那樣的畫面篩選。
+
+> **[`072_activity_log_retention.sql`](supabase/migrations/072_activity_log_retention.sql)**：`AFTER INSERT` 的 statement-level trigger（`purge_old_activity_log()`），每次 `log_activity()` 寫入後順便清掉 `created_at` 超過 30 天的紀錄。**刻意不用 pg_cron**——要另外啟用 extension，免費方案支不支援不確定，用 trigger 綁在既有的寫入路徑上更保險、不依賴額外的排程機制。`FOR EACH STATEMENT` 而不是 `FOR EACH ROW`：`log_activity()` 一次只插入一筆，语意上這是「維護性掃除」不是「處理這一筆的內容」，用 statement-level 更精確，如果之後有地方改成批次寫入也不會重複觸發清除。**編號原本想接著上一輪的 069，但這次又跟並行 session 推上來的 `069_sso_account_notifications.sql` 撞號**（這個 repo 現在同時有兩個 session 在推進度已經是常態，每次 push 前都要重新 `ls migrations` 確認最新編號)，改成 072（070/071 也已經被對方用掉）。
+
+> **前端同步調整**：[`ActivityLogView.vue`](src/views/admin/ActivityLogView.vue) 拿掉「顯示範圍」下拉選單裡的「全部」選項——30 天以前的資料現在真的會被刪掉，留著這個選項只會讓使用者以為系統留著更久的紀錄、查不到還以為是 bug。文案改成明確講「系統只保留最近 30 天的紀錄，超過會自動清除，請盡量在事情發生後盡快查閱」。[`activityLog.ts`](src/stores/activityLog.ts) 的 `fetchLog()` 註解同步更新，講清楚 `sinceDays` 這個畫面篩選跟資料庫真正的 30 天保留是兩個獨立機制，`sinceDays` 傳大於 30 也查不到已經被清掉的資料。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。
+
+> **待使用者：** 到 SQL Editor 執行 [`072_activity_log_retention.sql`](supabase/migrations/072_activity_log_retention.sql)（需在 068 之後，跟並行 session 的 069/070/071 系列順序無關，彼此互不影響）。這個 migration 生效後不會馬上看到清除效果（要等超過 30 天的紀錄真的出現才會被清掉），沒有需要特別驗證的操作，正常運作即可。
+
 > 最後更新：2026-07-28（第一百四十三輪，**操作紀錄畫面預設只顯示最近 7 天**）：延續第一百三十六輪新增的「操作紀錄」功能，使用者問「log 紀錄可以保留 7 天嗎」，先確認過使用者要的是**畫面預設篩選**（不是資料庫自動清除，怕真的限制成 7 天保留會跟這個功能本身「事後追查是誰改的」的目的互相衝突——很多問題都是超過一週才被發現）。
 
 > **改法**：[`activityLog.ts`](src/stores/activityLog.ts) 的 `fetchLog()` 新增 `sinceDays` 參數（預設 7），用 `created_at >= now() - sinceDays 天` 過濾，`sinceDays` 傳 `null` 代表不過濾（全部）。[`ActivityLogView.vue`](src/views/admin/ActivityLogView.vue) 新增「顯示範圍」下拉選單（最近 7 天／最近 30 天／全部），預設「最近 7 天」，切換會重新查詢。**資料庫本身完全沒有任何刪除/過期機制**，只是畫面預設篩選，選「全部」隨時查得到最早的紀錄。
