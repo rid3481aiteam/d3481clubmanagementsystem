@@ -31,6 +31,24 @@ export interface UserProfile {
   updated_at: string
 }
 
+// SSO 已核准、但這個人還沒登入過 D3481（user_profiles 裡還沒有對應列）。
+// 地區管理員可以在這個階段就先指派社別/角色（見 070 migration），
+// 使用者第一次登入時會直接套用，不用再卡一次待審核。
+export interface SsoPendingAccount {
+  sso_sub: string
+  status: 'registered' | 'approved' | 'rejected'
+  email: string
+  name: string | null
+  rotary_district: string | null
+  rotary_club: string | null
+  account_type: string | null
+  provisioned_club_id: string | null
+  provisioned_role: 'club_secretary' | 'club_member' | null
+  provisioned_at: string | null
+  consumed_at: string | null
+  last_occurred_at: string
+}
+
 // 跨社協作授權：某人 home club 之外，被額外授權管理的社
 export interface UserClubRole {
   user_id: string

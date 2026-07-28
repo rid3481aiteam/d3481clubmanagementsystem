@@ -6,7 +6,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useClubStore } from '@/stores/club'
 import { useActivityLogStore } from '@/stores/activityLog'
 import { suggestClubId as suggestClubIdFor } from '@/lib/clubMatch'
-import type { UserProfile, UserRole } from '@/types'
+import type { UserProfile, UserRole, SsoPendingAccount } from '@/types'
 
 const auth = useAuthStore()
 const invites = useInvitesStore()
@@ -143,6 +143,51 @@ async function activatePendingAccount(p: UserProfile) {
   await activityLog.log('account.approve', `核准「${p.name}」的帳號申請，角色：${roleLabel(role)}`, p.club_id)
 }
 
+// SSO 已核准、尚未登入 D3481 的申請人：地區管理員可以先指派社別/角色，
+// 使用者之後第一次登入就直接是已核准狀態，不用再走一次待審核
+// （070 migration）。只有地區視角能看到／操作，跟 RLS 的
+// is_district_admin() 限制一致。
+const provisionClubChoice = ref<Record<string, string>>({})
+const provisionRoleChoice = ref<Record<string, 'club_secretary' | 'club_member'>>({})
+
+function isSsoClubApplication(p: SsoPendingAccount) {
+  return p.account_type === '扶輪社'
+}
+
+function isSsoDistrictAdminType(p: SsoPendingAccount) {
+  return p.account_type === '管理者'
+}
+
+watch(() => accounts.ssoApprovedWaiting, (list) => {
+  for (const p of list) {
+    if (provisionClubChoice.value[p.sso_sub]) continue
+    const guess = suggestClubIdFor(p.rotary_club, club.allClubs)
+    if (guess) provisionClubChoice.value[p.sso_sub] = guess
+  }
+}, { immediate: true })
+
+// 「扶輪社」申請（社帳號）：地區直接指派社別＋角色，登入即可用，
+// 對應 sso-login case 3 裡 provisioned_role 有值的分支。
+async function provisionClubApplication(p: SsoPendingAccount) {
+  const targetClubId = provisionClubChoice.value[p.sso_sub]
+  if (!targetClubId) return
+  const role = provisionRoleChoice.value[p.sso_sub] ?? 'club_secretary'
+  const { error } = await accounts.provisionSsoPendingAccount(p.sso_sub, targetClubId, role)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.sso_provision_club', `預先指派「${p.name ?? p.email}」的 SSO 社帳號申請到「${clubName(targetClubId)}」，角色：${roleLabel(role)}`, targetClubId)
+}
+
+// 「扶輪社友」申請（一般社友）：地區只轉交社別，角色留給該社決定，
+// 對應 sso-login case 3 裡只有 provisioned_club_id 的分支
+// （等同現有 forwardToClub 的效果，只是提前到登入前執行）。
+async function provisionForwardToClub(p: SsoPendingAccount) {
+  const targetClubId = provisionClubChoice.value[p.sso_sub]
+  if (!targetClubId) return
+  const { error } = await accounts.provisionSsoPendingAccount(p.sso_sub, targetClubId, null)
+  if (error) { alert(error.message); return }
+  await activityLog.log('account.sso_provision_forward', `預先把「${p.name ?? p.email}」的 SSO 申請轉交給「${clubName(targetClubId)}」`, targetClubId)
+}
+
 async function toggleActive(a: UserProfile) {
   const nextActive = !a.is_active
   const { error } = await accounts.setActive(a.id, nextActive)
@@ -215,6 +260,7 @@ async function loadAccounts() {
   accounts.setScope(scopeClubId)
   await accounts.fetchManaged()
   if (canManagePending.value) await accounts.fetchPending()
+  if (isDistrictAdminView.value) await accounts.fetchSsoApprovedWaiting()
   await accounts.fetchMembers()
   await invites.fetchLog(scopeClubId)
 }
@@ -350,6 +396,79 @@ watch(isDistrictAdminView, loadAccounts)
         </tbody>
       </table>
     </div>
+    </template>
+
+    <template v-if="isDistrictAdminView && accounts.ssoApprovedWaiting.length">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">SSO 已核准，尚未登入</h2>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">
+        這些人已經在 RotarySSO 通過核准，但還沒登入過本平台。可以先指派社別/角色，對方之後第一次登入就會直接生效，不用再等一次待審核。
+      </p>
+      <div class="tw" style="margin-bottom:24px;">
+        <table class="card-table">
+          <thead class="th">
+            <tr>
+              <th>姓名</th>
+              <th>扶輪社</th>
+              <th>扶輪地區</th>
+              <th>扶輪身分別</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in accounts.ssoApprovedWaiting" :key="p.sso_sub">
+              <td data-label="姓名">
+                {{ p.name ?? p.email }}
+                <span v-if="isSsoClubApplication(p)" class="bdg b-n" style="margin-left:6px;">社帳號</span>
+              </td>
+              <td data-label="扶輪社">{{ p.rotary_club ?? '-' }}</td>
+              <td data-label="扶輪地區">{{ p.rotary_district ?? '-' }}</td>
+              <td data-label="扶輪身分別">{{ p.account_type ?? '-' }}</td>
+              <td>
+                <span v-if="isSsoDistrictAdminType(p)" style="font-size:12px; color:var(--muted);">
+                  SSO 判定為地區管理員，登入後自動取得地區管理權限，不需指派社別
+                </span>
+                <div v-else-if="isSsoClubApplication(p)" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <select
+                    class="fi"
+                    :value="provisionClubChoice[p.sso_sub] ?? ''"
+                    style="min-width:160px; padding:6px 8px;"
+                    @change="provisionClubChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value"
+                  >
+                    <option value="" disabled>選擇社別</option>
+                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                  <select
+                    class="fi"
+                    :value="provisionRoleChoice[p.sso_sub] ?? 'club_secretary'"
+                    style="min-width:110px; padding:6px 8px;"
+                    @change="provisionRoleChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value as 'club_secretary' | 'club_member'"
+                  >
+                    <option value="club_secretary">各社管理員</option>
+                    <option value="club_member">一般社友</option>
+                  </select>
+                  <button class="btn btn-gold btn-sm" :disabled="!provisionClubChoice[p.sso_sub]" @click="provisionClubApplication(p)">
+                    {{ p.provisioned_club_id ? '重新指派' : '指派' }}
+                  </button>
+                </div>
+                <div v-else style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <select
+                    class="fi"
+                    :value="provisionClubChoice[p.sso_sub] ?? ''"
+                    style="min-width:160px; padding:6px 8px;"
+                    @change="provisionClubChoice[p.sso_sub] = ($event.target as HTMLSelectElement).value"
+                  >
+                    <option value="" disabled>選擇社別</option>
+                    <option v-for="c in club.allClubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                  <button class="btn btn-gold btn-sm" :disabled="!provisionClubChoice[p.sso_sub]" @click="provisionForwardToClub(p)">
+                    {{ p.provisioned_club_id ? '重新轉交' : '轉交' }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </template>
 
     <template v-if="canManagePending">

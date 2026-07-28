@@ -237,6 +237,16 @@ Deno.serve(async (req) => {
     ? { district_role: 'admin' }
     : {}
 
+  // 070 migration：查一次 SSO 帳戶事件通知留下的核准記錄，全新帳號分支
+  // 建立當下（見下方 case 3）跟登入後套用資料（見下方 6.1 節區塊）都會
+  // 用到，只查一次共用，避免重複打兩次一樣的查詢。
+  const { data: pendingAccount } = await adminClient
+    .from('sso_pending_account')
+    .select('status, consumed_at, rotary_district, rotary_club, account_type, provisioned_club_id, provisioned_role')
+    .eq('sso_sub', info.sub)
+    .maybeSingle()
+  const isApproved = pendingAccount?.status === 'approved'
+
   // 1. 這個 sso_sub 之前登入過，已經連結過本地帳號
   const { data: linkedProfile } = await adminClient
     .from('user_profiles')
@@ -283,8 +293,25 @@ Deno.serve(async (req) => {
         .eq('id', targetUserId)
       if (error) return errorResponse(error.message, 500)
     } else {
-      // 3. 全新帳號：club_id 一律留空，交給地區管理員在「帳號管理」頁
+      // 3. 全新帳號：預設 club_id 留空，交給地區管理員在「帳號管理」頁
       // 手動指派社別，不自動用 rotary_club 文字比對 clubs.name。
+      //
+      // 但如果地區管理員已經在「SSO 已核准，尚未登入」清單裡預先指派過
+      // （070 migration），這裡直接套用，讓使用者第一次登入就是已核准
+      // 狀態，不用再卡一次待審核：
+      //   - provisioned_role 有值（社帳號申請，地區直接決定角色）：
+      //     club_id／role 都直接帶進去，登入即可用。
+      //   - 只有 provisioned_club_id、沒有 provisioned_role（社友申請，
+      //     只轉交社別）：club_id 帶進去、requested_role 設
+      //     'club_member'，效果等同 forwardToClub()，該社仍需要自己在
+      //     「帳號審核」按「啟動」決定最終角色——這是刻意保留的人工關卡。
+      const hasProvisioning = isApproved && !!pendingAccount?.provisioned_club_id
+      const provisioning: Record<string, unknown> = hasProvisioning
+        ? pendingAccount!.provisioned_role
+          ? { club_id: pendingAccount!.provisioned_club_id, role: pendingAccount!.provisioned_role }
+          : { club_id: pendingAccount!.provisioned_club_id, requested_role: 'club_member' }
+        : {}
+
       const { data: created, error } = await adminClient.auth.admin.createUser({
         email: info.email,
         email_confirm: true,
@@ -294,6 +321,7 @@ Deno.serve(async (req) => {
           sso_account_type: info.account_type,
           sso_rotary_club: info.rotary_club,
           sso_rotary_district: info.rotary_district,
+          ...provisioning,
         },
       })
       if (error) {
@@ -304,30 +332,29 @@ Deno.serve(async (req) => {
       }
       targetUserId = created.user.id
 
-      try {
-        await notifyDistrictAdminsOfPendingAccount(adminClient, info)
-      } catch (notifyErr) {
-        console.error('notifyDistrictAdminsOfPendingAccount failed:', notifyErr)
+      // 地區管理員已經預先指派過社別的話，代表這筆不再需要地區關注
+      // （該做的判斷已經做完），不用再發「有人在等審核」的信。
+      if (!hasProvisioning) {
+        try {
+          await notifyDistrictAdminsOfPendingAccount(adminClient, info)
+        } catch (notifyErr) {
+          console.error('notifyDistrictAdminsOfPendingAccount failed:', notifyErr)
+        }
       }
     }
   }
 
-  // 6.1 節：查 SSO 帳戶事件通知留下的核准記錄，若已核准且尚未套用過，
-  // 把「已通過 SSO 管理者查驗」的扶輪社／地區／身分別資料覆蓋進
-  // user_profiles，並標記已套用。只補資訊欄位，不動 club_id／role——
-  // 那兩個仍走既有的人工比對社別流程（見 069 migration 說明）。每次
-  // 登入都查，但 consumed_at 有值時是單純查詢不會真的動到資料，所以
-  // case 1/2/3 三種情況都適用同一段邏輯，不用各自處理。失敗不能擋到
-  // 使用者本人的登入，比照 notifyDistrictAdminsOfPendingAccount 整包
-  // 包在 try/catch 裡。
+  // 6.1 節：若已核准且尚未套用過，把「已通過 SSO 管理者查驗」的扶輪社／
+  // 地區／身分別資料覆蓋進 user_profiles，並標記已套用（pendingAccount
+  // 沿用檔案前段已經查過的那次結果，不用再查一次）。只補資訊欄位，
+  // club_id／role 的指派已經在上面 case 3 分支處理過（有預先指派就直接
+  // 套用，沒有就維持既有人工比對流程，見 069／070 migration 說明）。
+  // 每次登入都查，但 consumed_at 有值時是單純查詢不會真的動到資料，
+  // 所以 case 1/2/3 三種情況都適用同一段邏輯。失敗不能擋到使用者本人
+  // 的登入，比照 notifyDistrictAdminsOfPendingAccount 整包包在
+  // try/catch 裡。
   try {
-    const { data: pendingAccount } = await adminClient
-      .from('sso_pending_account')
-      .select('status, consumed_at, rotary_district, rotary_club, account_type')
-      .eq('sso_sub', info.sub)
-      .maybeSingle()
-
-    if (pendingAccount?.status === 'approved' && !pendingAccount.consumed_at) {
+    if (isApproved && pendingAccount && !pendingAccount.consumed_at) {
       const appliedAt = new Date().toISOString()
       const { error: verifyError } = await adminClient
         .from('user_profiles')

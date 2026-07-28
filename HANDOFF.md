@@ -1,6 +1,27 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-07-28（第一百四十輪，**編輯名冊表格加上凍結表頭＋凍結前三欄，捲動只發生在表格內**）：延續上一輪加寬表格後，使用者進一步要求「表格內容超出畫面時用捲軸查看，盡量減少整個畫面移動,同時考量標題固定欄位（表頭固定）以及第一列固定（凍結欄）」。做法比照 Excel 凍結窗格：在 [`RosterView.vue`](src/views/roster/RosterView.vue) 編輯名冊的表格外層多掛 `roster-edit-wrap` class，桌面版（`min-width:701px`，手機走 card-table 版型不受影響）給這個容器設 `max-height: calc(100vh - 320px)` 自己出垂直捲軸，`thead th` 用 `position:sticky; top:0` 固定表頭，`col-index`/`col-english`/`col-name`（項次/英文名稱/中文姓名）三欄用 `position:sticky` 搭配累加的 `left` 值（0/56px/166px，這三欄本來就有寫死的固定寬度，才能精準算出偏移量）凍結在左側，往右捲動時使用者仍看得出「這是哪一列」。因為本機一樣沒有這個專案的 Supabase 存取權限，改用還原相同 CSS＋20 筆假資料的靜態頁面驗證：往下捲動確認表頭列不動、往右捲動確認前三欄不動、且外層工具列全程沒有跟著移動（捲動完全侷限在表格自己的捲軸內）。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純前端 CSS/class 調整，不需要使用者額外部署步驟。**如果之後其他頁面的表格也遇到同樣「內容太多要捲很遠」的問題，可以比照這個 `roster-edit-wrap` 的寫法（sticky 表頭＋sticky 前幾欄＋容器 max-height）另外接一份，不建議直接把這組規則搬到全站共用的 `.tw`／`table` 樣式，因為不是每個表格都有「項次/英文名稱/中文姓名」這種固定寬度的識別欄位，硬套會需要逐頁調整 left 偏移量。**
+> 最後更新：2026-07-28（第一百四十一輪，**SSO 已核准的申請人可在登入前就先指派社別/角色——待部署**）：接續上一輪部署測試，使用者實測發現：即使 SSO 核准、webhook 也正確收到資料，這個人在「帳號審核」還是完全看不到，因為 D3481 只有等對方真的登入過一次才會建立 `user_profiles`。使用者提出明確需求：希望地區管理員能在對方登入之前就先看到 SSO 已核准的申請、先指派好社別/角色，讓對方第一次登入就直接可用，不用再卡一次待審核。
+
+> **確認現況（不用改）**：SSO 帳戶類型是「管理者」的人，登入當下就會自動拿到地區管理員權限（`districtRolePatch`／`handle_new_user()` trigger 本來就會處理），不受 `club_id` 是否為空限制（`isPendingApproval` 明確排除地區管理員）——這部分本來就符合使用者要的效果，這輪沒有改動。缺口只在一般社友／社帳號申請人。
+
+> **[070_sso_pending_provisioning.sql](supabase/migrations/070_sso_pending_provisioning.sql)**：`sso_pending_account` 新增 `provisioned_club_id`／`provisioned_role`（限 club_secretary/club_member）／`provisioned_at`，並開放地區管理員（`is_district_admin()`）直接 UPDATE 這張表（原本只有 service role 能寫）。
+
+> **[sso-login](supabase/functions/sso-login/index.ts)**：case 3（全新帳號）建立時，先查一次 `sso_pending_account`（跟既有 6.1 節區塊共用同一次查詢結果，不重複查），如果地區管理員已經預先指派過：
+> - 有指派角色（社帳號申請，地區直接決定）：`club_id`／`role` 都直接帶進 `user_metadata`，登入當下就是完全生效的帳號。
+> - 只指派社別、沒指派角色（一般社友申請，只轉交）：`club_id` 帶進去、`requested_role` 設 `club_member`，效果等同現有 `forwardToClub()`，登入後該社仍需要自己按「啟動」決定最終角色——**這是刻意保留的人工關卡，不是漏做**，對應使用者原話「或是直接手動分配到各社由各社進行權限編輯」這條路徑。沒有預先指派的話，維持原本行為（`club_id` 留空丟進待審核）。已預先指派的案子，建立帳號後不再寄「有人在等審核」的信給地區（該做的判斷已經做完）。
+
+> **UI**：[AccountManagementView.vue](src/views/admin/AccountManagementView.vue) 帳號審核上方新增「SSO 已核准，尚未登入」區塊（只有地區視角看得到），列出 `sso_pending_account` 裡 `status='approved'` 但 `user_profiles` 還查不到對應 `sso_sub` 的人。畫面邏輯完全比照既有「帳號審核」的兩種申請類型（`account_type='扶輪社'` 直接選社別＋角色；一般社友只選社別、按「轉交」）；`account_type='管理者'` 的人顯示提示文字、不給操作，因為他們不需要指派社別。[accounts.ts](src/stores/accounts.ts) 新增 `fetchSsoApprovedWaiting()`（查詢後用 `sso_sub` 反查 `user_profiles` 排除已登入過的人，這份清單量體小，前端反向比對即可，不用另開 view）與 `provisionSsoPendingAccount()`。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。Edge Function 一樣沒有本機 Deno 可以直接跑，這次改動邏輯上是既有 069 輪 6.1 區塊的延伸（只是把套用的時間點從「登入後」提前到「建立帳號當下」），沒有新增外部依賴或簽章相關邏輯，風險相對低；仍待使用者在正式環境用測試帳號走一次「地區先指派 → 測試帳號登入 → 確認直接可用不卡待審核」驗收。
+
+> **待使用者部署：**
+> 1. SQL Editor 執行 [070_sso_pending_provisioning.sql](supabase/migrations/070_sso_pending_provisioning.sql)
+> 2. 重新部署 `sso-login`：`supabase functions deploy sso-login`（或 Dashboard 貼新程式碼，記得 JWT 驗證開關維持 OFF，這輪没有動這個設定但部署新版程式碼不會自動改回去，之前踩過的雷是「貼程式碼」這個動作本身會重置開關，要留意）
+> 3. 前端照常走 Cloudflare 部署流程即可（`AccountManagementView.vue`／`accounts.ts` 純前端改動）
+
+> 部署完成後驗收：先在「帳號審核」上方的「SSO 已核准，尚未登入」找到之前測試的 `erichuang@wowcasa.com.tw`（如果 `sso_pending_account` 裡還在），指派一個社別／角色，再用該帳號登入一次，確認直接進入系統、不會看到「等候審核」畫面。
+
+> 最後更新（上一輪）：2026-07-28（第一百四十輪，**編輯名冊表格加上凍結表頭＋凍結前三欄，捲動只發生在表格內**）：延續上一輪加寬表格後，使用者進一步要求「表格內容超出畫面時用捲軸查看，盡量減少整個畫面移動,同時考量標題固定欄位（表頭固定）以及第一列固定（凍結欄）」。做法比照 Excel 凍結窗格：在 [`RosterView.vue`](src/views/roster/RosterView.vue) 編輯名冊的表格外層多掛 `roster-edit-wrap` class，桌面版（`min-width:701px`，手機走 card-table 版型不受影響）給這個容器設 `max-height: calc(100vh - 320px)` 自己出垂直捲軸，`thead th` 用 `position:sticky; top:0` 固定表頭，`col-index`/`col-english`/`col-name`（項次/英文名稱/中文姓名）三欄用 `position:sticky` 搭配累加的 `left` 值（0/56px/166px，這三欄本來就有寫死的固定寬度，才能精準算出偏移量）凍結在左側，往右捲動時使用者仍看得出「這是哪一列」。因為本機一樣沒有這個專案的 Supabase 存取權限，改用還原相同 CSS＋20 筆假資料的靜態頁面驗證：往下捲動確認表頭列不動、往右捲動確認前三欄不動、且外層工具列全程沒有跟著移動（捲動完全侷限在表格自己的捲軸內）。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。純前端 CSS/class 調整，不需要使用者額外部署步驟。**如果之後其他頁面的表格也遇到同樣「內容太多要捲很遠」的問題，可以比照這個 `roster-edit-wrap` 的寫法（sticky 表頭＋sticky 前幾欄＋容器 max-height）另外接一份，不建議直接把這組規則搬到全站共用的 `.tw`／`table` 樣式，因為不是每個表格都有「項次/英文名稱/中文姓名」這種固定寬度的識別欄位，硬套會需要逐頁調整 left 偏移量。**
 
 > 最後更新（上一輪）：2026-07-28（第一百三十九輪，**社友名冊「編輯名冊」畫面加寬，減少橫向捲動**）：使用者反映編輯名冊時可編輯的表格區域被裁得太窄，欄位要左右滑動才看得到（截圖顯示視窗右側還有大片空白沒用到）。根因是全站共用的 `.page { max-width: 1100px; }`（[`App.vue:319`](src/App.vue:319)）把每一頁的內容寬度都鎖住，但編輯模式的表格（`.roster-table.editing`）需要 1320px 才放得下全部 12 欄。修法：只在「編輯名冊」開啟時（`bulkEditing` 為 true）幫 [`RosterView.vue`](src/views/roster/RosterView.vue) 的 `.page` 根節點多掛一個 `page-wide` class，配一條 `.page.page-wide { max-width: 1360px; }`（用雙 class 選擇器保證優先度贏過全站的 `.page`，不受 CSS 打包順序影響），不動全站其他頁面的 1100px 版型，離開編輯模式會自動變回原本寬度。因為這台機器沒有這個專案的 `.env.local`／Supabase CLI 存取權（沿用先前輪已知的限制），無法完整登入跑真實資料驗證；改用一個還原相同 CSS 規則與表格結構的靜態頁面，在 1500px 寬視窗下截圖比對修法前後——修法後 12 欄（含最後的「狀態」）全部顯示、`.tw` 容器沒有橫向捲軸，修法前確認會被裁掉並出現捲軸。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**沒有動到任何後端/資料庫，純前端 CSS 調整，不需要使用者額外部署步驟。**
 

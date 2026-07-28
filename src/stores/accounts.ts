@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import type { UserProfile, UserRole, UserClubRole } from '@/types'
+import type { UserProfile, UserRole, UserClubRole, SsoPendingAccount } from '@/types'
 
 function unwrapFunctionError(error: unknown) {
   if (error instanceof FunctionsHttpError) {
@@ -19,6 +19,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const pendingCount = ref(0)
   const members = ref<UserProfile[]>([])
   const collaborators = ref<UserClubRole[]>([])
+  const ssoApprovedWaiting = ref<SsoPendingAccount[]>([])
   const loading = ref(false)
 
   // 目前查詢範圍：null = 地區視角（不限社別）；有值 = 社端視角，只查該社。
@@ -124,6 +125,41 @@ export const useAccountsStore = defineStore('accounts', () => {
         // 忽略寄信失敗
       }
     }
+    return { error }
+  }
+
+  // SSO 已核准、但這個人還沒登入過 D3481 的名單（070 migration）。只有
+  // 地區管理員看得到（RLS 限定 is_district_admin()）。這裡用兩次查詢
+  // 自己做反向比對（sso_pending_account 裡有、user_profiles 裡還沒有），
+  // 不用另外建 view——這份清單量體小，前端過濾成本可忽略。
+  async function fetchSsoApprovedWaiting() {
+    const { data: rows } = await supabase
+      .from('sso_pending_account')
+      .select('*')
+      .eq('status', 'approved')
+      .order('last_occurred_at', { ascending: false })
+    if (!rows?.length) {
+      ssoApprovedWaiting.value = []
+      return
+    }
+    const { data: claimed } = await supabase
+      .from('user_profiles')
+      .select('sso_sub')
+      .in('sso_sub', rows.map(r => r.sso_sub))
+    const claimedSubs = new Set((claimed ?? []).map(p => p.sso_sub))
+    ssoApprovedWaiting.value = rows.filter(r => !claimedSubs.has(r.sso_sub))
+  }
+
+  // 地區管理員預先指派社別/角色，等這個人真的登入時由 sso-login 直接套用
+  // （見 070 migration 說明）。role 傳 null 代表只轉交社別、角色留給該社
+  // 自己決定，效果對應 forwardToClub()；有給 role 則對應 activatePending()
+  // 一次到位。
+  async function provisionSsoPendingAccount(sub: string, clubId: string, role: 'club_secretary' | 'club_member' | null) {
+    const { error } = await supabase
+      .from('sso_pending_account')
+      .update({ provisioned_club_id: clubId, provisioned_role: role, provisioned_at: new Date().toISOString() })
+      .eq('sso_sub', sub)
+    if (!error) await fetchSsoApprovedWaiting()
     return { error }
   }
 
@@ -265,9 +301,10 @@ export const useAccountsStore = defineStore('accounts', () => {
   }
 
   return {
-    managed, pending, pendingCount, members, collaborators, loading,
+    managed, pending, pendingCount, members, collaborators, ssoApprovedWaiting, loading,
     setScope,
     fetchManaged, fetchPending, fetchPendingCount, approveRole, activatePending, forwardToClub, dismissPending,
+    fetchSsoApprovedWaiting, provisionSsoPendingAccount,
     fetchMembers, createMember, resetMemberPassword,
     setActive, setDistrictRole, deleteAccount,
     fetchClubCollaborators, updateCollaboratorRole, revokeCollaborator,
