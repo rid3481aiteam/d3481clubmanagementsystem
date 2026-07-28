@@ -1,5 +1,24 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-07-28（第一百四十九輪，**社友名冊改成完全屬於各社，地區層級不能再看到任何社的名冊明細——待部署**）：延續前幾輪的資安討論（免費方案容量、備份規劃），使用者接著提出更完整的三點顧慮（社友資料資安、系統備份、資料庫容量），逐一討論後聚焦到第一點：**重新定義社友名冊的歸屬**——地區管理員/唯讀都不能再看到任何社的名冊明細（姓名、電話、Email、公司等），這是各社自己的資料，只有該社自己的社友/管理員看得到。
+
+> **查證發現的實際漏洞**：討論過程中查了 `RosterView.vue` 才發現，目前只要是沒有掛在任何社底下的地區帳號（例如純「地區唯讀」）打開「社友名冊」頁面，會直接看到全區 100 個社合併在一起的完整名冊——因為 `roster.fetchAll(auth.clubId)` 在 `auth.clubId` 是空值時不會加任何篩選條件，加上 RLS 本來就放行地區身分看全部。這不是理論風險，是真實存在的路徑，這輪順便補起來。
+
+> **範圍確認**：使用者確認「社友人數」「領域分布」這種不含個人身分的純統計數字，地區視角可以繼續看（不算「名冊」），只有個別社友的明細要擋。
+
+> **[`073_roster_district_isolation.sql`](supabase/migrations/073_roster_district_isolation.sql)**：`roster_select` RLS 拿掉 `is_district_viewer()` 這個地區層級的例外，改成只放行 `club_id = current_club_id()`——地區管理員/唯讀從此對 `roster` 表完全沒有任何列級存取權，不管有沒有帶 club_id 篩選都一樣。地區視角瀏覽「社團總覽→單一社」詳情頁（[`ClubDetailView.vue`](src/views/admin/ClubDetailView.vue)）需要的「社友人數」「領域分布」改用兩支新的 `SECURITY DEFINER` 函式（`club_active_member_count`／`club_classification_breakdown`），資料庫端就算好聚合結果才回傳，前端完全收不到任何一筆個別社友的原始資料；這兩支函式各自驗證呼叫者是 `is_district_viewer()` 或本社自己人才放行，不是無條件公開。
+
+> **檢查過其他呼叫 `roster.fetchAll()` 的地方**（`OfficersView`／`MemberCareView`／`ActivityListView`／`AttendanceView`／`RosterView` 自己）**都是傳 `auth.clubId`（自己的社），不受這次限縮影響，繼續正常運作**——這次改動的範圍精準只影響「地區身分想跨社看名冊」這一條路徑。
+
+> `vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。
+
+> **這輪討論但還沒有做的部分**（供下一輪接續）：
+> - 「轉移到其他地區」使用者確認是**複製一套獨立部署**，不是多租戶共用平台，架構上不用大改，但建議之後找時間整理一份「D3481 專屬設定清單」（寫死的地區代碼/種子資料/RotarySSO client/品牌色），方便之後複製時知道要改哪裡。
+> - 「檔案一律走 Supabase Storage、還是要不要導入 Google Drive」使用者同意先維持 Supabase Storage，Google Drive 列為之後容量吃緊時的備案，這輪沒有寫進 CLAUDE.md 規則，之後如果要正式定案再補。
+> - 地端(NAS)+異地(GitHub)備份的規劃已經討論出具體腳本/workflow 草稿，使用者要先確認做法、還沒要動手實作。
+
+> **待使用者：** 到 SQL Editor 執行 [`073_roster_district_isolation.sql`](supabase/migrations/073_roster_district_isolation.sql)（這台機器連不到 D3481 的 Supabase 專案）。跑完後用一個「地區唯讀」或「地區管理員」帳號測試：①打開「社友名冊」頁面應該完全看不到任何資料（不是看到全部，是看到空的，因為地區帳號本來就不屬於任何社）；②到「社團總覽→點某個社→查看社團資訊」，確認「社友人數」「領域分布」這兩個統計卡還是正常顯示數字，沒有變成 0 或空白；③換一個該社自己的社友/管理員帳號登入，確認自己社的名冊完全不受影響、正常看得到明細。
+
 > 最後更新：2026-07-28（第一百四十八輪，**幹部管理「新增其他主要幹部/委員會成員」加上職位名稱未填提醒**）：使用者截圖 [`OfficersView.vue`](src/views/club/OfficersView.vue) 的「新增其他主要幹部」表單，反映使用者容易先勾選成員才發現忘了填「職位名稱」，希望提醒要先填職位名稱。這個表單其實本來就有防呆（`+ 加入所選成員` 按鈕在 `newPrimaryPositionName` 空白時是 disabled），但只是按鈕變灰、沒有主動說明原因，使用者容易看不懂為什麼按不下去。改法：職位名稱空白時，勾選成員清單上方顯示一段金色提示文字「請先填寫上方的『職位名稱』，才能勾選成員」，同時整組 checkbox 也一起 disabled（灰階降低透明度），逼使用者照順序先填職位名稱再勾人，而不是讓他勾完才發現送不出去。**「新增委員會成員」區塊也是同一套元件結構、同樣的問題，一併套用同一個提示模式**（`newCommitteeName` 空白時提示「請先填寫上方的『委員會名稱』」），新增共用的 `.hint-warn`／`.checkbox-grid-disabled` scoped class。純前端 UI 提示，沒有動到資料驗證邏輯（`addPrimaryOfficers`/`addCommitteeMembers` 本來就已經有防呆，這輪只是把防呆講清楚)。用還原相同結構的靜態頁面驗證：職位名稱空白時提示文字出現、勾選框呈現灰階不可互動；填入文字後提示消失、勾選框跟按鈕都恢復正常。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。
 
 > 最後更新（上一輪）：2026-07-28（第一百四十七輪，**真的修好編輯名冊凍結欄——資料列的 `<td>` 從一開始就沒掛 `col-index`/`col-english`/`col-name` class**）：使用者回報「表頭確實不會動，但第一/第二欄還是會動」，這次不是瀏覽器 rendering bug，是我上上輪自己漏寫的真 bug——[`RosterView.vue`](src/views/roster/RosterView.vue) 的 sticky CSS 是寫給 `td.col-index`/`td.col-english`/`td.col-name` 用的，但資料列的 `<td data-label="項次">`／`<td data-label="英文名稱">`／`<td data-label="中文姓名">` 從第一百四十輪加這個功能時就只顧著幫 `<th>` 表頭補 class，忘記同步幫 `<tbody>` 裡對應的 `<td>` 也加上這三個 class，導致 sticky 規則從頭到尾都只套用在表頭（表頭本身平時是靜止的，看不出差異），資料列從來沒被凍結過，捲動時當然照樣跟著跑。修法很單純：三個 `<td>` 補上 `class="col-index"`／`class="col-english"`／`class="col-name"`（[`RosterView.vue:596-600`](src/views/roster/RosterView.vue:596)）。這次用還原相同 CSS＋markup 的靜態頁面實際捲到最右／往下捲多列，明確看到修好前資料列的項次/英文名稱/中文姓名會被捲走、修好後這三欄在多筆資料列上都確實停在原地不跟著橫向捲動，跟表頭凍結的欄寬完全對齊。`vue-tsc --noEmit`＋`npm run build` 皆已驗證通過。**這次是純粹的程式碼疏漏，不是瀏覽器差異，往後再幫哪個表格加凍結欄時要記得 `<th>` 跟 `<tbody>` 的 `<td>` 兩邊的 class 都要補，只改一邊很容易忽略因為表頭本身平常就是靜止的，肉眼看不出破功。**
