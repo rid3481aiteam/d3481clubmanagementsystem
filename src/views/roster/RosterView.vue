@@ -819,6 +819,19 @@ onMounted(() => {
   .roster-edit-wrap {
     max-height: calc(100vh - 320px);
     overflow: auto;
+    /* sticky 儲存格搭配 table 預設的 border-collapse:collapse 在部分
+       瀏覽器（尤其 Safari／Firefox）會有捲動時背景色局部消失、變透明
+       的已知 rendering bug，改成 separate 才能讓每個 sticky 儲存格
+       的背景色穩定渲染；border-spacing:0 抵銷間距，視覺上跟 collapse
+       一致（這張表只有 border-bottom，不會有邊框重疊需要 collapse 處理）。
+       isolation:isolate 讓這個捲動容器自成一個 stacking context，
+       避免 sticky 儲存格的 z-index 疊圖規則被外層版面影響。 */
+    isolation: isolate;
+  }
+
+  .roster-edit-wrap table {
+    border-collapse: separate;
+    border-spacing: 0;
   }
 
   .roster-edit-wrap thead th {
@@ -841,6 +854,7 @@ onMounted(() => {
   .roster-edit-wrap th.col-name {
     position: sticky;
     z-index: 3;
+    background: var(--gold-p);
   }
 
   .roster-edit-wrap .col-index { left: 0; }
