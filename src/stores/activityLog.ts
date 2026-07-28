@@ -10,9 +10,10 @@ export const useActivityLogStore = defineStore('activityLog', () => {
   // clubId 有值 = 各社視角只查自己社；null = 地區視角看全地區（含地區
   // 層級跟所有社的紀錄，RLS 本來就只放行地區管理員這樣查）。
   //
-  // sinceDays 只是畫面預設的顯示範圍（減少一次撈太多筆），不是資料庫
-  // 保留期限——資料庫本身不會自動清除任何紀錄，選「全部」還是查得到
-  // 更早的操作紀錄。
+  // sinceDays 是畫面篩選（減少一次撈太多筆）——資料庫本身另外有
+  // 072_activity_log_retention.sql 的 trigger 真的每天清掉超過 30 天
+  // 的紀錄，兩者是各自獨立的機制，sinceDays 傳大於 30 也查不到已經
+  // 被清掉的資料。
   async function fetchLog(clubId: string | null, sinceDays: number | null = 7) {
     loading.value = true
     let query = supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(500)

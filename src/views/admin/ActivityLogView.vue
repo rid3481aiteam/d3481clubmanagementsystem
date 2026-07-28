@@ -10,12 +10,13 @@ const club = useClubStore()
 
 const isDistrictAdminView = computed(() => auth.isDistrictAdminView)
 
-// 只是畫面預設的顯示範圍，資料庫本身不會自動清除任何紀錄——選「全部」
-// 隨時查得到更早的操作紀錄。
+// 資料庫本身最多只保留 30 天（見 072_activity_log_retention.sql，
+// 考量免費方案 500MB 容量上限，超過 30 天的紀錄會被自動清除），
+// 所以這裡不提供「全部」選項——選了也查不到 30 天以前的資料，
+// 提供這個選項只會誤導使用者以為系統留著更久的紀錄。
 const RANGE_OPTIONS = [
   { value: '7', label: '最近 7 天' },
-  { value: '30', label: '最近 30 天' },
-  { value: 'all', label: '全部' },
+  { value: '30', label: '最近 30 天（資料庫最多保留這麼久）' },
 ]
 const range = ref('7')
 
@@ -23,8 +24,7 @@ const range = ref('7')
 // 紀錄），各社視角只看自己社——RLS 也會擋，但這裡先在查詢這層就限定
 // 範圍，不讓瀏覽器收到不該看到的資料。
 function load() {
-  const sinceDays = range.value === 'all' ? null : Number(range.value)
-  activityLog.fetchLog(isDistrictAdminView.value ? null : auth.clubId, sinceDays)
+  activityLog.fetchLog(isDistrictAdminView.value ? null : auth.clubId, Number(range.value))
 }
 
 onMounted(() => {
@@ -47,7 +47,7 @@ function clubName(clubId: string) {
 
     <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">
       記錄{{ isDistrictAdminView ? '地區層級與各社' : '本社' }}的關鍵操作（帳號審核、資料新增/編輯/刪除等）。
-      這裡的顯示範圍只是畫面篩選，資料不會被刪除，需要時可以切換看更早的紀錄。
+      為了控制資料庫容量，系統只保留最近 30 天的紀錄，超過會自動清除，請盡量在事情發生後盡快查閱。
     </p>
 
     <div style="margin-bottom:14px;">
