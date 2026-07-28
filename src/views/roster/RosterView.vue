@@ -570,7 +570,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="bulkEditing" class="tw">
+    <div v-if="bulkEditing" class="tw roster-edit-wrap">
       <table class="roster-table card-table editing">
         <thead class="th">
           <tr>
@@ -809,6 +809,52 @@ onMounted(() => {
 <style scoped>
 .page.page-wide {
   max-width: 1360px;
+}
+
+/* 編輯名冊表格內容多時，只讓表格自己出捲軸（垂直+水平都固定表頭/
+   前三欄），使用者掃到後面欄位或往下捲動時不用連整個頁面一起移動,
+   桌面版才套用——手機版走 card-table 版型，欄位變成上下堆疊,
+   sticky 定位在那種版型下沒有意義。 */
+@media (min-width: 701px) {
+  .roster-edit-wrap {
+    max-height: calc(100vh - 320px);
+    overflow: auto;
+  }
+
+  .roster-edit-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--gold-p);
+  }
+
+  .roster-edit-wrap td.col-index,
+  .roster-edit-wrap td.col-english,
+  .roster-edit-wrap td.col-name {
+    position: sticky;
+    z-index: 1;
+    background: var(--card);
+  }
+
+  .roster-edit-wrap th.col-index,
+  .roster-edit-wrap th.col-english,
+  .roster-edit-wrap th.col-name {
+    position: sticky;
+    z-index: 3;
+  }
+
+  .roster-edit-wrap .col-index { left: 0; }
+  .roster-edit-wrap .col-english { left: 56px; }
+  .roster-edit-wrap .col-name {
+    left: 166px;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, .08);
+  }
+
+  .roster-edit-wrap tr:hover td.col-index,
+  .roster-edit-wrap tr:hover td.col-english,
+  .roster-edit-wrap tr:hover td.col-name {
+    background: rgba(23, 69, 143, .04);
+  }
 }
 
 .roster-table {
