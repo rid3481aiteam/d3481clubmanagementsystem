@@ -593,11 +593,11 @@ onMounted(() => {
             v-for="(m, index) in filteredDraftRows"
             :key="m.id"
           >
-            <td data-label="項次">{{ index + 1 }}</td>
-            <td data-label="英文名稱">
+            <td class="col-index" data-label="項次">{{ index + 1 }}</td>
+            <td class="col-english" data-label="英文名稱">
               <input v-model="m.nick_name" class="fi table-input" />
             </td>
-            <td data-label="中文姓名">
+            <td class="col-name" data-label="中文姓名">
               <input v-model="m.name" class="fi table-input required-input" />
             </td>
             <td data-label="社內職稱">
