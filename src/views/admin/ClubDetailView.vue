@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useRosterStore } from '@/stores/roster'
@@ -7,7 +7,7 @@ import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import { useAttendanceStore } from '@/stores/attendance'
 import { useMembershipReportsStore } from '@/stores/membershipReports'
 import { useFeaturesStore } from '@/stores/features'
-import type { Club, Meeting, ClubOfficerRole, RosterMember, RosterMemberStatus } from '@/types'
+import type { Club, Meeting, ClubOfficerRole } from '@/types'
 
 const route = useRoute()
 const roster = useRosterStore()
@@ -27,20 +27,11 @@ const SINGLE_ROLES: { role: ClubOfficerRole; label: string }[] = [
   { role: 'secretary', label: '秘書' },
 ]
 
-function memberStatus(m: RosterMember): RosterMemberStatus {
-  return m.member_status ?? (m.is_active ? 'normal' : 'resigned')
-}
-
-const activeMembers = computed(() => roster.members.filter(m => memberStatus(m) !== 'resigned'))
-
-const classificationBreakdown = computed(() => {
-  const map = new Map<string, number>()
-  for (const m of activeMembers.value) {
-    const key = m.classification?.trim() || '未分類'
-    map.set(key, (map.get(key) ?? 0) + 1)
-  }
-  return [...map.entries()].sort((a, b) => b[1] - a[1])
-})
+// 名冊本身（姓名、聯絡方式等）現在只有該社自己人看得到，地區視角這裡
+// 只拿不含個人身分的聚合統計（見 073_roster_district_isolation.sql
+// 的 club_active_member_count／club_classification_breakdown）。
+const activeMemberCount = ref(0)
+const classificationBreakdown = ref<{ classification: string; member_count: number }[]>([])
 
 function officerName(role: ClubOfficerRole) {
   return officers.list.find(o => o.role === role)?.name || '-'
@@ -51,7 +42,8 @@ async function load() {
   const { data } = await supabase.from('clubs').select('*').eq('id', id).single()
   club.value = data
 
-  await roster.fetchAll(id)
+  activeMemberCount.value = await roster.fetchActiveMemberCount(id)
+  classificationBreakdown.value = await roster.fetchClassificationBreakdown(id)
   await officers.fetchAll(id, yearTerm)
   await attendance.fetchMonthlyRates(id)
   await membershipReports.fetchAll(id)
@@ -103,7 +95,7 @@ watch(() => route.params.id, load)
     <div class="grid">
       <div class="tw card">
         <h3>社友人數</h3>
-        <p class="stat">{{ activeMembers.length }} <span class="unit">人</span></p>
+        <p class="stat">{{ activeMemberCount }} <span class="unit">人</span></p>
       </div>
 
       <div class="tw card">
@@ -132,7 +124,7 @@ watch(() => route.params.id, load)
     <h2 class="section-h">領域分布</h2>
     <div class="tw" style="padding:16px 20px; margin-bottom:24px;">
       <div v-if="classificationBreakdown.length" style="display:flex; gap:8px; flex-wrap:wrap;">
-        <span class="bdg b-n" v-for="[cls, count] in classificationBreakdown" :key="cls">{{ cls }}（{{ count }}）</span>
+        <span class="bdg b-n" v-for="item in classificationBreakdown" :key="item.classification">{{ item.classification }}（{{ item.member_count }}）</span>
       </div>
       <p v-else style="color:var(--muted); font-size:13px;">尚無社友資料</p>
     </div>
