@@ -534,7 +534,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page" :class="{ 'page-wide': bulkEditing }">
     <div class="ph">
       <div style="display:flex; align-items:center; gap:8px;">
         <h1>社友名冊</h1>
@@ -807,6 +807,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.page.page-wide {
+  max-width: 1360px;
+}
+
 .roster-table {
   min-width: 1180px;
 }
