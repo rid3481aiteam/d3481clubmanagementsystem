@@ -27,7 +27,7 @@ const LABELS: Record<FeatureKey, string> = {
   E1_activities: '活動列表（含例會，報名/不克參加）',
   F1_district_calendar: '地區行事曆',
   G1_iou: 'IOU 捐獻收據追蹤',
-  I1_gg: 'GG案盤點（全球獎助金）',
+  I1_gg: '全球獎助金盤點',
   J1_line_notify: 'LINE 通知設定（測試中）',
   K1_meeting_email_notify: '新增例會自動發信通知社友（測試中）',
   L1_knowledge_base: '地區知識庫（測試中）',

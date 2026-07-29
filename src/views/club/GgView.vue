@@ -41,7 +41,7 @@ const showModal = ref(false)
 const editingId = ref<string | null>(null)
 const form = ref(emptyForm())
 const formError = ref('')
-const modalTitle = computed(() => editingId.value ? '編輯GG案' : '+ 新增GG案')
+const modalTitle = computed(() => editingId.value ? '編輯全球獎助金' : '+ 新增全球獎助金')
 
 function emptyForm() {
   return {
@@ -120,17 +120,17 @@ onMounted(() => {
   <div class="page">
     <div class="ph">
       <div>
-        <h1>🌐 GG案盤點</h1>
-        <p class="ph-sub">全球獎助金專案追蹤，發起並完成一個 GG 案可獲 3 顆★</p>
+        <h1>🌐 全球獎助金盤點</h1>
+        <p class="ph-sub">全球獎助金專案追蹤，發起並完成一個全球獎助金案可獲 3 顆★</p>
       </div>
-      <button v-if="canManage" class="btn btn-gold" @click="openAdd">+ 新增GG案</button>
+      <button v-if="canManage" class="btn btn-gold" @click="openAdd">+ 新增全球獎助金</button>
     </div>
 
     <div class="summary-grid">
       <div class="tw summary-card" style="border-left:3px solid var(--navy);">
         <div class="summary-label">進行中</div>
         <div class="summary-value">{{ activeCount }}</div>
-        <div class="summary-sub">GG案</div>
+        <div class="summary-sub">全球獎助金</div>
       </div>
       <div class="tw summary-card" style="border-left:3px solid var(--gold);">
         <div class="summary-label">規劃中</div>
@@ -181,7 +181,7 @@ onMounted(() => {
             </td>
           </tr>
           <tr v-if="!gg.cases.length">
-            <td :colspan="canManage ? 7 : 6" style="text-align:center; color:var(--muted);">尚無GG案資料</td>
+            <td :colspan="canManage ? 7 : 6" style="text-align:center; color:var(--muted);">尚無全球獎助金資料</td>
           </tr>
         </tbody>
       </table>
@@ -197,7 +197,7 @@ onMounted(() => {
           <p v-if="formError" style="color:var(--red); font-size:12px; margin-bottom:10px;">{{ formError }}</p>
           <div>
             <label class="fl">案件名稱 *</label>
-            <input v-model="form.name" class="fi" placeholder="例：台日文化交流GG案" />
+            <input v-model="form.name" class="fi" placeholder="例：台日文化交流全球獎助金" />
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
             <div>

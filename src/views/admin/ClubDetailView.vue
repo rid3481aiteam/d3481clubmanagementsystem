@@ -129,7 +129,7 @@ watch(() => route.params.id, load)
       <p v-else style="color:var(--muted); font-size:13px;">尚無社友資料</p>
     </div>
 
-    <h2 class="section-h">社的年度成員（{{ yearTerm }}）</h2>
+    <h2 class="section-h">本屆幹部（{{ yearTerm }}）</h2>
     <div class="tw" style="padding:16px 20px; margin-bottom:24px;">
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <span class="bdg b-g" v-for="r in SINGLE_ROLES" :key="r.role">{{ r.label }}：{{ officerName(r.role) }}</span>

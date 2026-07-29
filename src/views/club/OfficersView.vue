@@ -381,7 +381,7 @@ watch(yearTerm, load)
 <template>
   <div class="page">
     <div class="ph">
-      <h1>社的年度成員</h1>
+      <h1>本屆幹部</h1>
       <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
         <label class="fl" style="display:inline-block; margin-right:6px;">年度</label>
         <select v-model="yearTerm" class="fi" style="width:170px; display:inline-block;" :disabled="editing">

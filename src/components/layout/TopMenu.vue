@@ -138,7 +138,7 @@ const navItems = computed<NavItem[]>(() => {
     }
     items.push({ type: 'link', to: '/club/announcements', icon: '📣', label: '社內公告' })
     const memberItems: { to: string; icon: string; label: string }[] = [
-      { to: '/club/officers', icon: '🎖️', label: '社的年度成員' },
+      { to: '/club/officers', icon: '🎖️', label: '本屆幹部' },
     ]
     if (features.isEnabled('D1_roster')) {
       memberItems.push({ to: '/roster', icon: '📋', label: '社友名冊' })
@@ -169,7 +169,7 @@ const navItems = computed<NavItem[]>(() => {
       items.push({ type: 'link', to: '/club/governor-award', icon: '🏅', label: '總監獎項申請' })
     }
     if (features.isEnabled('I1_gg') && auth.role !== 'club_member') {
-      items.push({ type: 'link', to: '/club/gg', icon: '🌐', label: 'GG案' })
+      items.push({ type: 'link', to: '/club/gg', icon: '🌐', label: '全球獎助金' })
     }
     if (features.isEnabled('L1_knowledge_base')) {
       items.push({ type: 'link', to: '/knowledge-base', icon: '📚', label: '知識庫（測試中）' })
