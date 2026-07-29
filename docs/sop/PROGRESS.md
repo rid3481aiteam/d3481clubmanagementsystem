@@ -55,6 +55,7 @@
   4. `10-account-review-activate.png` — 帳號審核清單，選好角色準備點「啟動」（如果目前示範社團沒有待審申請人，畫面會是「尚無待審核」空狀態，可截這張說明現況，或請使用者自己用另一個帳號申請一筆製造出待審資料）
   5. `11-account-overview.png` — 帳號總覽列表與操作按鈕
 - 只涵蓋<strong>社長/執秘視角</strong>；地區管理員視角的「進階設定」內容不同（多了「邀請/管理地區帳號」「SSO 已核准，尚未登入」「社團總覽」），仍歸在 Task #5，還沒寫
+- **額外產出 PPTX 簡報版**：`docs/sop/slides/D3481-帳號管理-管理本社帳號-SOP.pptx`（8 頁，navy #1C2B4A / gold #B8892A 品牌色，用 `pptxgenjs` + react-icons(Feather) 產生，不是從 Markdown 轉的，內容彼此獨立維護）。同樣 5 處畫面是「截圖待補」佔位框，之後補截圖時兩份文件（Markdown 跟 PPTX）都要記得更新，不會自動同步。產生腳本在 session 的 scratchpad（`d3481-sop-ppt/build_deck.js` + `render_icons.js`），沒有隨 commit 進 repo，之後要再改版面得重寫或請使用者提供腳本路徑。
 
 ### 待完成流程（Task #1、#3、#4、#5 剩餘部分）
 - [ ] 社友名冊：編輯既有社友（可用「王小明」示範）、Excel 匯入/匯出（Task #1 剩餘）
