@@ -45,10 +45,20 @@
 - 這次改用 **puppeteer-core 驅動本機真實 Chrome**（`scratchpad/d3481-sop/shoot.js`，非 headless 才能正確渲染中文字型)，直接 `page.screenshot()` 存檔，而不是用 `mcp__Claude_Preview__preview_screenshot`（那個工具的圖只會顯示在對話裡，沒有辦法另存成檔案）。腳本用 `puppeteer-core` + `executablePath` 指向 `/Applications/Google Chrome.app/...`，不用整包下載 Chromium
 - 寫入正式站資料（按下「儲存」）這類動作，auto mode 分類器會擋下並要求明確使用者授權，這次有先問過使用者才動手
 
-### 待完成流程（Task #1~#4 剩餘部分）
+### Task #2（帳號管理：邀請本社帳號、帳號列表、停用/啟用）—— 2026-07-29 更新
+- **步驟文字已寫好**，見 `docs/sop/02-功能操作SOP.md` 第 4 章「帳號管理：管理本社帳號」，依照 `src/views/admin/AccountManagementView.vue` 實際邏輯撰寫，涵蓋社長/執秘視角的四個子步驟：進入入口 → 帳號權限授予（邀請）→ 帳號審核（核准新申請）→ 帳號總覽（權限切換/重設密碼/停用啟用/永久刪除）
+- **這次改成使用者自行截圖**（不是像文件二前段那樣由 Claude 用 puppeteer 操作正式站），因為示範帳號密碼與 Supabase anon key 使用者選擇不提供給 Claude
+- 文件內已預留 5 張圖片的檔名與插入位置，使用者截圖後請依此檔名存入 `docs/sop/screenshots/`（沿用既有 `sop@gmail.com` 示範帳號即可，該帳號本來就是 club_secretary 角色）：
+  1. `07-advanced-settings-menu.png` — 進階設定選單，「管理本社帳號」入口
+  2. `08-grant-access-filled.png` — 帳號權限授予表單，已輸入 Email 與角色
+  3. `09-invite-log.png` — 展開的授權紀錄表
+  4. `10-account-review-activate.png` — 帳號審核清單，選好角色準備點「啟動」（如果目前示範社團沒有待審申請人，畫面會是「尚無待審核」空狀態，可截這張說明現況，或請使用者自己用另一個帳號申請一筆製造出待審資料）
+  5. `11-account-overview.png` — 帳號總覽列表與操作按鈕
+- 只涵蓋<strong>社長/執秘視角</strong>；地區管理員視角的「進階設定」內容不同（多了「邀請/管理地區帳號」「SSO 已核准，尚未登入」「社團總覽」），仍歸在 Task #5，還沒寫
+
+### 待完成流程（Task #1、#3、#4、#5 剩餘部分）
 - [ ] 社友名冊：編輯既有社友（可用「王小明」示範）、Excel 匯入/匯出（Task #1 剩餘）
-- [ ] 帳號管理：邀請本社帳號、帳號列表、停用/啟用（Task #2）
 - [ ] 例會管理：新增例會、出席彙總登記、逐人出席勾選（Task #3）
 - [ ] 地區通訊錄：瀏覽、分區篩選、搜尋（Task #4，唯讀，用 sop@gmail.com 即可測）
 - [ ] 地區管理員視角：邀請/管理地區帳號、社團總覽（Task #5，暫緩，需要先取得地區示範帳號）
-- [ ] 把所有截圖 + 步驟文字整理成 Markdown，套用跟文件一同款視覺（`build_pdf.py` 那套 navy/gold 樣式），輸出 PDF 到 `docs/sop/`（Task #6）
+- [ ] 把所有截圖 + 步驟文字整理成 Markdown，套用跟文件一同款視覺（`build_pdf.py` 那套 navy/gold 樣式），輸出 PDF 到 `docs/sop/`（Task #6，等 Task #2 的 5 張截圖到位後可以先局部重新產出）
