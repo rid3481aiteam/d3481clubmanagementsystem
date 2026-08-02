@@ -5,18 +5,21 @@ import { useAttendanceStore } from '@/stores/attendance'
 import { useMembershipReportsStore } from '@/stores/membershipReports'
 import { usePermissionsStore } from '@/stores/permissions'
 import { useFeaturesStore } from '@/stores/features'
+import { useRosterStore } from '@/stores/roster'
 import PageHelp from '@/components/help/PageHelp.vue'
-import type { ClubMonthlyMembershipReportUpdate } from '@/types'
+import type { ClubMonthlyMembershipReportUpdate, AttendanceStatus, RosterMember } from '@/types'
 
 const auth = useAuthStore()
 const attendance = useAttendanceStore()
 const reports = useMembershipReportsStore()
 const permissions = usePermissionsStore()
 const features = useFeaturesStore()
+const roster = useRosterStore()
 
 const attendanceMonthlyHelpItems = [
   '這頁自動彙整「活動」頁例會逐人登記的出席紀錄，換上方「選擇月份」就能看該月出席率、例會場次跟每場例會的應出席／實際出席人數。',
   '如果有例會沒有透過「活動」頁逐人登記，可以在「快速新增／補登例會出席」直接填當天應出席／實際出席人數；該天若已逐人登記過，請改到「活動」頁該場例會的出席記錄編輯，不要兩邊都填。',
+  '「個人補出席」是針對單一社友的補登（例如跨社補會、簽到漏登），選人名跟日期後補一筆狀態，不會動到其他社友或整場的應出席／實際出席人數。',
   '有開通 RI 半年報功能的話，「RI 半年報基準人數」區塊可以填基準／當月男女社友人數與年齡分布，系統會自動算出淨成長，供社長每半年填報 RI 用。',
   '最下面「歷月出席月報」是全部月份的總表，可以用來對照出席率趨勢，60% 是扶輪社規定的最低出席門檻。',
 ]
@@ -58,6 +61,51 @@ async function handleQuickAdd() {
   }
   quickForm.value = { date: '', title: '', expected: null, actual: null }
   await refreshMonth()
+}
+
+// ── 個人補出席 ──────────────────────────────────────
+const STATUS_LABEL: Record<AttendanceStatus, string> = {
+  present: '出席',
+  absent: '缺席',
+  leave: '請假',
+  exempt: '免計',
+}
+
+function isAttendanceMember(m: RosterMember) {
+  return (m.member_status ?? (m.is_active ? 'normal' : 'resigned')) !== 'resigned'
+}
+
+function displayName(m: RosterMember) {
+  return m.nick_name ? `${m.nick_name}（${m.name}）` : m.name
+}
+
+const attendanceMembers = computed(() => roster.members.filter(isAttendanceMember))
+
+const makeupForm = ref({ memberId: '', date: '', status: 'present' as AttendanceStatus })
+const makeupSaving = ref(false)
+const makeupError = ref<string | null>(null)
+const makeupSuccess = ref<string | null>(null)
+
+async function handleMakeupSave() {
+  if (!auth.clubId || !makeupForm.value.memberId || !makeupForm.value.date) return
+  makeupSaving.value = true
+  makeupError.value = null
+  makeupSuccess.value = null
+  const { error } = await attendance.makeupMemberAttendance(
+    auth.clubId,
+    makeupForm.value.memberId,
+    makeupForm.value.date,
+    makeupForm.value.status,
+    attendanceMembers.value.length
+  )
+  makeupSaving.value = false
+  if (error) {
+    makeupError.value = error.message
+    return
+  }
+  const member = attendanceMembers.value.find(m => m.id === makeupForm.value.memberId)
+  makeupSuccess.value = `已補登 ${member ? displayName(member) : ''} ${makeupForm.value.date} 的出席狀態`
+  await Promise.all([refreshMonth(), attendance.fetchRates(auth.clubId)])
 }
 
 // ── RI 半年報基準／當月人數 ──────────────────────────
@@ -113,6 +161,7 @@ onMounted(async () => {
     attendance.fetchMonthlyRates(auth.clubId),
     reports.fetchAll(auth.clubId),
     attendance.fetchMeetingsForMonth(auth.clubId, selectedMonth.value),
+    roster.fetchAll(auth.clubId),
   ])
   loadMembershipForm()
 })
@@ -224,6 +273,37 @@ watch(selectedMonth, async () => {
       <p v-if="quickError" style="color:var(--red); font-size:12px; margin-top:8px;">{{ quickError }}</p>
       <div style="margin-top:12px;">
         <button class="btn btn-gold" :disabled="quickSaving" @click="handleQuickAdd">{{ quickSaving ? '儲存中…' : '新增／更新這一天' }}</button>
+      </div>
+    </div>
+
+    <div v-if="canEditAttendance" class="tw" style="padding:16px 20px; margin-bottom:24px;">
+      <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:10px;">個人補出席</h2>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">
+        針對單一社友補登某一天的出席狀態（例如跨社補會、簽到漏登），不會影響其他社友或整場例會的應出席／實際出席人數。
+      </p>
+      <div class="form-grid">
+        <label>
+          <span>社友姓名</span>
+          <select class="fi" v-model="makeupForm.memberId">
+            <option value="" disabled>請選擇</option>
+            <option v-for="m in attendanceMembers" :key="m.id" :value="m.id">{{ displayName(m) }}</option>
+          </select>
+        </label>
+        <label>
+          <span>日期</span>
+          <input type="date" class="fi" v-model="makeupForm.date" />
+        </label>
+        <label>
+          <span>狀態</span>
+          <select class="fi" v-model="makeupForm.status">
+            <option v-for="(label, key) in STATUS_LABEL" :key="key" :value="key">{{ label }}</option>
+          </select>
+        </label>
+      </div>
+      <p v-if="makeupError" style="color:var(--red); font-size:12px; margin-top:8px;">{{ makeupError }}</p>
+      <p v-if="makeupSuccess" style="color:var(--green); font-size:12px; margin-top:8px;">{{ makeupSuccess }}</p>
+      <div style="margin-top:12px;">
+        <button class="btn btn-gold" :disabled="makeupSaving" @click="handleMakeupSave">{{ makeupSaving ? '儲存中…' : '補登這位社友的出席' }}</button>
       </div>
     </div>
 

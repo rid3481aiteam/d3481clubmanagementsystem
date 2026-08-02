@@ -158,6 +158,106 @@ export const useAttendanceStore = defineStore('attendance', () => {
     return { error }
   }
 
+  // 個人補出席：只補登「單一社友」某一天的出席狀態，跟上面 quickAddSession
+  // （整場例會的應出席／實際出席人次）互補，不互相覆蓋。找不到當天例會／
+  // 出席彙總就新建空白的。activeMemberCount 是該社目前在籍（非退社）社友
+  // 人數，用來判斷這場例會的逐人明細是不是已經「登記全社」（走過「活動」
+  // 頁的逐人出席）——是的話補這位社友之後要連動重算彙總人次，維持跟 save()
+  // 一致的統計；如果明細筆數還不到全社人數（多半是走「快速新增」填的整場
+  // 人次，或只補登過零星幾位），彙總數字維持原樣，不讓單一社友的補登去
+  // 覆蓋別人手動填的整場人次。
+  async function makeupMemberAttendance(
+    clubId: string,
+    memberId: string,
+    date: string,
+    status: AttendanceStatus,
+    activeMemberCount: number
+  ) {
+    const { data: existingMeeting } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('date', date)
+      .maybeSingle()
+
+    let meetingId = existingMeeting?.id as string | undefined
+
+    if (!meetingId) {
+      const { data: newMeeting, error: meetingError } = await supabase
+        .from('meetings')
+        .insert({ club_id: clubId, date })
+        .select()
+        .single()
+      if (meetingError) return { error: meetingError }
+      meetingId = newMeeting.id
+    }
+
+    const { data: existingSession } = await supabase
+      .from('attendance_sessions')
+      .select('id')
+      .eq('meeting_id', meetingId)
+      .maybeSingle()
+
+    let sessionId = existingSession?.id as string | undefined
+    let hadFullDetails = false
+
+    if (!sessionId) {
+      const { data: newSession, error: sessionError } = await supabase
+        .from('attendance_sessions')
+        .insert({ meeting_id: meetingId, club_id: clubId, total: 0, present: 0, absent: 0, leave: 0, exempt: 0 })
+        .select()
+        .single()
+      if (sessionError) return { error: sessionError }
+      sessionId = newSession.id
+    } else {
+      const { count } = await supabase
+        .from('attendance_details')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', sessionId)
+      hadFullDetails = (count ?? 0) >= activeMemberCount
+    }
+
+    const { data: existingDetail } = await supabase
+      .from('attendance_details')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('member_id', memberId)
+      .maybeSingle()
+
+    if (existingDetail) {
+      const { error } = await supabase
+        .from('attendance_details')
+        .update({ status })
+        .eq('id', existingDetail.id)
+      if (error) return { error }
+    } else {
+      const { error } = await supabase
+        .from('attendance_details')
+        .insert({ session_id: sessionId, club_id: clubId, member_id: memberId, status })
+      if (error) return { error }
+    }
+
+    if (hadFullDetails) {
+      const { data: allDetails } = await supabase
+        .from('attendance_details')
+        .select('status')
+        .eq('session_id', sessionId)
+      const entries = allDetails ?? []
+      await supabase
+        .from('attendance_sessions')
+        .update({
+          total: entries.length,
+          present: entries.filter(d => d.status === 'present').length,
+          absent: entries.filter(d => d.status === 'absent').length,
+          leave: entries.filter(d => d.status === 'leave').length,
+          exempt: entries.filter(d => d.status === 'exempt').length,
+        })
+        .eq('id', sessionId)
+    }
+
+    return { error: null }
+  }
+
   async function save(
     meetingId: string,
     clubId: string,
@@ -219,6 +319,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     fetchDistrictMonthlyRates,
     fetchMeetingsForMonth,
     quickAddSession,
+    makeupMemberAttendance,
     save,
   }
 })
