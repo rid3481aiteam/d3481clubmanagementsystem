@@ -454,7 +454,7 @@ export interface RosterExcelRow {
   電話?: string
   個人電話?: string
   公司電話?: string
-  入社日期?: string
+  入社日期?: string | number | Date
 }
 
 // ── 潛在社友 ─────────────────────────────────────────

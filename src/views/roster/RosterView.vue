@@ -131,6 +131,46 @@ function activeFromStatus(status: RosterMemberStatus) {
   return status !== 'resigned'
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, '0')
+}
+
+// Excel 儲存格如果本身是「日期」格式（不是純文字），XLSX.read 開了
+// cellDates 後大多會直接給 JS Date，但少數版本/情況仍會落回序列數字，
+// 兩種都要接住。
+function excelSerialToISODate(serial: number): string | null {
+  const utcDays = Math.floor(serial - 25569)
+  const d = new Date(utcDays * 86400 * 1000)
+  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+}
+
+// 各社「入社日期」欄位填法不一（西元/民國年、- / . 分隔、有沒有補零、
+// 中文「年月日」），這裡盡量兜住常見寫法轉成資料庫看得懂的
+// YYYY-MM-DD；轉不出來回傳 null，由呼叫端決定怎麼提醒使用者，不要讓
+// Postgres 的 date 型別直接因為格式不對讓整批匯入卡住。
+function parseJoinDate(raw: string | number | Date | undefined): string | null {
+  if (raw == null || raw === '') return null
+  if (raw instanceof Date) {
+    return isNaN(raw.getTime()) ? null : `${raw.getFullYear()}-${pad2(raw.getMonth() + 1)}-${pad2(raw.getDate())}`
+  }
+  if (typeof raw === 'number') return excelSerialToISODate(raw)
+
+  const s = String(raw).trim()
+  if (!s) return null
+
+  const m = s.match(/^(\d{1,4})年(\d{1,2})月(\d{1,2})日?$/) ?? s.match(/^(\d{1,4})[-/.](\d{1,2})[-/.](\d{1,2})$/)
+  if (!m) return null
+
+  let year = Number(m[1])
+  const month = Number(m[2])
+  const day = Number(m[3])
+  if (year < 1000) year += 1911 // 民國年轉西元（社友慣用民國年填入社日期）
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+
+  const iso = `${year}-${pad2(month)}-${pad2(day)}`
+  return isNaN(new Date(iso).getTime()) ? null : iso
+}
+
 function withDerivedStatus(payload: RosterMemberInsert): RosterMemberInsert {
   const status = payload.member_status ?? 'normal'
   return {
@@ -380,7 +420,7 @@ async function handleImport(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: 'array' })
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true })
   const sheet = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<RosterExcelRow>(sheet)
   if (fileInput.value) fileInput.value.value = ''
@@ -411,6 +451,7 @@ async function handleImport(e: Event) {
   const seen = new Set<string>()
   let blankNameCount = 0
   let duplicateInFileCount = 0
+  const badJoinDateNames: string[] = []
 
   importPreview.value = rows.flatMap((row, index) => {
     const name = String(row.姓名 ?? '').trim()
@@ -420,6 +461,8 @@ async function handleImport(e: Event) {
     const status = normalizeStatus(row.狀態)
     const personalPhone = row.個人電話 ?? row.電話 ?? null
     const existing = existingByName.get(name)
+    const joinDate = parseJoinDate(row.入社日期)
+    if (row.入社日期 && !joinDate) badJoinDateNames.push(name)
     const payload: RosterMemberInsert = {
       club_id: auth.clubId ?? '',
       name,
@@ -435,7 +478,7 @@ async function handleImport(e: Event) {
       phone: personalPhone,
       personal_phone: personalPhone,
       company_phone: row.公司電話 ?? null,
-      join_date: row.入社日期 ?? null,
+      join_date: joinDate,
       is_active: activeFromStatus(status),
       note: null,
     }
@@ -459,6 +502,12 @@ async function handleImport(e: Event) {
   }
   if (duplicateInFileCount) {
     warnings.push(`有 ${duplicateInFileCount} 列的姓名跟檔案裡前面某一列重複，只保留第一筆`)
+  }
+  if (badJoinDateNames.length) {
+    warnings.push(
+      `以下社友的「入社日期」看不懂，這次匯入這些人的入社日期會先留空，其他欄位照常匯入，之後可以到名冊列表手動補填：${badJoinDateNames.join('、')}\n` +
+      `入社日期建議填西元年，格式例如 2026-07-01、2026/7/1 或民國年 113/7/1。`
+    )
   }
   if (warnings.length) alert(warnings.join('\n\n'))
 }
