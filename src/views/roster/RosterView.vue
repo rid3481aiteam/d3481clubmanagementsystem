@@ -587,7 +587,7 @@ onMounted(() => {
     <div class="ph">
       <div style="display:flex; align-items:center; gap:8px;">
         <h1>社友名冊</h1>
-        <PageHelp title="社友名冊怎麼用" :items="rosterHelpItems" />
+        <PageHelp title="社友名冊怎麼用" :items="rosterHelpItems" manual-url="/manual/sop-guide.pdf#page=3" />
       </div>
       <div v-if="canManage" style="display:flex; gap:8px;">
         <template v-if="features.isEnabled('D2_roster_excel') && !bulkEditing">

@@ -4,6 +4,7 @@ import { ref, onBeforeUnmount } from 'vue'
 defineProps<{
   title: string
   items: string[]
+  manualUrl?: string
 }>()
 
 const btnRef = ref<HTMLElement | null>(null)
@@ -43,6 +44,15 @@ onBeforeUnmount(() => {
 
 <template>
   <button ref="btnRef" type="button" class="page-help-btn" aria-label="使用教學" title="使用教學" @click.stop="toggle">?</button>
+  <a
+    v-if="manualUrl"
+    :href="manualUrl"
+    target="_blank"
+    rel="noopener"
+    class="page-help-btn"
+    aria-label="查看使用手冊"
+    title="查看使用手冊"
+  >📖</a>
 
   <Teleport to="body">
     <div v-if="open" class="page-help-panel" :style="panelStyle" @click.stop>
