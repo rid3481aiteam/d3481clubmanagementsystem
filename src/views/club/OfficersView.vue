@@ -4,7 +4,14 @@ import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useOfficersStore, currentYearTerm } from '@/stores/officers'
 import { useActivityLogStore } from '@/stores/activityLog'
+import PageHelp from '@/components/help/PageHelp.vue'
 import type { ClubOfficer, ClubOfficerRole, RosterMember } from '@/types'
+
+const officersHelpItems = [
+  '這裡設定的是本屆四大幹部（社長、社長當選人、副社長、秘書），成員都要先建在「社友名冊」裡才選得到人。',
+  '其他職位（財務、糾察等）與各委員會請分開新增，職位名稱可自訂，同一批人可以一次勾選加入同一個職位或委員會。',
+  '設定完成後會同步回名冊的「社內職稱」欄位，選單裡沒看到人時先回名冊確認資料有沒有建好。',
+]
 
 const auth = useAuthStore()
 const roster = useRosterStore()
@@ -381,7 +388,10 @@ watch(yearTerm, load)
 <template>
   <div class="page">
     <div class="ph">
-      <h1>本屆幹部</h1>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h1>本屆幹部</h1>
+        <PageHelp title="本屆幹部怎麼用" :items="officersHelpItems" manual-url="/manual/roster-officers-guide.pdf#page=6" />
+      </div>
       <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
         <label class="fl" style="display:inline-block; margin-right:6px;">年度</label>
         <select v-model="yearTerm" class="fi" style="width:170px; display:inline-block;" :disabled="editing">

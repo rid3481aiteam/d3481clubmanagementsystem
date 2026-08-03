@@ -6,7 +6,15 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useClubStore } from '@/stores/club'
 import { useActivityLogStore } from '@/stores/activityLog'
 import { suggestClubId as suggestClubIdFor } from '@/lib/clubMatch'
+import PageHelp from '@/components/help/PageHelp.vue'
 import type { UserProfile, UserRole, SsoPendingAccount } from '@/types'
+
+const accountManagementHelpItems = [
+  '社友要先自己用扶輪帳號（RotarySSO）申請過一次，才會出現在「帳號審核」清單裡，這裡不會、也不能直接幫社友建立新帳號。',
+  '「帳號權限授予」是給對方已經有帳號、要另外加權限的情況；「帳號審核」才是核准全新申請人加入本社。',
+  '角色怎麼選看是否需要維護社務資料：需要編輯例會/名冊/活動的選「各社管理員」，只需要檢視與報名活動的選「一般社友」。',
+  '「帳號總覽」可以隨時調整權限、重設密碼（僅手機號碼登入的帳號可用）、停用/啟用，「永久刪除」不可復原。',
+]
 
 const auth = useAuthStore()
 const invites = useInvitesStore()
@@ -288,7 +296,10 @@ watch(isDistrictAdminView, loadAccounts)
 <template>
   <div class="page">
     <div class="ph">
-      <h1>帳號管理</h1>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h1>帳號管理</h1>
+        <PageHelp title="帳號管理怎麼用" :items="accountManagementHelpItems" manual-url="/manual/account-activation-guide.pdf#page=6" />
+      </div>
     </div>
 
     <template v-if="isDistrictAdminView || isClubTier">
