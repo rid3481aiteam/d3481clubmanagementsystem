@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useMeetingsStore } from '@/stores/meetings'
 import { useAttendanceStore } from '@/stores/attendance'
 import { useRosterStore } from '@/stores/roster'
 import { usePermissionsStore } from '@/stores/permissions'
+import { useToastStore } from '@/stores/toast'
 import type { AttendanceStatus, RosterMember } from '@/types'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const meetings = useMeetingsStore()
 const attendance = useAttendanceStore()
 const roster = useRosterStore()
 const permissions = usePermissionsStore()
+const toast = useToastStore()
 
 const canManage = computed(() => permissions.can('attendance', 'edit'))
 
@@ -57,8 +60,10 @@ async function load() {
 async function handleSave() {
   const meetingId = route.params.id as string
   if (!auth.clubId) return
-  await attendance.save(meetingId, auth.clubId, statuses.value)
+  const { error } = await attendance.save(meetingId, auth.clubId, statuses.value)
+  if (error) { toast.show('儲存失敗：' + error.message, 'err'); return }
   await attendance.fetchRates(auth.clubId)
+  toast.show('已儲存出席記錄')
 }
 
 onMounted(async () => {
@@ -73,6 +78,7 @@ watch(() => route.params.id, load)
   <div class="page">
     <div class="ph">
       <h1>出席記錄 — {{ meetings.current?.date }} {{ meetings.current?.title }}</h1>
+      <button class="btn btn-g" @click="router.back()">← 返回</button>
     </div>
 
     <div v-if="attendance.session" class="stat-grid" style="margin-bottom:20px;">

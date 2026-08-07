@@ -112,7 +112,7 @@ function emptyActivityForm(): ActivityInsert {
   return {
     organizing_club_id: auth.clubId ?? '', title: '', description: null, location: null,
     address: null, start_at: '', registration_deadline: null, capacity: null,
-    status: 'open', club_only: false, category: '社內活動', host_name: null,
+    status: 'open', club_only: true, category: '社內活動', host_name: null,
   }
 }
 
@@ -192,6 +192,9 @@ async function save() {
     const payload: ActivityInsert = {
       ...activityForm.value,
       category: pickedCategory.value,
+      // 社內活動一律強制僅本社可見，不論「招募對象」切換元件當下的狀態；
+      // 這裡是最終送出前的最後一道防線，避免類別跟實際可見範圍不一致而跨社外洩。
+      club_only: pickedCategory.value === '社內活動' ? true : activityForm.value.club_only,
       title: activityForm.value.title.trim(),
       description: activityForm.value.description?.trim() || null,
       location: activityForm.value.location?.trim() || null,
@@ -453,7 +456,11 @@ watch(() => auth.isDistrictAdminView, loadActivities)
                 <option value="cancelled">已取消</option>
               </select>
             </div>
-            <div>
+            <div v-if="pickedCategory === '社內活動'">
+              <label class="fl">招募對象</label>
+              <p style="font-size:12.5px; color:var(--muted); margin:0;">社內活動固定僅本社社友看得到、可報名，不開放跨社瀏覽。</p>
+            </div>
+            <div v-else>
               <label class="fl">招募對象</label>
               <div class="segmented">
                 <button type="button" class="seg-btn" :class="{ active: !activityForm.club_only }" @click="activityForm.club_only = false">全地區社友（可跨社報名）</button>
