@@ -177,7 +177,7 @@ watch(selectedMonth, async () => {
     <div class="ph">
       <div style="display:flex; align-items:center; gap:8px;">
         <h1>出席月報</h1>
-        <PageHelp title="出席月報怎麼用" :items="attendanceMonthlyHelpItems" manual-url="/manual/attendance-monthly-guide.pdf#page=4" />
+        <PageHelp title="出席月報怎麼用" :items="attendanceMonthlyHelpItems" manual-url="/manual/attendance-monthly-guide.pdf" />
       </div>
     </div>
 

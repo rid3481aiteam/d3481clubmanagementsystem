@@ -390,7 +390,7 @@ watch(yearTerm, load)
     <div class="ph">
       <div style="display:flex; align-items:center; gap:8px;">
         <h1>本屆幹部</h1>
-        <PageHelp title="本屆幹部怎麼用" :items="officersHelpItems" manual-url="/manual/roster-officers-guide.pdf#page=6" />
+        <PageHelp title="本屆幹部怎麼用" :items="officersHelpItems" manual-url="/manual/roster-officers-guide.pdf" />
       </div>
       <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
         <label class="fl" style="display:inline-block; margin-right:6px;">年度</label>

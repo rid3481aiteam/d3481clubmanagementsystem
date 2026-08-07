@@ -298,7 +298,7 @@ watch(isDistrictAdminView, loadAccounts)
     <div class="ph">
       <div style="display:flex; align-items:center; gap:8px;">
         <h1>帳號管理</h1>
-        <PageHelp title="帳號管理怎麼用" :items="accountManagementHelpItems" manual-url="/manual/account-activation-guide.pdf#page=6" />
+        <PageHelp title="帳號管理怎麼用" :items="accountManagementHelpItems" manual-url="/manual/account-activation-guide.pdf" />
       </div>
     </div>
 

@@ -269,7 +269,7 @@ watch(() => auth.isDistrictAdminView, loadActivities)
     <div class="ph">
       <div style="display:flex; align-items:center; gap:8px;">
         <h1>活動</h1>
-        <PageHelp title="活動怎麼用" :items="activitiesHelpItems" manual-url="/manual/activities-guide.pdf#page=3" />
+        <PageHelp title="活動怎麼用" :items="activitiesHelpItems" manual-url="/manual/activities-guide.pdf" />
       </div>
       <button v-if="canManage || canManageMeetings" class="btn btn-gold" @click="openAdd">+ 新增</button>
     </div>
