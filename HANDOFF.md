@@ -1,6 +1,10 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-08-08（第一百五十九輪，**依 3 份 QA 測試報告修復「潛在社友追蹤」「社友關懷」「社內公告」三頁的功能缺陷**）：使用者提供 2026-08-07 的三份手動測試報告（[`潛在社友追蹤`](src/views/roster/ProspectiveView.vue)／[`社友關懷`](src/views/club/MemberCareView.vue)／[`社內公告`](src/views/club/ClubAnnouncementsView.vue)），逐項依報告的「修復優先順序建議」修正：
+> 最後更新：2026-08-08（第一百六十輪，**潛在社友追蹤／社友關懷比照上一輪堵住地區管理員旁通漏洞**）：延續上一輪（159）三份測試報告裡標註「未涵蓋範圍」的疑慮，使用者確認要「比照上一輪」（158/075 對活動的處理原則）處理。查證 `prospects_select`／`care_select`（[`002_roster_members.sql`](supabase/migrations/002_roster_members.sql)）都有 `OR is_district_admin()` 無條件旁通。跟活動不同的是，這兩張表完全沒有「非社內、可跨社瀏覽」的資料類別（不像活動還有友社/地區活動要保留地區總覽），每一筆都是單一社的招募/關懷內部資料，所以這次採用跟 [`073_roster_district_isolation.sql`](supabase/migrations/073_roster_district_isolation.sql)（社友名冊）完全一樣的作法——直接拿掉 `is_district_admin()` 旁通，不是像活動那樣做 `AND NOT club_only` 的部分保留。新增 [`076_prospective_care_district_isolation.sql`](supabase/migrations/076_prospective_care_district_isolation.sql)。額外確認：`grep` 全部呼叫 `prospective.fetchAll()`/`care.fetchAll()` 的地方（`ProspectiveView.vue`／`MemberCareView.vue`／`DashboardView.vue`）都是傳 `auth.clubId`，沒有任何地方依賴 `null`（地區視角）撈全地區資料，確認這次收緊不會誤傷現有功能。
+>
+> 同一輪使用者也問「能不能連到 Supabase 查 503 問題」——Supabase MCP 的 `list_projects` 再次確認只看得到 WOWCasa/AICasa/Homerepair，看不到 D3481 專案（跟 memory 記錄一致，帳號權限沒變），改成請使用者在 Claude 內建瀏覽器（Browser pane）自行登入 Supabase Dashboard（Claude 不經手密碼），登入後由 Claude 用瀏覽器工具導覽到 Logs 頁面協助讀取診斷 503 錯誤——這部分待瀏覽器內操作結果，若有查到根因會另外記錄。
+>
+> 最後更新（上一輪）：2026-08-08（第一百五十九輪，**依 3 份 QA 測試報告修復「潛在社友追蹤」「社友關懷」「社內公告」三頁的功能缺陷**）：使用者提供 2026-08-07 的三份手動測試報告（[`潛在社友追蹤`](src/views/roster/ProspectiveView.vue)／[`社友關懷`](src/views/club/MemberCareView.vue)／[`社內公告`](src/views/club/ClubAnnouncementsView.vue)），逐項依報告的「修復優先順序建議」修正：
 >
 > **[`ProspectiveView.vue`](src/views/roster/ProspectiveView.vue) + [`stores/prospective.ts`](src/stores/prospective.ts)**：① 補上刪除功能（store 新增 `remove()`，RLS 本來就允許 DELETE，純粹前端沒做）；② `save()` 送出前把 `invited_date`/`follow_up_date` 的空字串轉 `null`，修掉「填過再清空」會把空字串送給 Postgres date 欄位報錯的 bug；③「追蹤中」統計卡改成排除已入社/婉拒（新增 `isTracking()` 跟「需跟進」共用同一組排除規則，避免兩張卡邏輯不一致），「需跟進」順便涵蓋「從未設定追蹤日」的人；④ Modal 包 `<form>`＋姓名欄位補 `required`＋`maxlength=100`，讓瀏覽器原生驗證生效；⑤ 新增下次追蹤日期早於邀請日期的軟性提示（不擋存檔）；⑥ 狀態改「已邀請」時自動帶入今天當邀請日期；⑦ 備註改 `textarea`；⑧ 加姓名／公司搜尋框；⑨ 表單欄位補 `id`/`for` 綁定；⑩ `alert()` 改用站內 toast。
 >
