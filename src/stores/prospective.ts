@@ -26,5 +26,10 @@ export const useProspectiveStore = defineStore('prospective', () => {
     return { error }
   }
 
-  return { prospects, loading, fetchAll, insert, update }
+  async function remove(id: string) {
+    const { error } = await supabase.from('prospective_members').delete().eq('id', id)
+    return { error }
+  }
+
+  return { prospects, loading, fetchAll, insert, update, remove }
 })

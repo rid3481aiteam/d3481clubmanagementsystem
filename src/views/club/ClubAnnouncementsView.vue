@@ -2,14 +2,20 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAnnouncementsStore } from '@/stores/announcements'
+import { useToastStore } from '@/stores/toast'
 import type { ClubAnnouncement } from '@/types'
 
 const auth = useAuthStore()
 const announcements = useAnnouncementsStore()
+const toast = useToastStore()
+
+const TITLE_MAX_LENGTH = 100
 
 const showModal = ref(false)
 const editingId = ref<string | null>(null)
 const form = ref(emptyForm())
+const formError = ref('')
+const saving = ref(false)
 const modalTitle = computed(() => editingId.value ? '編輯社內公告' : '新增社內公告')
 
 function toDateTimeLocal(date: Date) {
@@ -39,6 +45,7 @@ function toLocalInputValue(value: string | null) {
 function formatDateTime(value: string | null) {
   if (!value) return '-'
   return new Date(value).toLocaleString('zh-TW', {
+    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -46,9 +53,30 @@ function formatDateTime(value: string | null) {
   })
 }
 
+// 狀態改成綜合判斷：草稿（未勾選發布）／排程中（發布時間還沒到）／
+// 已發布（發布時間 ≤ now < 到期時間）／已過期（到期時間已過）
+function announcementStatus(item: ClubAnnouncement) {
+  if (!item.is_published) return { label: '草稿', cls: 'b-g' }
+  const now = Date.now()
+  const publishedAt = new Date(item.published_at).getTime()
+  const expiresAt = item.expires_at ? new Date(item.expires_at).getTime() : null
+  if (now < publishedAt) return { label: '排程中', cls: 'b-y' }
+  if (expiresAt !== null && now >= expiresAt) return { label: '已過期', cls: 'b-n' }
+  return { label: '已發布', cls: 'b-gr' }
+}
+
+// 已知的資料庫 constraint 錯誤，轉成中文訊息，不直接把後端原文（資料表/約束名稱）丟給使用者
+function friendlyError(message: string): string {
+  if (message.includes('club_announcements_expires_after_publish')) return '到期時間必須晚於發布時間'
+  if (message.includes('club_announcements_title_present')) return '請輸入標題'
+  if (message.includes('club_announcements_body_present')) return '請輸入內容'
+  return '儲存失敗，請稍後再試'
+}
+
 function openAdd() {
   editingId.value = null
   form.value = emptyForm()
+  formError.value = ''
   showModal.value = true
 }
 
@@ -61,6 +89,7 @@ function openEdit(item: ClubAnnouncement) {
     published_at: toLocalInputValue(item.published_at),
     expires_at: toLocalInputValue(item.expires_at),
   }
+  formError.value = ''
   showModal.value = true
 }
 
@@ -68,7 +97,13 @@ async function save() {
   const clubId = auth.clubId
   const title = form.value.title.trim()
   const body = form.value.body.trim()
-  if (!clubId || !title || !body) return
+  if (!title) { formError.value = '請輸入標題'; return }
+  if (!body) { formError.value = '請輸入內容'; return }
+  if (!clubId) return
+  if (form.value.expires_at && form.value.expires_at <= form.value.published_at) {
+    formError.value = '到期時間必須晚於發布時間'
+    return
+  }
 
   const payload = {
     title,
@@ -78,22 +113,26 @@ async function save() {
     expires_at: form.value.expires_at ? new Date(form.value.expires_at).toISOString() : null,
   }
 
+  saving.value = true
   const { error } = editingId.value
     ? await announcements.updateClubAnnouncement(editingId.value, clubId, payload)
     : await announcements.createClubAnnouncement({ ...payload, club_id: clubId, created_by: auth.user?.id ?? null })
+  saving.value = false
 
   if (error) {
-    alert(error.message)
+    formError.value = friendlyError(error.message)
     return
   }
   showModal.value = false
+  toast.show(editingId.value ? '已更新' : '已新增')
 }
 
 async function remove(item: ClubAnnouncement) {
   const clubId = auth.clubId
   if (!clubId || !confirm(`刪除「${item.title}」？`)) return
   const { error } = await announcements.deleteClubAnnouncement(item.id, clubId)
-  if (error) alert(error.message)
+  if (error) { toast.show('刪除失敗：' + friendlyError(error.message), 'err'); return }
+  toast.show('已刪除')
 }
 
 onMounted(() => {
@@ -108,7 +147,7 @@ onMounted(() => {
       <button class="btn btn-gold" @click="openAdd">+ 新增公告</button>
     </div>
 
-    <div class="tw">
+    <div class="tw" style="overflow-x:auto;">
       <table class="card-table">
         <thead class="th">
           <tr>
@@ -122,13 +161,11 @@ onMounted(() => {
         <tbody>
           <tr v-for="item in announcements.adminClubAnnouncements" :key="item.id">
             <td data-label="標題" class="card-stack">
-              <strong>{{ item.title }}</strong>
+              <strong class="ellipsis-cell" :title="item.title">{{ item.title }}</strong>
               <div class="announcement-preview">{{ item.body }}</div>
             </td>
             <td data-label="狀態">
-              <span class="bdg" :class="item.is_published ? 'b-gr' : 'b-g'">
-                {{ item.is_published ? '已發布' : '草稿' }}
-              </span>
+              <span class="bdg" :class="announcementStatus(item).cls">{{ announcementStatus(item).label }}</span>
             </td>
             <td data-label="發布時間">{{ formatDateTime(item.published_at) }}</td>
             <td data-label="到期時間">{{ formatDateTime(item.expires_at) }}</td>
@@ -152,32 +189,35 @@ onMounted(() => {
           <h3>{{ modalTitle }}</h3>
           <button class="mb-close" @click="showModal = false">×</button>
         </div>
-        <div class="mb-body">
-          <div>
-            <label class="fl">標題 *</label>
-            <input v-model="form.title" class="fi" />
+        <form @submit.prevent="save">
+          <div class="mb-body">
+            <p v-if="formError" style="color:var(--red); font-size:12px; margin-bottom:10px;">{{ formError }}</p>
+            <div>
+              <label class="fl" for="announcement-title">標題 *</label>
+              <input id="announcement-title" v-model="form.title" class="fi" required :maxlength="TITLE_MAX_LENGTH" />
+            </div>
+            <div>
+              <label class="fl" for="announcement-body">內容 *</label>
+              <textarea id="announcement-body" v-model="form.body" class="fi announcement-body" required></textarea>
+            </div>
+            <div>
+              <label class="fl" for="announcement-published-at">發布時間 *</label>
+              <input id="announcement-published-at" v-model="form.published_at" type="datetime-local" class="fi" required />
+            </div>
+            <div>
+              <label class="fl" for="announcement-expires-at">到期時間</label>
+              <input id="announcement-expires-at" v-model="form.expires_at" type="datetime-local" class="fi" />
+            </div>
+            <label class="publish-toggle">
+              <input v-model="form.is_published" type="checkbox" />
+              <span>立即發布（取消勾選則存為草稿，社友看不到）</span>
+            </label>
           </div>
-          <div>
-            <label class="fl">內容 *</label>
-            <textarea v-model="form.body" class="fi announcement-body"></textarea>
+          <div class="mb-foot">
+            <button type="button" class="btn btn-g" @click="showModal = false">取消</button>
+            <button type="submit" class="btn btn-gold" :disabled="saving">{{ saving ? '儲存中…' : '儲存' }}</button>
           </div>
-          <div>
-            <label class="fl">發布時間 *</label>
-            <input v-model="form.published_at" type="datetime-local" class="fi" />
-          </div>
-          <div>
-            <label class="fl">到期時間</label>
-            <input v-model="form.expires_at" type="datetime-local" class="fi" />
-          </div>
-          <label class="publish-toggle">
-            <input v-model="form.is_published" type="checkbox" />
-            <span>發布到本社儀表板</span>
-          </label>
-        </div>
-        <div class="mb-foot">
-          <button class="btn btn-g" @click="showModal = false">取消</button>
-          <button class="btn btn-gold" @click="save">儲存</button>
-        </div>
+        </form>
       </div>
     </div>
   </div>
@@ -205,5 +245,13 @@ onMounted(() => {
   gap: 8px;
   font-size: 13px;
   color: var(--text);
+}
+
+.ellipsis-cell {
+  display: block;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
