@@ -17,17 +17,20 @@ export const useActivitiesStore = defineStore('activities', () => {
   const loading = ref(false)
 
   // clubId 有值時只查「跟本社有關」的活動：本社主辦的（不論分類/狀態）+
-  // 其他社主辦但非草稿的公開活動（友社/地區活動）。RLS 對地區管理員是放行
-  // 看全地區（含其他社的例會私人報名活動），切到社端視角時要在查詢這層
-  // 額外擋掉，不能只靠畫面過濾——不然瀏覽器還是會收到其他社的私人資料。
-  // 不帶或傳 null 才是地區視角，看全地區（含其他社的例會，供地區管理員總覽）。
+  // 其他社主辦但非草稿、非社內活動的公開活動（友社/地區活動）。club_only.eq.false
+  // 這個條件跟 RLS（075_activities_district_admin_club_only_fix.sql）的界線
+  // 對齊：社內活動（club_only=true）一律不該跨社出現，不管查詢這層有沒有
+  // 篩到，RLS 本來就會擋掉，這裡同步收緊只是避免送出一個「看起來會撈到別社
+  // 社內活動」的查詢造成誤解。
+  // 不帶或傳 null 才是地區視角，看全地區（含其他社的例會，供地區管理員總覽，
+  // 社內活動仍由 RLS 擋住不會出現）。
   async function fetchAll(clubId?: string | null) {
     loading.value = true
     let query = supabase
       .from('activities')
       .select('*, clubs(name)')
       .order('start_at', { ascending: false })
-    if (clubId) query = query.or(`organizing_club_id.eq.${clubId},and(meeting_id.is.null,status.neq.draft)`)
+    if (clubId) query = query.or(`organizing_club_id.eq.${clubId},and(meeting_id.is.null,status.neq.draft,club_only.eq.false)`)
     const { data } = await query
     activities.value = (data as ActivityWithClub[] | null) ?? []
     loading.value = false
