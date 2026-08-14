@@ -1,6 +1,18 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-08-08（第一百六十輪，**潛在社友追蹤／社友關懷比照上一輪堵住地區管理員旁通漏洞**）：延續上一輪（159）三份測試報告裡標註「未涵蓋範圍」的疑慮，使用者確認要「比照上一輪」（158/075 對活動的處理原則）處理。查證 `prospects_select`／`care_select`（[`002_roster_members.sql`](supabase/migrations/002_roster_members.sql)）都有 `OR is_district_admin()` 無條件旁通。跟活動不同的是，這兩張表完全沒有「非社內、可跨社瀏覽」的資料類別（不像活動還有友社/地區活動要保留地區總覽），每一筆都是單一社的招募/關懷內部資料，所以這次採用跟 [`073_roster_district_isolation.sql`](supabase/migrations/073_roster_district_isolation.sql)（社友名冊）完全一樣的作法——直接拿掉 `is_district_admin()` 旁通，不是像活動那樣做 `AND NOT club_only` 的部分保留。新增 [`076_prospective_care_district_isolation.sql`](supabase/migrations/076_prospective_care_district_isolation.sql)。額外確認：`grep` 全部呼叫 `prospective.fetchAll()`/`care.fetchAll()` 的地方（`ProspectiveView.vue`／`MemberCareView.vue`／`DashboardView.vue`）都是傳 `auth.clubId`，沒有任何地方依賴 `null`（地區視角）撈全地區資料，確認這次收緊不會誤傷現有功能。
+> 最後更新：2026-08-14（第一百六十一輪，**`/calendar` 地區重要行事曆改成響應式（依斷點切換版型/欄位）**）：使用者提供一份「如何跟 AI 說明響應式需求」的教學文件（含具體斷點、版型、欄位優先級與驗收標準），依此重寫 [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue)：
+>
+> **斷點與版型**：Desktop（`>=1024px`）用 `<table>` 顯示全部欄位（日期/時段/活動名稱/地點/完整日期含星期/倒數天數/加入行事曆）；Tablet（`640–1023px`）改兩欄卡片格線（`grid-template-columns:1fr 1fr`），隱藏含星期的完整日期，地點單行截斷，「加入行事曆」保留文字＋圖示；Mobile（`<640px`）改單欄卡片，標題 `-webkit-line-clamp:2` 限兩行，地點 `text-overflow:ellipsis` 截斷，右上角倒數天數 badge，「加入行事曆」縮成純圖示按鈕但維持 `min-width/height:44px` 觸控熱區。三種版型共用同一份 `monthGroups`/`filtered` computed（沒有另外重複寫一套過濾/抓資料邏輯），純粹用 CSS media query（`min-width:640px`/`min-width:1024px`）切換 `display`，**沒有用 JS 偵測 `window.innerWidth`**。
+>
+> **其他共同規則**：月份分組標題 `.dc-month-head` 加 `position:sticky; top:0`，所有尺寸捲動時都會置頂；篩選頁籤（即將到來/全部/已過期）在 `<640px` 改 `flex:1 1 33.333%` 等寬三等分，容器加 `overflow-x:auto` 保險。
+>
+> **驗證**：`vue-tsc --noEmit` 通過。因為這個環境沒有 D3481 專案的 Supabase 憑證（`.env.local` 不存在，`list_projects` 也看不到這個專案，跟 memory 記錄一致），無法直接跑起 `/calendar` 頁面實測登入後畫面，改成另外用同一份 markup/CSS 搭配假資料（含使用者提供的最長活動名稱範例：「2027-28年度『社領導人學習研習會』(Club Leadership Learning Seminar：CLLS) 08:00-21:30」）做成靜態 HTML，在 Claude 內建瀏覽器實測 320/375/768/1440px 四個寬度：全部無橫向捲軸（`body.scrollWidth` 等於 `clientWidth`）、最長活動名稱在三種版型都正常換行/截斷沒撐破版面、768px 確認正確切到兩欄卡片、1440px 確認正確切到表格版、320/375px 確認標題兩行截斷＋圖示按鈕≥44px。
+>
+> **這次刻意沒做**（教學文件「五、追加優化」列的是第二輪才做的項目，這輪先做完第一版核心需求）：`aria-label` 只加在 Mobile 圖示按鈕上（已做），沒有額外做無限捲動／分批渲染（文件建議 51 筆時 Mobile 先渲染 20 筆，這個環境連不到真實資料看不出目前實際筆數是否需要，先不處理，需要的話可以之後追加）；斷點規則沒有抽成共用元件（目前只有這一個頁面用得到，等第二個列表頁也要用同一套斷點時再抽取比較不會抽錯介面）。
+>
+> **待使用者：** 部署後在正式站登入實測 `/calendar`，用真實資料在手機/平板/桌機分別確認版型與資料正確；如果之後要把這套斷點規則套到其他列表頁，屆時再一起討論怎麼抽成共用元件。
+>
+> 最後更新（上一輪）：2026-08-08（第一百六十輪，**潛在社友追蹤／社友關懷比照上一輪堵住地區管理員旁通漏洞**）：延續上一輪（159）三份測試報告裡標註「未涵蓋範圍」的疑慮，使用者確認要「比照上一輪」（158/075 對活動的處理原則）處理。查證 `prospects_select`／`care_select`（[`002_roster_members.sql`](supabase/migrations/002_roster_members.sql)）都有 `OR is_district_admin()` 無條件旁通。跟活動不同的是，這兩張表完全沒有「非社內、可跨社瀏覽」的資料類別（不像活動還有友社/地區活動要保留地區總覽），每一筆都是單一社的招募/關懷內部資料，所以這次採用跟 [`073_roster_district_isolation.sql`](supabase/migrations/073_roster_district_isolation.sql)（社友名冊）完全一樣的作法——直接拿掉 `is_district_admin()` 旁通，不是像活動那樣做 `AND NOT club_only` 的部分保留。新增 [`076_prospective_care_district_isolation.sql`](supabase/migrations/076_prospective_care_district_isolation.sql)。額外確認：`grep` 全部呼叫 `prospective.fetchAll()`/`care.fetchAll()` 的地方（`ProspectiveView.vue`／`MemberCareView.vue`／`DashboardView.vue`）都是傳 `auth.clubId`，沒有任何地方依賴 `null`（地區視角）撈全地區資料，確認這次收緊不會誤傷現有功能。
 >
 > 同一輪使用者也問「能不能連到 Supabase 查 503 問題」——Supabase MCP 的 `list_projects` 再次確認只看得到 WOWCasa/AICasa/Homerepair，看不到 D3481 專案（跟 memory 記錄一致，帳號權限沒變），改成請使用者在 Claude 內建瀏覽器（Browser pane）自行登入 Supabase Dashboard（Claude 不經手密碼），登入後由 Claude 用瀏覽器工具導覽到 Logs 頁面協助讀取診斷 503 錯誤——這部分待瀏覽器內操作結果，若有查到根因會另外記錄。
 >
