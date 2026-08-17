@@ -1,6 +1,8 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-08-14（第一百六十一輪，**`/calendar` 地區重要行事曆改成響應式（依斷點切換版型/欄位）**）：使用者提供一份「如何跟 AI 說明響應式需求」的教學文件（含具體斷點、版型、欄位優先級與驗收標準），依此重寫 [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue)：
+> 最後更新：2026-08-17（第一百六十二輪，**新增「台北西區扶青社」到社團總覽**）：使用者要求新建一個社團「台北西區扶青社」。這個環境連不到 D3481 專案的 Supabase（跟 memory 記錄一致），無法直接透過後台「+ 新增社團」（[`ClubListView.vue`](src/views/admin/ClubListView.vue)）幫使用者按下去，改成寫一份 migration：新增 [`077_add_taipei_west_rotaract.sql`](supabase/migrations/077_add_taipei_west_rotaract.sql)，只 insert `name='台北西區扶青社'`／`zone='第二分區'`（比照輔導社台北西區扶輪社所在分區，使用者確認），其餘社長/執秘/email/電話/例會時間地點等欄位留空，之後由地區管理員在「編輯社團」頁面補上（跟既有 [`015_seed_district_clubs.sql`](supabase/migrations/015_seed_district_clubs.sql) 同樣的 seed 慣例，`WHERE NOT EXISTS` 可重複執行不會產生重複社團）。**待使用者：** 到 Supabase Dashboard SQL Editor 手動執行 077 migration，執行後到正式站「社團總覽」確認「台北西區扶青社」出現在第二分區，需要的話再補社長/執秘等聯絡資訊。
+
+> 最後更新（上一輪）：2026-08-14（第一百六十一輪，**`/calendar` 地區重要行事曆改成響應式（依斷點切換版型/欄位）**）：使用者提供一份「如何跟 AI 說明響應式需求」的教學文件（含具體斷點、版型、欄位優先級與驗收標準），依此重寫 [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue)：
 >
 > **斷點與版型**：Desktop（`>=1024px`）用 `<table>` 顯示全部欄位（日期/時段/活動名稱/地點/完整日期含星期/倒數天數/加入行事曆）；Tablet（`640–1023px`）改兩欄卡片格線（`grid-template-columns:1fr 1fr`），隱藏含星期的完整日期，地點單行截斷，「加入行事曆」保留文字＋圖示；Mobile（`<640px`）改單欄卡片，標題 `-webkit-line-clamp:2` 限兩行，地點 `text-overflow:ellipsis` 截斷，右上角倒數天數 badge，「加入行事曆」縮成純圖示按鈕但維持 `min-width/height:44px` 觸控熱區。三種版型共用同一份 `monthGroups`/`filtered` computed（沒有另外重複寫一套過濾/抓資料邏輯），純粹用 CSS media query（`min-width:640px`/`min-width:1024px`）切換 `display`，**沒有用 JS 偵測 `window.innerWidth`**。
 >
