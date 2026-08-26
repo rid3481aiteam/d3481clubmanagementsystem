@@ -1,9 +1,14 @@
 # 出席月報手冊（attendance-monthly-guide.pdf）更新草稿
 
-> 用途：`public/manual/attendance-monthly-guide.pdf` 是使用者外部製作、排版好的簡報 PDF（Rotary navy/gold
-> 風格，共 11 頁），不是 Claude 產生的，專案裡也沒有留 PowerPoint/Keynote 原始檔，所以 Claude 沒辦法直接
-> 改動這份 PDF 的視覺內容。這份文件只是「異動內容的文字草稿」，給負責重新排版簡報的人（使用者本人／
-> AI 委員會／設計工具）參考，把下面的文字放進對應頁面即可，不含實際排版。
+> **已完成**（2026-08-26）：下面規劃的三處異動已經直接做進 `public/manual/attendance-monthly-guide.pdf`
+> 本體，不是只留文字草稿。做法：原本 11 頁是 Canva 匯出的 PDF（作者「黃奕凱」），沒有 PowerPoint/Keynote
+> 原始檔，但 PDF 本身其實是可解析的向量內容（有文字層、有獨立的圖片物件），所以改用程式（PyMuPDF）直接
+> 讀取原始頁面的背景圖、金色邊框卡片圖、頁尾條這幾個可重複使用的圖片素材，比照原本排版重新產生新頁面／
+> 局部覆蓋文字，而不是整份重畫。新版共 12 頁：原本 STEP1～4 逐字不動，STEP2 多一條「日期打錯可以直接
+> 修正」，新增一頁 STEP5「個人補出席：批次加入／單筆加入／清單一次送出」（用本機假資料截圖示範），原本
+> STEP5／STEP6 順延成 STEP6／STEP7，最後確認頁多一條「批次補登」提醒。CJK 文字改用系統 STHeiti 字型
+> 子集化嵌入（原本直接嵌入 55MB 的 .ttc 一度讓檔案暴衝到 1.3GB，抓出來後用 fonttools 只抽出用得到的
+> 字，檔案控制在 21MB）。下面原本的規劃內容保留，作為異動理由的紀錄。
 >
 > 對應程式改動：見 commit `7805ce8`（[AttendanceMonthlyView.vue](../../src/views/meetings/AttendanceMonthlyView.vue)、
 > [attendance.ts](../../src/stores/attendance.ts)）。
