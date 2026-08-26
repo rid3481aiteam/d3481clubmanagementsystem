@@ -258,6 +258,119 @@ export const useAttendanceStore = defineStore('attendance', () => {
     return { error: null }
   }
 
+  // 批次「個人補出席」：items 可能混雜多位社友、多個日期，先依日期分組，
+  // 同一天只查一次／建一次 meeting + session（避免跟單筆版本一樣，同一天
+  // 被查詢好幾次），同一天底下再逐位社友沿用 makeupMemberAttendance 同一套
+  // 「找到就更新、找不到就新增」邏輯；全部處理完才視需要重算一次彙總數字。
+  async function batchMakeupAttendance(
+    clubId: string,
+    items: { memberId: string; date: string; status: AttendanceStatus }[],
+    activeMemberCount: number
+  ) {
+    const results: { memberId: string; date: string; error: string | null }[] = []
+
+    const byDate = new Map<string, typeof items>()
+    for (const item of items) {
+      const list = byDate.get(item.date) ?? []
+      list.push(item)
+      byDate.set(item.date, list)
+    }
+
+    for (const [date, dateItems] of byDate) {
+      const { data: existingMeeting } = await supabase
+        .from('meetings')
+        .select('id')
+        .eq('club_id', clubId)
+        .eq('date', date)
+        .maybeSingle()
+
+      let meetingId = existingMeeting?.id as string | undefined
+
+      if (!meetingId) {
+        const { data: newMeeting, error: meetingError } = await supabase
+          .from('meetings')
+          .insert({ club_id: clubId, date })
+          .select()
+          .single()
+        if (meetingError) {
+          for (const item of dateItems) results.push({ memberId: item.memberId, date, error: meetingError.message })
+          continue
+        }
+        meetingId = newMeeting.id
+      }
+
+      const { data: existingSession } = await supabase
+        .from('attendance_sessions')
+        .select('id')
+        .eq('meeting_id', meetingId)
+        .maybeSingle()
+
+      let sessionId = existingSession?.id as string | undefined
+      let hadFullDetails = false
+
+      if (!sessionId) {
+        const { data: newSession, error: sessionError } = await supabase
+          .from('attendance_sessions')
+          .insert({ meeting_id: meetingId, club_id: clubId, total: 0, present: 0, absent: 0, leave: 0, exempt: 0 })
+          .select()
+          .single()
+        if (sessionError) {
+          for (const item of dateItems) results.push({ memberId: item.memberId, date, error: sessionError.message })
+          continue
+        }
+        sessionId = newSession.id
+      } else {
+        const { count } = await supabase
+          .from('attendance_details')
+          .select('id', { count: 'exact', head: true })
+          .eq('session_id', sessionId)
+        hadFullDetails = (count ?? 0) >= activeMemberCount
+      }
+
+      for (const item of dateItems) {
+        const { data: existingDetail } = await supabase
+          .from('attendance_details')
+          .select('id')
+          .eq('session_id', sessionId)
+          .eq('member_id', item.memberId)
+          .maybeSingle()
+
+        if (existingDetail) {
+          const { error } = await supabase
+            .from('attendance_details')
+            .update({ status: item.status })
+            .eq('id', existingDetail.id)
+          results.push({ memberId: item.memberId, date, error: error?.message ?? null })
+        } else {
+          const { error } = await supabase
+            .from('attendance_details')
+            .insert({ session_id: sessionId, club_id: clubId, member_id: item.memberId, status: item.status })
+          results.push({ memberId: item.memberId, date, error: error?.message ?? null })
+        }
+      }
+
+      if (hadFullDetails) {
+        const { data: allDetails } = await supabase
+          .from('attendance_details')
+          .select('status')
+          .eq('session_id', sessionId)
+        const entries = allDetails ?? []
+        await supabase
+          .from('attendance_sessions')
+          .update({
+            total: entries.length,
+            present: entries.filter(d => d.status === 'present').length,
+            absent: entries.filter(d => d.status === 'absent').length,
+            leave: entries.filter(d => d.status === 'leave').length,
+            exempt: entries.filter(d => d.status === 'exempt').length,
+          })
+          .eq('id', sessionId)
+      }
+    }
+
+    return { results }
+  }
+
   async function save(
     meetingId: string,
     clubId: string,
@@ -320,6 +433,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     fetchMeetingsForMonth,
     quickAddSession,
     makeupMemberAttendance,
+    batchMakeupAttendance,
     save,
   }
 })
