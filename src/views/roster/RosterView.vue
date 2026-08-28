@@ -29,6 +29,7 @@ const rosterHelpItems = [
   '這裡是全社社友的通訊錄（電話、Email、公司等），新社加入平台第一件事就是把社友資料建進來，之後每頁功能才有資料可以用。',
   '社友人數多的話建議先「下載範本」，在 Excel 一次填好整批社友，再用「匯入 Excel」建立，比一筆一筆「+ 新增社友」快很多。',
   '資料建好後可以「編輯名冊」直接在畫面上整批修改，或「匯出 Excel」備份、交接給下一屆使用。',
+  '「編輯名冊」畫面每一列最右邊有「刪除」，是給重複建立、打錯要整筆刪掉的情況用，連同這位社友的出席記錄都會一併永久刪除、無法復原；如果只是社友請假或退社，請改選「狀態」欄，不要用刪除。',
   '上方搜尋框可查姓名/公司/電話/Email，「正常/請假/退社」篩選可以快速看目前有效社友或歷史紀錄。',
 ]
 
@@ -357,6 +358,26 @@ async function saveBulkEdit() {
   if (changedCount) await activityLog.log('roster.bulk_update', `批次編輯社友名冊，共更新 ${changedCount} 筆`, auth.clubId)
 }
 
+const deletingId = ref<string | null>(null)
+
+// 真正刪除（不是退社），給重複建立的社友資料用。連同出席明細、社友關懷紀錄
+// 一併刪除且無法復原，跟「退社」（僅改狀態，保留歷史紀錄）不同，先跟使用者
+// 確認清楚再送出。
+async function handleDeleteMember(row: RosterDraft) {
+  const label = row.nick_name ? `${row.nick_name}（${row.name}）` : row.name
+  if (!confirm(`確定永久刪除「${label}」？相關的出席記錄與社友關懷紀錄也會一併刪除，無法復原。\n\n如果只是社友暫時請假或離社，請改用「狀態」欄選擇「請假」或「退社」，不要用這裡的刪除。`)) return
+  deletingId.value = row.id
+  const { error } = await roster.remove(row.id)
+  deletingId.value = null
+  if (error) {
+    alert('刪除失敗：' + error.message)
+    return
+  }
+  draftRows.value = draftRows.value.filter(r => r.id !== row.id)
+  await roster.fetchAll(auth.clubId)
+  await activityLog.log('roster.delete', `永久刪除社友「${label}」`, auth.clubId)
+}
+
 const showModal = ref(false)
 const editing = ref<RosterMember | null>(null)
 const form = ref<RosterMemberInsert>(emptyForm())
@@ -635,6 +656,7 @@ onMounted(() => {
             <th>Email</th>
             <th>入社日期</th>
             <th>狀態</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -673,9 +695,17 @@ onMounted(() => {
                 <option value="resigned">退社</option>
               </select>
             </td>
+            <td data-label="操作">
+              <button
+                type="button"
+                class="btn btn-red btn-sm"
+                :disabled="deletingId === m.id"
+                @click="handleDeleteMember(m)"
+              >{{ deletingId === m.id ? '刪除中…' : '刪除' }}</button>
+            </td>
           </tr>
           <tr v-if="!filteredDraftRows.length">
-            <td colspan="12" style="text-align:center; color:var(--muted);">查無資料</td>
+            <td colspan="13" style="text-align:center; color:var(--muted);">查無資料</td>
           </tr>
         </tbody>
       </table>

@@ -34,6 +34,14 @@ export const useRosterStore = defineStore('roster', () => {
     return update(id, { is_active: isActive, member_status: isActive ? 'normal' : 'resigned' })
   }
 
+  // 真正刪除一筆社友（例如重複建立的資料），跟 setActive 的「退社」軟刪除不同——
+  // 這筆連同出席明細（attendance_details）、社友關懷（member_care）會一併被
+  // DB 的 ON DELETE CASCADE 刪掉，無法復原；一般想讓社友離社請改用退社。
+  async function remove(id: string) {
+    const { error } = await supabase.from('roster').delete().eq('id', id)
+    return { error }
+  }
+
   // 給地區視角看「社友人數」「領域分布」這種不含個人身分的統計用——
   // 名冊本身（姓名、聯絡方式等）已經改成只有該社自己人看得到，地區
   // 走這兩支 SECURITY DEFINER 函式，資料庫端就算好聚合結果才回傳，
@@ -49,7 +57,7 @@ export const useRosterStore = defineStore('roster', () => {
   }
 
   return {
-    members, loading, fetchAll, insert, update, setActive,
+    members, loading, fetchAll, insert, update, setActive, remove,
     fetchActiveMemberCount, fetchClassificationBreakdown,
   }
 })
