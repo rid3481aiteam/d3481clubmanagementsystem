@@ -1,5 +1,11 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-08-17（第一百六十八輪，**「社友出席率統計」表補上「入社日期」欄，方便對照「計算次數」為什麼因人而異**）：使用者看到「社友出席率統計」表裡不同人的「計算次數」差很多（5～12 都有），問「這些數字的差異是什麼，統計基礎是什麼」。查證 `member_attendance_rate` view（[`003_meetings_attendance.sql`](supabase/migrations/003_meetings_attendance.sql)）的 `counted` 是 `COUNT(*) FILTER (WHERE status != 'exempt')`——算的是「這位社友有出席明細紀錄、且不是免計」的例會數，不是全社總例會數。跟使用者說明差異主要來源：① 例會逐人出席是「存檔當下」的名冊快照，社友入社前就已存檔完成的例會不會回溯補上他的紀錄，這是最常見原因；② 免計狀態會被排除在分母外；③ 只用「快速新增」補整場人次、沒有逐人登記的例會，完全不會寫進 `attendance_details`，所有人的計算次數都不會因此增加；④ 只被單獨用「個人補出席」補過幾天的社友計算次數也會偏少。使用者接著說「請檢查」——這個環境連不到 D3481 專案的 Supabase，沒辦法直接查詢 `roster`／`attendance_details` 的真實資料驗證是不是入社時間造成的，改成把①的驗證方式直接做進畫面：[`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 的「社友出席率統計」表新增「入社日期」欄（`joinDateFor()`，從已經載入的 `roster.members` 查 `join_date`，不用新查詢），使用者自己就能對照，不用切到「社友名冊」另外查。表格上面的說明文字也補了一句解釋。
+>
+> **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。純新增顯示欄位，沒有新邏輯分支，`colspan`（空狀態列）同步從 6 改成 7。
+>
+> **待使用者：** 部署後看「社友出席率統計」表新增的「入社日期」欄，對照計算次數偏低的社友（例如上次截圖的 Golden）入社日期是不是確實比較晚，確認①是不是主要原因；如果入社日期正常、計算次數卻異常偏低，可能是②③④的情況，屆時可以再回來一起查是哪一種。
+
 > 最後更新：2026-08-17（第一百六十七輪，**「社友出席率統計」表改成依姓名字母排序，取代原本的依出席率排序**）：使用者上一輪反映的「英文字母排序」原來是針對 165 輪新增的「社友出席率統計」表——附了截圖，姓名欄看起來是亂序（因為那張表原本設計是依「出席率」由低到高排，不是依姓名），166 輪誤判成是在講 `roster.ts` 的名冊排序（那個也確實有 bug，順手修掉了，但不是這次截圖指的那張表）。這輪把 [`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 的 `sortedRates` 排序邏輯換掉：新增 `compareRateRows()`，跟 [`stores/roster.ts`](src/stores/roster.ts) 的 `compareRosterMembers()` 同一套原則（有英文名的不分大小寫依字母順序排前面，沒有的依中文姓名排後面），取代原本 `(a.rate ?? -1) - (b.rate ?? -1)` 的出席率排序。**出席率 <60% 還是用紅色徽章標示**，只是不再靠排序去凸顯，改用姓名字母序當主要排序，避免資料一變動整份名單順序就跳動、也符合使用者這次要的「字母順序」。頁面上方 `PageHelp` 說明跟表格上面的提示文字都同步改了措辭（拿掉「由低到高排序」，改成「依姓名排序；出席率低於 60% 用紅色標示」）。
 >
 > **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過；另外用 node 拿使用者截圖裡實際出現的英文名（Motor/Insurance/Ironman/Daniel/Leon/Rex/Thomas/Charlies/Jeff/Jerome/House/Johnny/Tim）跑過一次 `compareRateRows`，排序結果是 Charlies→Daniel→House→Insurance→Ironman→Jeff→Jerome→Johnny→Leon→Motor→Rex→Thomas→Tim，確認是正確字母順序。這個環境連不到 D3481 專案的 Supabase，無法用真實資料在瀏覽器實測。

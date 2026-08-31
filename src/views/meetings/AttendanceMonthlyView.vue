@@ -239,6 +239,13 @@ function rateMemberName(r: MemberAttendanceRate) {
   return r.member_nick_name ? `${r.member_nick_name}（${r.member_name}）` : r.member_name
 }
 
+// 「計算次數」因人而異多半是因為入社時間不同（例會逐人出席是存檔當下
+// 的名冊快照，入社前已存檔的例會不會回溯補上），把入社日期一起列出來
+// 方便直接對照，不用另外切到「社友名冊」查。
+function joinDateFor(memberId: string) {
+  return roster.members.find(m => m.id === memberId)?.join_date ?? null
+}
+
 function compareRateRows(a: MemberAttendanceRate, b: MemberAttendanceRate) {
   const an = (a.member_nick_name ?? '').trim()
   const bn = (b.member_nick_name ?? '').trim()
@@ -605,13 +612,14 @@ watch(selectedMonth, async () => {
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin:24px 0 8px;">社友出席率統計</h2>
     <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">
-      依扶輪年度累計計算（不受上面「選擇月份」篩選），依姓名排序；出席率低於 60% 最低門檻的社友用紅色標示。
+      依扶輪年度累計計算（不受上面「選擇月份」篩選），依姓名排序；出席率低於 60% 最低門檻的社友用紅色標示。「計算次數」因人而異多半是入社時間不同——入社前已經存檔的例會不會回溯補上紀錄，可以對照「入社日期」欄判斷。
     </p>
     <div class="tw">
       <table class="card-table">
         <thead class="th">
           <tr>
             <th>姓名</th>
+            <th>入社日期</th>
             <th>計算次數</th>
             <th>出席</th>
             <th>缺席</th>
@@ -622,6 +630,7 @@ watch(selectedMonth, async () => {
         <tbody>
           <tr v-for="r in sortedRates" :key="r.member_id">
             <td data-label="姓名">{{ rateMemberName(r) }}</td>
+            <td data-label="入社日期">{{ joinDateFor(r.member_id) ?? '-' }}</td>
             <td data-label="計算次數">{{ r.counted }}</td>
             <td data-label="出席">{{ r.present }}</td>
             <td data-label="缺席">{{ r.absent }}</td>
@@ -633,7 +642,7 @@ watch(selectedMonth, async () => {
             </td>
           </tr>
           <tr v-if="!sortedRates.length">
-            <td colspan="6" style="text-align:center; color:var(--muted);">尚無出席資料</td>
+            <td colspan="7" style="text-align:center; color:var(--muted);">尚無出席資料</td>
           </tr>
         </tbody>
       </table>
