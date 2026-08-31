@@ -1,6 +1,12 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-08-17（第一百六十四輪，**社端「出席月報」的「歷月出席月報」表也比照上一輪（163）的 Excel 欄位規格調整**）：使用者問「在各社自己的出席月報的呈現方式可以比照嗎」，延續上一輪只改了地區端 [`AdminAttendanceView.vue`](src/views/admin/AdminAttendanceView.vue)（一列一社）的做法，這輪把社端 [`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 最下面的「歷月出席月報」表（一列一月，是這頁裡跟 Excel「一列一筆記錄」結構真正對應的表格）也改成同一組欄位順序：月份→RI半年報基準人數(男/女/合計)→月底人數(男/女/合計)→淨成長→年齡分布(40以下/41+/合計)→例會次數→出席率。原本這張表只用「當月社友合計」一個數字＋「淨成長」，這次擴充成完整的男/女/年齡欄位（資料其實 `membershipFor(r.month)` 早就有了，只是沒顯示全部），拿掉「應出席/實際出席」合併欄（比照 163 輪，Excel 沒有這兩欄）。`colspan` 邏輯（13/3）跟表頭配色 class（`hdr-navy`/`hdr-purple`/`hdr-yellow`/`hdr-green`）直接沿用地區端那份，兩張表現在視覺上完全一致。
+> 最後更新：2026-08-17（第一百六十五輪，**社端「出席月報」新增「社友出席率統計」區塊**）：使用者要求「各社的出席月報內要有一段顯示社友各自的出席率統計」。查證發現這個統計其實早就存在——`member_attendance_rate` view（依扶輪年度累計，[`003_meetings_attendance.sql`](supabase/migrations/003_meetings_attendance.sql)）跟對應的 `attendance.rates`／`fetchRates()`（[`stores/attendance.ts`](src/stores/attendance.ts)）目前只用在單場例會的「活動」頁（[`AttendanceView.vue`](src/views/meetings/AttendanceView.vue) 「個人出席率」表），**「出席月報」頁完全沒有顯示這份資料**（`AttendanceMonthlyView.vue` 之前只在「個人補出席」送出後才順便呼叫一次 `fetchRates()`，畫面上沒有對應的表格）。這次直接沿用同一份 store/view，不用新增查詢邏輯：① `onMounted` 補上 `attendance.fetchRates(auth.clubId)`；② 在「歷月出席月報」下面新增「社友出席率統計」表格（姓名/計算次數/出席/缺席/請假/出席率，欄位跟「活動」頁那份一致），新增 `sortedRates` computed 依出席率由低到高排序，方便社秘一眼看出誰接近或已經低於 60% 門檻，出席率 <60% 用紅色徽章標示（跟頁面上其他地方強調的 60% 門檻一致）；③ 補上 `member_nick_name` 顯示（`rateMemberName()`，格式跟這頁其他地方的「暱稱（姓名）」一致——「活動」頁那份原本沒有用到這個欄位，這次算順便補齊）；④ 說明區塊補一條提示這是「依扶輪年度累計，不受選擇月份篩選」，避免使用者誤以為出席率會隨上面「選擇月份」變動。
+>
+> **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。這個環境連不到 D3481 專案的 Supabase，無法用真實資料登入實測。
+>
+> **待使用者：** 部署後登入任一社帳號看「出席月報」最下面新增的「社友出席率統計」，確認排序（由低到高）跟紅色徽章（<60%）符合預期，數字應該要跟「活動」頁任一場例會底下的「個人出席率」表一致（同一份資料來源）。
+
+> 最後更新（上一輪）：2026-08-17（第一百六十四輪，**社端「出席月報」的「歷月出席月報」表也比照上一輪（163）的 Excel 欄位規格調整**）：使用者問「在各社自己的出席月報的呈現方式可以比照嗎」，延續上一輪只改了地區端 [`AdminAttendanceView.vue`](src/views/admin/AdminAttendanceView.vue)（一列一社）的做法，這輪把社端 [`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 最下面的「歷月出席月報」表（一列一月，是這頁裡跟 Excel「一列一筆記錄」結構真正對應的表格）也改成同一組欄位順序：月份→RI半年報基準人數(男/女/合計)→月底人數(男/女/合計)→淨成長→年齡分布(40以下/41+/合計)→例會次數→出席率。原本這張表只用「當月社友合計」一個數字＋「淨成長」，這次擴充成完整的男/女/年齡欄位（資料其實 `membershipFor(r.month)` 早就有了，只是沒顯示全部），拿掉「應出席/實際出席」合併欄（比照 163 輪，Excel 沒有這兩欄）。`colspan` 邏輯（13/3）跟表頭配色 class（`hdr-navy`/`hdr-purple`/`hdr-yellow`/`hdr-green`）直接沿用地區端那份，兩張表現在視覺上完全一致。
 >
 > **這次刻意沒動的兩個地方**：① 上面「{{選擇月份}} 例會清單」那張表（單月內逐場例會列表，日期/主題/應出席/實際出席/出席率/操作）——這是「一列一場例會」的鑽取明細，跟 Excel「一列一筆月報記錄」的粒度不同，沒有對應欄位可以比照，維持原樣；② 「RI 半年報基準人數」那個輸入表單區塊——這是給使用者「編輯當月數字」用的表單（本來就已經照基準/月底/年齡分區塊排列），不是彙總表格，不需要重排欄位順序。
 >

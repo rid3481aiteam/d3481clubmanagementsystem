@@ -9,7 +9,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useMeetingsStore } from '@/stores/meetings'
 import { useToastStore } from '@/stores/toast'
 import PageHelp from '@/components/help/PageHelp.vue'
-import type { ClubMonthlyMembershipReportUpdate, AttendanceStatus, RosterMember } from '@/types'
+import type { ClubMonthlyMembershipReportUpdate, AttendanceStatus, RosterMember, MemberAttendanceRate } from '@/types'
 
 const auth = useAuthStore()
 const attendance = useAttendanceStore()
@@ -25,7 +25,8 @@ const attendanceMonthlyHelpItems = [
   '如果有例會沒有透過「活動」頁逐人登記，可以在「快速新增／補登例會出席」直接填當天應出席／實際出席人數；該天若已逐人登記過，請改到「活動」頁該場例會的出席記錄編輯，不要兩邊都填。',
   '「個人補出席」是針對單一社友的補登（例如跨社補會、簽到漏登），不會動到其他社友或整場的應出席／實際出席人數。可以用「批次加入」一次勾選多位社友套用同一天同一種狀態，也可以用下面的單筆表單幫同一位社友加好幾筆不同天的補登，全部加進清單後按「送出全部補登」一次寫入。',
   '有開通 RI 半年報功能的話，「RI 半年報基準人數」區塊可以填基準／當月男女社友人數與年齡分布，系統會自動算出淨成長，供社長每半年填報 RI 用。',
-  '最下面「歷月出席月報」是全部月份的總表，可以用來對照出席率趨勢，60% 是扶輪社規定的最低出席門檻。',
+  '「歷月出席月報」是全部月份的總表，可以用來對照出席率趨勢，60% 是扶輪社規定的最低出席門檻。',
+  '最下面「社友出席率統計」是每位社友個人的累計出席率（依扶輪年度計算，不受選擇月份影響），由低到高排序方便找出快低於 60% 門檻的人。',
 ]
 
 const canEditAttendance = computed(() => permissions.can('attendance', 'edit'))
@@ -228,6 +229,16 @@ function membershipFor(month: string) {
   return reports.reports.find(r => r.month === month) ?? null
 }
 
+// ── 社友出席率統計 ──────────────────────────────────
+// 沿用「活動」頁單場出席記錄下面同一份 member_attendance_rate 統計
+// （以扶輪年度累計，不受上面「選擇月份」篩選），出席率低到高排序方便
+// 社秘一眼看出誰接近或已經低於 60% 最低門檻。
+function rateMemberName(r: MemberAttendanceRate) {
+  return r.member_nick_name ? `${r.member_nick_name}（${r.member_name}）` : r.member_name
+}
+
+const sortedRates = computed(() => [...attendance.rates].sort((a, b) => (a.rate ?? -1) - (b.rate ?? -1)))
+
 async function refreshMonth() {
   if (!auth.clubId) return
   await Promise.all([
@@ -242,6 +253,7 @@ onMounted(async () => {
     reports.fetchAll(auth.clubId),
     attendance.fetchMeetingsForMonth(auth.clubId, selectedMonth.value),
     roster.fetchAll(auth.clubId),
+    attendance.fetchRates(auth.clubId),
   ])
   loadMembershipForm()
 })
@@ -575,6 +587,42 @@ watch(selectedMonth, async () => {
           </tr>
           <tr v-if="!attendance.monthlyRates.length">
             <td :colspan="features.isEnabled('B6_membership_report') ? 13 : 3" style="text-align:center; color:var(--muted);">尚無出席資料</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin:24px 0 8px;">社友出席率統計</h2>
+    <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">
+      依扶輪年度累計計算（不受上面「選擇月份」篩選），由低到高排序，方便找出接近或已低於 60% 最低門檻的社友。
+    </p>
+    <div class="tw">
+      <table class="card-table">
+        <thead class="th">
+          <tr>
+            <th>姓名</th>
+            <th>計算次數</th>
+            <th>出席</th>
+            <th>缺席</th>
+            <th>請假</th>
+            <th>出席率</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in sortedRates" :key="r.member_id">
+            <td data-label="姓名">{{ rateMemberName(r) }}</td>
+            <td data-label="計算次數">{{ r.counted }}</td>
+            <td data-label="出席">{{ r.present }}</td>
+            <td data-label="缺席">{{ r.absent }}</td>
+            <td data-label="請假">{{ r.leave }}</td>
+            <td data-label="出席率">
+              <span class="bdg" :class="r.rate !== null && r.rate < 60 ? 'b-r' : 'b-gr'">
+                {{ r.rate ?? '-' }}{{ r.rate !== null ? '%' : '' }}
+              </span>
+            </td>
+          </tr>
+          <tr v-if="!sortedRates.length">
+            <td colspan="6" style="text-align:center; color:var(--muted);">尚無出席資料</td>
           </tr>
         </tbody>
       </table>
