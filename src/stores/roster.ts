@@ -3,20 +3,31 @@ import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 import type { RosterMember, RosterMemberInsert, RosterMemberUpdate } from '@/types'
 
+// 社友排序：有英文名（nick_name）的排前面、依英文字母順序；沒有的排後面、
+// 依中文姓名排序。改用 JS 端排序而不是交給 Postgres 的 `.order()`，是因為
+// DB collation（大小寫、重音、前後空白怎麼比較）不受我們控制，實際看到的
+// 結果不一定是人眼認知的「英文字母順序」（例如大寫全部排在小寫前面）；
+// `localeCompare` 搭配 `sensitivity:'base'` 才能保證真的是不分大小寫的
+// 字母順序，順便 trim() 掉可能存在的前後空白。
+function compareRosterMembers(a: RosterMember, b: RosterMember) {
+  const an = (a.nick_name ?? '').trim()
+  const bn = (b.nick_name ?? '').trim()
+  if (an && bn) return an.localeCompare(bn, 'en', { sensitivity: 'base', numeric: true })
+  if (an && !bn) return -1
+  if (!an && bn) return 1
+  return (a.name ?? '').trim().localeCompare((b.name ?? '').trim(), 'zh-Hant')
+}
+
 export const useRosterStore = defineStore('roster', () => {
   const members = ref<RosterMember[]>([])
   const loading = ref(false)
 
   async function fetchAll(clubId: string | null) {
     loading.value = true
-    let query = supabase
-      .from('roster')
-      .select('*')
-      .order('nick_name', { ascending: true, nullsFirst: false })
-      .order('name')
+    let query = supabase.from('roster').select('*')
     if (clubId) query = query.eq('club_id', clubId)
     const { data } = await query
-    members.value = data ?? []
+    members.value = (data ?? []).sort(compareRosterMembers)
     loading.value = false
   }
 

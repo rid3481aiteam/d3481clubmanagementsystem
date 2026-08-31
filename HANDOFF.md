@@ -1,5 +1,13 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-08-17（第一百六十六輪，**社友名冊排序改成 JS 端排序，修正英文名排序不是真正的字母順序**）：使用者反映「名字排序的原則，如果是以英文字母來進行排列的話，要依照英文字母順序」。查證 [`stores/roster.ts`](src/stores/roster.ts) 的 `fetchAll()` 原本是交給 Postgres `.order('nick_name', {ascending:true, nullsFirst:false}).order('name')`，排序結果依賴資料庫的文字 collation 設定（大小寫、前後空白怎麼比較不是我們能控制的），不保證是人眼認知的「不分大小寫字母順序」——例如全大寫的英文名可能被排到所有小寫名字前面，或有人 nick_name 存了前導空白就整個排到最前面。改成抓回全部社友資料後在前端用 `compareRosterMembers()` 排序：有英文名（`nick_name`）的用 `localeCompare(..., 'en', {sensitivity:'base', numeric:true})`（trim 過、不分大小寫）排前面，沒有英文名的排後面、依中文姓名（`zh-Hant`）排序——排序邏輯本身跟以前一樣（英文名優先、有分兩組），只是把「怎麼比較才算字母順序」這件事從資料庫 collation 換成我們自己精確控制的比較函式。`roster.members` 是幾乎所有頁面（名冊列表、出席月報「個人補出席」下拉選單、活動頁逐人出席、批次補登checkbox清單等）共用的社友清單來源，這處改完各處排序會一起修正，不用逐頁改。
+>
+> 順便確認了其他用到「依名稱排序」的地方（`OfficersView.vue` 的委員會/職位名稱排序、`dashboard.ts`／`accounts.ts`／`club.ts`／`attendance.ts` 的 `.order('name')`／`.order('member_name')`）都是排中文姓名或中文職稱，不是使用者這次講的「英文字母排序」情境，這輪沒有動。
+>
+> **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過；另外用 node 手動跑了 `compareRosterMembers` 的幾個邊界案例（全大寫 `ERIC`、前導空白 ` Ben`、無英文名的中文名字），排序結果符合預期（不分大小寫字母序在前，中文名字在後）。這個環境連不到 D3481 專案的 Supabase，無法用真實名冊資料在瀏覽器實測。
+>
+> **待使用者：** 部署後找一個社友人數較多、英文名大小寫不統一的社，看「社友名冊」列表跟「出席月報」個人補出席下拉選單，確認英文名現在是真的字母順序（不分大小寫），沒有英文名的社友排在後面按中文姓名排序。
+
 > 最後更新：2026-08-17（第一百六十五輪，**社端「出席月報」新增「社友出席率統計」區塊**）：使用者要求「各社的出席月報內要有一段顯示社友各自的出席率統計」。查證發現這個統計其實早就存在——`member_attendance_rate` view（依扶輪年度累計，[`003_meetings_attendance.sql`](supabase/migrations/003_meetings_attendance.sql)）跟對應的 `attendance.rates`／`fetchRates()`（[`stores/attendance.ts`](src/stores/attendance.ts)）目前只用在單場例會的「活動」頁（[`AttendanceView.vue`](src/views/meetings/AttendanceView.vue) 「個人出席率」表），**「出席月報」頁完全沒有顯示這份資料**（`AttendanceMonthlyView.vue` 之前只在「個人補出席」送出後才順便呼叫一次 `fetchRates()`，畫面上沒有對應的表格）。這次直接沿用同一份 store/view，不用新增查詢邏輯：① `onMounted` 補上 `attendance.fetchRates(auth.clubId)`；② 在「歷月出席月報」下面新增「社友出席率統計」表格（姓名/計算次數/出席/缺席/請假/出席率，欄位跟「活動」頁那份一致），新增 `sortedRates` computed 依出席率由低到高排序，方便社秘一眼看出誰接近或已經低於 60% 門檻，出席率 <60% 用紅色徽章標示（跟頁面上其他地方強調的 60% 門檻一致）；③ 補上 `member_nick_name` 顯示（`rateMemberName()`，格式跟這頁其他地方的「暱稱（姓名）」一致——「活動」頁那份原本沒有用到這個欄位，這次算順便補齊）；④ 說明區塊補一條提示這是「依扶輪年度累計，不受選擇月份篩選」，避免使用者誤以為出席率會隨上面「選擇月份」變動。
 >
 > **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。這個環境連不到 D3481 專案的 Supabase，無法用真實資料登入實測。
