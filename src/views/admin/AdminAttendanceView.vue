@@ -72,6 +72,32 @@ const groupedRows = computed(() => {
     .map(([zone, list]) => ({ zone, list }))
 })
 
+// 全區合計（比照使用者提供的 RI 半年報 Excel 最下面的「合計」列）：只加總
+// 社友人數相關欄位，例會次數／出席率不加總——Excel 原本那幾欄在合計列
+// 也是留空，因為「出席率」本來就不是能直接相加的數字，各社例會次數
+// 不一也加總沒有意義。目前系統還沒有「衛星社」的資料，等衛星社建進來
+// 之後，這裡預留可以再拆成「扶輪社合計／衛星社合計／合計」三列。
+const totals = computed(() => {
+  let baseline_male = 0, baseline_female = 0, current_male = 0, current_female = 0
+  let age_under_40 = 0, age_41_plus = 0
+  for (const r of rows.value) {
+    baseline_male += r.report?.baseline_male ?? 0
+    baseline_female += r.report?.baseline_female ?? 0
+    current_male += r.report?.current_male ?? 0
+    current_female += r.report?.current_female ?? 0
+    age_under_40 += r.report?.age_under_40 ?? 0
+    age_41_plus += r.report?.age_41_plus ?? 0
+  }
+  const baselineTotal = baseline_male + baseline_female
+  const currentTotal = current_male + current_female
+  return {
+    baseline_male, baseline_female, baselineTotal,
+    current_male, current_female, currentTotal,
+    netGrowth: currentTotal - baselineTotal,
+    age_under_40, age_41_plus, ageTotal: age_under_40 + age_41_plus,
+  }
+})
+
 const expandedZones = ref(new Set<string>())
 function toggleZone(zone: string) {
   const s = new Set(expandedZones.value)
@@ -103,14 +129,7 @@ async function loadMonth() {
 function handleExport() {
   const withMembership = features.isEnabled('B6_membership_report')
   const exportRows = groupedRows.value.flatMap(g => g.list.map(r => {
-    const base: Record<string, string | number> = {
-      分區: g.zone,
-      社名: r.clubName,
-      例會場次: r.rate?.meeting_count ?? 0,
-      應出席: r.rate?.expected ?? 0,
-      實際出席: r.rate?.actual ?? 0,
-      出席率: r.rate?.rate != null ? `${r.rate.rate}%` : '-',
-    }
+    const base: Record<string, string | number> = { 分區: g.zone, 社名: r.clubName }
     if (withMembership) {
       base['RI半年報基準-男'] = r.report?.baseline_male ?? '-'
       base['RI半年報基準-女'] = r.report?.baseline_female ?? '-'
@@ -123,8 +142,23 @@ function handleExport() {
       base['41歲以上'] = r.report?.age_41_plus ?? '-'
       base['年齡合計'] = r.ageTotal
     }
+    base['例會次數'] = r.rate?.meeting_count ?? 0
+    base['出席率'] = r.rate?.rate != null ? `${r.rate.rate}%` : '-'
     return base
   }))
+
+  if (withMembership) {
+    const t = totals.value
+    exportRows.push({
+      分區: '', 社名: '合計',
+      'RI半年報基準-男': t.baseline_male, 'RI半年報基準-女': t.baseline_female, 'RI半年報基準-合計': t.baselineTotal,
+      [`${selectedMonth.value}月底-男`]: t.current_male, [`${selectedMonth.value}月底-女`]: t.current_female, [`${selectedMonth.value}月底-合計`]: t.currentTotal,
+      淨成長: t.netGrowth,
+      '40歲以下': t.age_under_40, '41歲以上': t.age_41_plus, 年齡合計: t.ageTotal,
+      例會次數: '-', 出席率: '-',
+    })
+  }
+
   const sheet = XLSX.utils.json_to_sheet(exportRows)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, sheet, '全區月報')
@@ -156,16 +190,14 @@ watch(selectedMonth, loadMonth)
         <thead class="th">
           <tr>
             <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">社名</th>
-            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">例會場次</th>
-            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">應出席</th>
-            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">實際出席</th>
-            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">出席率</th>
             <template v-if="features.isEnabled('B6_membership_report')">
               <th class="hdr-navy" colspan="3">RI 半年報基準人數</th>
               <th class="hdr-purple" colspan="3">{{ selectedMonth }} 月底人數</th>
               <th class="hdr-yellow" rowspan="2" style="vertical-align:middle;">淨成長</th>
               <th class="hdr-green" colspan="3">{{ selectedMonth }} 年齡分布</th>
             </template>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">例會次數</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">出席率</th>
           </tr>
           <tr>
             <template v-if="features.isEnabled('B6_membership_report')">
@@ -177,7 +209,7 @@ watch(selectedMonth, loadMonth)
         </thead>
         <tbody v-for="g in groupedRows" :key="g.zone">
           <tr class="zone-row" @click="toggleZone(g.zone)">
-            <td :colspan="features.isEnabled('B6_membership_report') ? 15 : 5">
+            <td :colspan="features.isEnabled('B6_membership_report') ? 13 : 3">
               <span class="zone-chevron">{{ expandedZones.has(g.zone) ? '▾' : '▸' }}</span>
               <strong>{{ g.zone }}</strong>
               <span style="color:var(--muted); font-weight:400;">（{{ g.list.length }} 社）</span>
@@ -186,14 +218,6 @@ watch(selectedMonth, loadMonth)
           <template v-if="expandedZones.has(g.zone)">
             <tr v-for="r in g.list" :key="r.clubId">
               <td data-label="社名">{{ r.clubName }}</td>
-              <td data-label="例會場次">{{ r.rate?.meeting_count ?? 0 }}</td>
-              <td data-label="應出席">{{ r.rate?.expected ?? 0 }}</td>
-              <td data-label="實際出席">{{ r.rate?.actual ?? 0 }}</td>
-              <td data-label="出席率">
-                <span class="bdg" :class="r.rate?.rate != null && r.rate.rate < 75 ? 'b-r' : 'b-gr'">
-                  {{ r.rate?.rate != null ? r.rate.rate + '%' : '-' }}
-                </span>
-              </td>
               <template v-if="features.isEnabled('B6_membership_report')">
                 <td data-label="基準-男">{{ r.report?.baseline_male ?? '-' }}</td>
                 <td data-label="基準-女">{{ r.report?.baseline_female ?? '-' }}</td>
@@ -206,14 +230,39 @@ watch(selectedMonth, loadMonth)
                 <td data-label="41歲以上">{{ r.report?.age_41_plus ?? '-' }}</td>
                 <td data-label="年齡合計">{{ r.ageTotal }}</td>
               </template>
+              <td data-label="例會次數">{{ r.rate?.meeting_count ?? 0 }}</td>
+              <td data-label="出席率">
+                <span class="bdg" :class="r.rate?.rate != null && r.rate.rate < 75 ? 'b-r' : 'b-gr'">
+                  {{ r.rate?.rate != null ? r.rate.rate + '%' : '-' }}
+                </span>
+              </td>
             </tr>
           </template>
         </tbody>
         <tbody v-if="!clubs.length">
           <tr>
-            <td :colspan="features.isEnabled('B6_membership_report') ? 15 : 5" style="text-align:center; color:var(--muted);">尚無社團資料</td>
+            <td :colspan="features.isEnabled('B6_membership_report') ? 13 : 3" style="text-align:center; color:var(--muted);">尚無社團資料</td>
           </tr>
         </tbody>
+        <tfoot v-if="clubs.length">
+          <tr class="totals-row">
+            <td>合計</td>
+            <template v-if="features.isEnabled('B6_membership_report')">
+              <td>{{ totals.baseline_male }}</td>
+              <td>{{ totals.baseline_female }}</td>
+              <td>{{ totals.baselineTotal }}</td>
+              <td>{{ totals.current_male }}</td>
+              <td>{{ totals.current_female }}</td>
+              <td>{{ totals.currentTotal }}</td>
+              <td>{{ totals.netGrowth }}</td>
+              <td>{{ totals.age_under_40 }}</td>
+              <td>{{ totals.age_41_plus }}</td>
+              <td>{{ totals.ageTotal }}</td>
+            </template>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </div>
@@ -234,6 +283,13 @@ watch(selectedMonth, loadMonth)
   display: inline-block;
   width: 14px;
   color: var(--muted);
+}
+
+.totals-row td {
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--gold-p);
+  padding: 14px 14px;
 }
 
 /* 比照使用者提供的 RI 半年報 Excel 表頭配色 */

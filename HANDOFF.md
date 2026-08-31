@@ -1,6 +1,22 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
-> 最後更新：2026-08-17（第一百六十二輪，**新增「台北西區扶青社」到社團總覽**）：使用者要求新建一個社團「台北西區扶青社」。這個環境連不到 D3481 專案的 Supabase（跟 memory 記錄一致），無法直接透過後台「+ 新增社團」（[`ClubListView.vue`](src/views/admin/ClubListView.vue)）幫使用者按下去，改成寫一份 migration：新增 [`077_add_taipei_west_rotaract.sql`](supabase/migrations/077_add_taipei_west_rotaract.sql)，只 insert `name='台北西區扶青社'`／`zone='第二分區'`（比照輔導社台北西區扶輪社所在分區，使用者確認），其餘社長/執秘/email/電話/例會時間地點等欄位留空，之後由地區管理員在「編輯社團」頁面補上（跟既有 [`015_seed_district_clubs.sql`](supabase/migrations/015_seed_district_clubs.sql) 同樣的 seed 慣例，`WHERE NOT EXISTS` 可重複執行不會產生重複社團）。**待使用者：** 到 Supabase Dashboard SQL Editor 手動執行 077 migration，執行後到正式站「社團總覽」確認「台北西區扶青社」出現在第二分區，需要的話再補社長/執秘等聯絡資訊。
+> 最後更新：2026-08-17（第一百六十三輪，**「出席月報（全區）」欄位順序／內容比照使用者提供的官方 Excel（`2026-27年度出席率.xlsx`）調整**）：使用者提供地區秘書實際在用的出席率 Excel（`7月` 分頁，132 列＝每社/衛星社一列＋最後 3 列小計），要求「依此 Excel 表格為主」調整 [`AdminAttendanceView.vue`](src/views/admin/AdminAttendanceView.vue)。比對後找到的落差跟這輪處理方式：
+>
+> ① **欄位順序**：Excel 是 社名→RI半年報基準(男/女/合計)→月底人數(男/女/合計)→淨成長→年齡分布(40以下/41+/合計)→例會次數→出席率，現有畫面卻把「例會次數/應出席/實際出席/出席率」放最前面——改成跟 Excel 一致的順序，`colspan` 數字同步從 15/5 改成 13/3（拿掉了下面②的兩欄）。
+>
+> ② **拿掉「應出席」「實際出席」兩欄**：Excel 完全沒有這兩欄，只留「例會次數」＋「出席率」，改成跟 Excel 一致（底層 `ClubMonthlyAttendanceRate` 的 `expected`/`actual` 還留著沒刪，只是這頁不顯示，別的地方如果還要用不受影響）。
+>
+> ③ **新增「合計」列**：Excel 最下面 3 列是「扶輪社」「衛星社」「合計」小計，這次先只做單一「合計」列（新增 `totals` computed，加總所有已載入社團的社友人數相關欄位），因為系統目前完全沒有「衛星社」這個概念（見下方待辦）,「扶輪社」跟「合計」現階段數字會一樣、暫不重複顯示。**例會次數／出席率刻意不加總**——比照 Excel 這兩欄在小計列本來就是留空，因為出席率不是能直接相加的數字，各社例會次數也不一，加總沒有意義。`handleExport()` 匯出的 Excel 也同步調整欄位順序＋補上合計列，可以直接取代使用者手動維護的這份檔案。
+>
+> ④ **使用者明確表示這次不用加「英文社名」欄位**（Excel 的 B 欄），所以 `clubs` 資料表沒有動，沒有新增 migration。
+>
+> **這次刻意沒做、待使用者確認範圍後再處理**：Excel 裡有 20 幾個「衛星社」獨立列（例如「1-3-1台北群英宇宙衛星社」），現在系統的 `clubs` 資料表、種子資料（`015_seed_district_clubs.sql`）完全沒有衛星社的概念，跟使用者確認過這是本輪唯一還沒回答的問題——衛星社要建成完整獨立的「社」（有自己帳號/名冊/例會/出席），還是只是「掛在母社底下、母社執秘手動填幾個數字」的報表分項？這決定了要新增什麼欄位（`is_satellite`／`parent_club_id`）、要不要多一層 UI，等使用者回覆再動。
+>
+> **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。這個環境連不到 D3481 專案的 Supabase（跟 memory 記錄一致，`.env.local` 不存在），無法登入正式站用真實資料實測，改成仔細重讀整段 template 的 `colspan` 算式（有會員資料時 1+3+3+1+3+1+1=13、沒有時 1+1+1=3，跟程式碼一致）跟 `v-if`/`v-for`/`template` 標籤配對，純結構調整、沒有新邏輯分支，风险相對低。
+>
+> **待使用者：** 部署後登入地區管理員帳號看「出席月報（全區）」，確認欄位順序、合計列數字跟你的 Excel 對得起來；再想一下衛星社要用哪種模式，回覆後我再接著做。
+
+> 最後更新（上一輪）：2026-08-17（第一百六十二輪，**新增「台北西區扶青社」到社團總覽**）：使用者要求新建一個社團「台北西區扶青社」。這個環境連不到 D3481 專案的 Supabase（跟 memory 記錄一致），無法直接透過後台「+ 新增社團」（[`ClubListView.vue`](src/views/admin/ClubListView.vue)）幫使用者按下去，改成寫一份 migration：新增 [`077_add_taipei_west_rotaract.sql`](supabase/migrations/077_add_taipei_west_rotaract.sql)，只 insert `name='台北西區扶青社'`／`zone='第二分區'`（比照輔導社台北西區扶輪社所在分區，使用者確認），其餘社長/執秘/email/電話/例會時間地點等欄位留空，之後由地區管理員在「編輯社團」頁面補上（跟既有 [`015_seed_district_clubs.sql`](supabase/migrations/015_seed_district_clubs.sql) 同樣的 seed 慣例，`WHERE NOT EXISTS` 可重複執行不會產生重複社團）。**待使用者：** 到 Supabase Dashboard SQL Editor 手動執行 077 migration，執行後到正式站「社團總覽」確認「台北西區扶青社」出現在第二分區，需要的話再補社長/執秘等聯絡資訊。
 
 > 最後更新（上一輪）：2026-08-14（第一百六十一輪，**`/calendar` 地區重要行事曆改成響應式（依斷點切換版型/欄位）**）：使用者提供一份「如何跟 AI 說明響應式需求」的教學文件（含具體斷點、版型、欄位優先級與驗收標準），依此重寫 [`DistrictCalendarView.vue`](src/views/DistrictCalendarView.vue)：
 >
