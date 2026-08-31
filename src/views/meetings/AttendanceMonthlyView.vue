@@ -26,7 +26,7 @@ const attendanceMonthlyHelpItems = [
   '「個人補出席」是針對單一社友的補登（例如跨社補會、簽到漏登），不會動到其他社友或整場的應出席／實際出席人數。可以用「批次加入」一次勾選多位社友套用同一天同一種狀態，也可以用下面的單筆表單幫同一位社友加好幾筆不同天的補登，全部加進清單後按「送出全部補登」一次寫入。',
   '有開通 RI 半年報功能的話，「RI 半年報基準人數」區塊可以填基準／當月男女社友人數與年齡分布，系統會自動算出淨成長，供社長每半年填報 RI 用。',
   '「歷月出席月報」是全部月份的總表，可以用來對照出席率趨勢，60% 是扶輪社規定的最低出席門檻。',
-  '最下面「社友出席率統計」是每位社友個人的累計出席率（依扶輪年度計算，不受選擇月份影響），由低到高排序方便找出快低於 60% 門檻的人。',
+  '最下面「社友出席率統計」是每位社友個人的累計出席率（依扶輪年度計算，不受選擇月份影響），依姓名排序，低於 60% 門檻的人出席率會用紅色標示。',
 ]
 
 const canEditAttendance = computed(() => permissions.can('attendance', 'edit'))
@@ -231,13 +231,24 @@ function membershipFor(month: string) {
 
 // ── 社友出席率統計 ──────────────────────────────────
 // 沿用「活動」頁單場出席記錄下面同一份 member_attendance_rate 統計
-// （以扶輪年度累計，不受上面「選擇月份」篩選），出席率低到高排序方便
-// 社秘一眼看出誰接近或已經低於 60% 最低門檻。
+// （以扶輪年度累計，不受上面「選擇月份」篩選）。姓名排序跟 roster.ts
+// 的 compareRosterMembers 同一套原則：有英文名的不分大小寫依字母順序
+// 排前面，沒有的依中文姓名排後面；出席率 <60% 另外用紅色徽章標示，
+// 不用排序去凸顯，避免每次資料一變動整份名單順序就跳動。
 function rateMemberName(r: MemberAttendanceRate) {
   return r.member_nick_name ? `${r.member_nick_name}（${r.member_name}）` : r.member_name
 }
 
-const sortedRates = computed(() => [...attendance.rates].sort((a, b) => (a.rate ?? -1) - (b.rate ?? -1)))
+function compareRateRows(a: MemberAttendanceRate, b: MemberAttendanceRate) {
+  const an = (a.member_nick_name ?? '').trim()
+  const bn = (b.member_nick_name ?? '').trim()
+  if (an && bn) return an.localeCompare(bn, 'en', { sensitivity: 'base', numeric: true })
+  if (an && !bn) return -1
+  if (!an && bn) return 1
+  return (a.member_name ?? '').trim().localeCompare((b.member_name ?? '').trim(), 'zh-Hant')
+}
+
+const sortedRates = computed(() => [...attendance.rates].sort(compareRateRows))
 
 async function refreshMonth() {
   if (!auth.clubId) return
@@ -594,7 +605,7 @@ watch(selectedMonth, async () => {
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin:24px 0 8px;">社友出席率統計</h2>
     <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">
-      依扶輪年度累計計算（不受上面「選擇月份」篩選），由低到高排序，方便找出接近或已低於 60% 最低門檻的社友。
+      依扶輪年度累計計算（不受上面「選擇月份」篩選），依姓名排序；出席率低於 60% 最低門檻的社友用紅色標示。
     </p>
     <div class="tw">
       <table class="card-table">

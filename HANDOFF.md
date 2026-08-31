@@ -1,5 +1,11 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-08-17（第一百六十七輪，**「社友出席率統計」表改成依姓名字母排序，取代原本的依出席率排序**）：使用者上一輪反映的「英文字母排序」原來是針對 165 輪新增的「社友出席率統計」表——附了截圖，姓名欄看起來是亂序（因為那張表原本設計是依「出席率」由低到高排，不是依姓名），166 輪誤判成是在講 `roster.ts` 的名冊排序（那個也確實有 bug，順手修掉了，但不是這次截圖指的那張表）。這輪把 [`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 的 `sortedRates` 排序邏輯換掉：新增 `compareRateRows()`，跟 [`stores/roster.ts`](src/stores/roster.ts) 的 `compareRosterMembers()` 同一套原則（有英文名的不分大小寫依字母順序排前面，沒有的依中文姓名排後面），取代原本 `(a.rate ?? -1) - (b.rate ?? -1)` 的出席率排序。**出席率 <60% 還是用紅色徽章標示**，只是不再靠排序去凸顯，改用姓名字母序當主要排序，避免資料一變動整份名單順序就跳動、也符合使用者這次要的「字母順序」。頁面上方 `PageHelp` 說明跟表格上面的提示文字都同步改了措辭（拿掉「由低到高排序」，改成「依姓名排序；出席率低於 60% 用紅色標示」）。
+>
+> **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過；另外用 node 拿使用者截圖裡實際出現的英文名（Motor/Insurance/Ironman/Daniel/Leon/Rex/Thomas/Charlies/Jeff/Jerome/House/Johnny/Tim）跑過一次 `compareRateRows`，排序結果是 Charlies→Daniel→House→Insurance→Ironman→Jeff→Jerome→Johnny→Leon→Motor→Rex→Thomas→Tim，確認是正確字母順序。這個環境連不到 D3481 專案的 Supabase，無法用真實資料在瀏覽器實測。
+>
+> **待使用者：** 部署後回去看「出席月報」最下面「社友出席率統計」，確認姓名欄現在是正確英文字母順序（不分大小寫），出席率低於 60% 的人還是有紅色徽章。
+
 > 最後更新：2026-08-17（第一百六十六輪，**社友名冊排序改成 JS 端排序，修正英文名排序不是真正的字母順序**）：使用者反映「名字排序的原則，如果是以英文字母來進行排列的話，要依照英文字母順序」。查證 [`stores/roster.ts`](src/stores/roster.ts) 的 `fetchAll()` 原本是交給 Postgres `.order('nick_name', {ascending:true, nullsFirst:false}).order('name')`，排序結果依賴資料庫的文字 collation 設定（大小寫、前後空白怎麼比較不是我們能控制的），不保證是人眼認知的「不分大小寫字母順序」——例如全大寫的英文名可能被排到所有小寫名字前面，或有人 nick_name 存了前導空白就整個排到最前面。改成抓回全部社友資料後在前端用 `compareRosterMembers()` 排序：有英文名（`nick_name`）的用 `localeCompare(..., 'en', {sensitivity:'base', numeric:true})`（trim 過、不分大小寫）排前面，沒有英文名的排後面、依中文姓名（`zh-Hant`）排序——排序邏輯本身跟以前一樣（英文名優先、有分兩組），只是把「怎麼比較才算字母順序」這件事從資料庫 collation 換成我們自己精確控制的比較函式。`roster.members` 是幾乎所有頁面（名冊列表、出席月報「個人補出席」下拉選單、活動頁逐人出席、批次補登checkbox清單等）共用的社友清單來源，這處改完各處排序會一起修正，不用逐頁改。
 >
 > 順便確認了其他用到「依名稱排序」的地方（`OfficersView.vue` 的委員會/職位名稱排序、`dashboard.ts`／`accounts.ts`／`club.ts`／`attendance.ts` 的 `.order('name')`／`.order('member_name')`）都是排中文姓名或中文職稱，不是使用者這次講的「英文字母排序」情境，這輪沒有動。
