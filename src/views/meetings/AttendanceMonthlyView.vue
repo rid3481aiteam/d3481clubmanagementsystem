@@ -522,16 +522,26 @@ watch(selectedMonth, async () => {
     </template>
 
     <h2 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:8px;">歷月出席月報</h2>
-    <div class="tw">
+    <div class="tw" style="overflow-x:auto;">
       <table class="card-table">
         <thead class="th">
           <tr>
-            <th class="hdr-purple">月份</th>
-            <th class="hdr-purple">例會場次</th>
-            <th class="hdr-purple">應出席 / 實際出席</th>
-            <th class="hdr-purple">出席率</th>
-            <th v-if="features.isEnabled('B6_membership_report')" class="hdr-purple">當月社友合計</th>
-            <th v-if="features.isEnabled('B6_membership_report')" class="hdr-yellow">淨成長</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">月份</th>
+            <template v-if="features.isEnabled('B6_membership_report')">
+              <th class="hdr-navy" colspan="3">RI 半年報基準人數</th>
+              <th class="hdr-purple" colspan="3">月底人數</th>
+              <th class="hdr-yellow" rowspan="2" style="vertical-align:middle;">淨成長</th>
+              <th class="hdr-green" colspan="3">年齡分布</th>
+            </template>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">例會次數</th>
+            <th class="hdr-purple" rowspan="2" style="vertical-align:middle;">出席率</th>
+          </tr>
+          <tr>
+            <template v-if="features.isEnabled('B6_membership_report')">
+              <th class="hdr-navy">男</th><th class="hdr-navy">女</th><th class="hdr-navy">合計</th>
+              <th class="hdr-purple">男</th><th class="hdr-purple">女</th><th class="hdr-purple">合計</th>
+              <th class="hdr-green">40歲以下</th><th class="hdr-green">41歲以上</th><th class="hdr-green">合計</th>
+            </template>
           </tr>
         </thead>
         <tbody>
@@ -541,27 +551,30 @@ watch(selectedMonth, async () => {
             :style="r.month === selectedMonth ? { background: 'var(--gold-p)' } : {}"
           >
             <td data-label="月份">{{ r.month }}</td>
-            <td data-label="例會場次">{{ r.meeting_count }}</td>
-            <td data-label="應出席 / 實際出席">{{ r.expected }} / {{ r.actual }}</td>
+            <template v-if="features.isEnabled('B6_membership_report')">
+              <td data-label="基準-男">{{ membershipFor(r.month)?.baseline_male ?? '-' }}</td>
+              <td data-label="基準-女">{{ membershipFor(r.month)?.baseline_female ?? '-' }}</td>
+              <td data-label="基準-合計">{{ (membershipFor(r.month)?.baseline_male ?? 0) + (membershipFor(r.month)?.baseline_female ?? 0) }}</td>
+              <td data-label="當月-男">{{ membershipFor(r.month)?.current_male ?? '-' }}</td>
+              <td data-label="當月-女">{{ membershipFor(r.month)?.current_female ?? '-' }}</td>
+              <td data-label="當月-合計">{{ (membershipFor(r.month)?.current_male ?? 0) + (membershipFor(r.month)?.current_female ?? 0) }}</td>
+              <td data-label="淨成長">
+                {{ ((membershipFor(r.month)?.current_male ?? 0) + (membershipFor(r.month)?.current_female ?? 0))
+                  - ((membershipFor(r.month)?.baseline_male ?? 0) + (membershipFor(r.month)?.baseline_female ?? 0)) }}
+              </td>
+              <td data-label="40歲以下">{{ membershipFor(r.month)?.age_under_40 ?? '-' }}</td>
+              <td data-label="41歲以上">{{ membershipFor(r.month)?.age_41_plus ?? '-' }}</td>
+              <td data-label="年齡合計">{{ (membershipFor(r.month)?.age_under_40 ?? 0) + (membershipFor(r.month)?.age_41_plus ?? 0) }}</td>
+            </template>
+            <td data-label="例會次數">{{ r.meeting_count }}</td>
             <td data-label="出席率">
               <span class="bdg" :class="r.rate !== null && r.rate < 75 ? 'b-r' : 'b-gr'">
                 {{ r.rate !== null ? r.rate + '%' : '-' }}
               </span>
             </td>
-            <template v-if="features.isEnabled('B6_membership_report') && membershipFor(r.month)">
-              <td data-label="當月社友合計">{{ (membershipFor(r.month)!.current_male ?? 0) + (membershipFor(r.month)!.current_female ?? 0) }}</td>
-              <td data-label="淨成長">
-                {{ ((membershipFor(r.month)!.current_male ?? 0) + (membershipFor(r.month)!.current_female ?? 0))
-                  - ((membershipFor(r.month)!.baseline_male ?? 0) + (membershipFor(r.month)!.baseline_female ?? 0)) }}
-              </td>
-            </template>
-            <template v-else-if="features.isEnabled('B6_membership_report')">
-              <td data-label="當月社友合計">-</td>
-              <td data-label="淨成長">-</td>
-            </template>
           </tr>
           <tr v-if="!attendance.monthlyRates.length">
-            <td colspan="6" style="text-align:center; color:var(--muted);">尚無出席資料</td>
+            <td :colspan="features.isEnabled('B6_membership_report') ? 13 : 3" style="text-align:center; color:var(--muted);">尚無出席資料</td>
           </tr>
         </tbody>
       </table>
