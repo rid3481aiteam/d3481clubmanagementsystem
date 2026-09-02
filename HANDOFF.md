@@ -4,7 +4,7 @@
 >
 > **驗證**：純 SQL migration，沒有改前端程式碼，不需要 `vue-tsc`/`build`。這個環境連不到 D3481 專案的 Supabase 無法直接執行驗證。
 >
-> **待使用者：** 到 Supabase Dashboard SQL Editor 執行 080 migration；執行後到「地區通訊錄」「社團總覽」確認第十一分區最後一筆改顯示「台北新星扶輪社」，該社原本填過的執秘/例會等聯絡資訊沒有跟著跑掉（只改了 name 欄位，其他欄位不受影響）。
+> **080 migration 已由使用者於 2026-08-17 在 Supabase Dashboard SQL Editor 手動執行完成，使用者確認「完成」**。至此「地區通訊錄」各分區社團排序（079）＋第十一分區社名訂正（080）這兩輪都已收尾，沒有其他待辦。
 
 > 最後更新：2026-08-17（第一百七十輪，**「地區通訊錄」各分區社團排序訂正回創社順序，找到根因**）：使用者反映「有人提出各分區的各社排序沒有按照成立時間」。查證 [`DirectoryView.vue`](src/views/directory/DirectoryView.vue)／[`ClubListView.vue`](src/views/admin/ClubListView.vue) 都是照 `clubs.sort_order` 排序，根因在 [`016_club_sort_order.sql`](supabase/migrations/016_club_sort_order.sql)：這支 migration 幫 `clubs` 加 `sort_order` 欄位時，初始化邏輯是 `ORDER BY name`（依社名排序），把 [`015_seed_district_clubs.sql`](supabase/migrations/015_seed_district_clubs.sql) 原本已經照創社順序輸入好的順序整個打散成字母/筆畫順序。也發現目前系統**完全沒有「成立日期」這種欄位可以拿來排序**，`sort_order` 也**沒有任何 UI 可以手動調整**（016 的註解寫「社團總覽可用上/下移按鈕調整」，但 `ClubListView.vue` 從頭到尾沒有這個功能，`sort_order` 只有新增社團時自動帶入「本分區目前最大值+1」）。
 >
