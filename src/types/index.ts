@@ -414,7 +414,7 @@ export type ClubMonthlyMembershipReportUpdate = Partial<
 >
 
 // ── 社友名冊 ─────────────────────────────────────────
-export type RosterClubPosition = 'PP' | 'IPP' | 'P' | 'VP' | 'PE' | 'S' | '社友'
+export type RosterClubPosition = 'PP' | 'IPP' | 'CP' | 'P' | 'VP' | 'PE' | 'S' | '社友'
 export type RosterMemberStatus = 'normal' | 'leave' | 'resigned'
 
 export interface RosterMember {

@@ -88,7 +88,7 @@ const CLASSIFICATIONS = [
   '其他服務業',
 ]
 
-const CLUB_POSITIONS: RosterClubPosition[] = ['PP', 'IPP', 'P', 'VP', 'PE', 'S', '社友']
+const CLUB_POSITIONS: RosterClubPosition[] = ['PP', 'IPP', 'CP', 'P', 'VP', 'PE', 'S', '社友']
 // 匯入 Excel 認得的欄位名稱，跟「下載範本」產生的欄位一致——各社自己的
 // 名冊格式不一定跟範本一樣，欄名對不上時要能明確告訴使用者哪裡不對，
 // 不能只是悄悄漏掉資料、不出任何提示。

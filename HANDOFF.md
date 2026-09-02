@@ -1,5 +1,11 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-08-17（第一百六十九輪，**社友名冊「社內職稱」新增「CP」（創社社長）**）：使用者要求在「社內職稱」下拉選單新增 CP。查證 `club_position` 欄位在 [`021_roster_member_profile_fields.sql`](supabase/migrations/021_roster_member_profile_fields.sql) 是 DB 層 `CHECK (club_position IN ('PP','IPP','P','VP','PE','S','社友'))`，不是前端憑空列出的選項，光改前端陣列存不進去，一定要連同資料庫約束一起改。新增 [`078_roster_club_position_add_cp.sql`](supabase/migrations/078_roster_club_position_add_cp.sql)：`DROP CONSTRAINT IF EXISTS roster_club_position_check`（021 建立時沒有明確命名，Postgres 自動產生的名稱，021 之後沒有其他 migration 動過，確認可以直接沿用）再重建成含 `CP` 的版本。同步改 `RosterClubPosition` 型別（[`types/index.ts`](src/types/index.ts)）跟 [`RosterView.vue`](src/views/roster/RosterView.vue) 的 `CLUB_POSITIONS` 陣列，`CP` 排在 `PP`／`IPP` 後面（歸類成「歷任／創社」相關的頭銜放一起），`P`／`VP`／`PE`／`S`／`社友` 順序不動。**待使用者到 Supabase Dashboard SQL Editor 手動執行 078 migration**（這個環境連不到 D3481 專案的 Supabase），沒執行的話畫面上雖然選得到 CP，實際存檔會被資料庫的舊 CHECK constraint 擋下來報錯。
+>
+> **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。
+>
+> **待使用者：** 到 Supabase Dashboard SQL Editor 執行 078 migration；執行後到「社友名冊」新增或編輯一筆社友，確認「社內職稱」下拉選單有 CP 選項、選了能正常存檔。
+
 > 最後更新：2026-08-17（第一百六十八輪，**「社友出席率統計」表補上「入社日期」欄，方便對照「計算次數」為什麼因人而異**）：使用者看到「社友出席率統計」表裡不同人的「計算次數」差很多（5～12 都有），問「這些數字的差異是什麼，統計基礎是什麼」。查證 `member_attendance_rate` view（[`003_meetings_attendance.sql`](supabase/migrations/003_meetings_attendance.sql)）的 `counted` 是 `COUNT(*) FILTER (WHERE status != 'exempt')`——算的是「這位社友有出席明細紀錄、且不是免計」的例會數，不是全社總例會數。跟使用者說明差異主要來源：① 例會逐人出席是「存檔當下」的名冊快照，社友入社前就已存檔完成的例會不會回溯補上他的紀錄，這是最常見原因；② 免計狀態會被排除在分母外；③ 只用「快速新增」補整場人次、沒有逐人登記的例會，完全不會寫進 `attendance_details`，所有人的計算次數都不會因此增加；④ 只被單獨用「個人補出席」補過幾天的社友計算次數也會偏少。使用者接著說「請檢查」——這個環境連不到 D3481 專案的 Supabase，沒辦法直接查詢 `roster`／`attendance_details` 的真實資料驗證是不是入社時間造成的，改成把①的驗證方式直接做進畫面：[`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 的「社友出席率統計」表新增「入社日期」欄（`joinDateFor()`，從已經載入的 `roster.members` 查 `join_date`，不用新查詢），使用者自己就能對照，不用切到「社友名冊」另外查。表格上面的說明文字也補了一句解釋。
 >
 > **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。純新增顯示欄位，沒有新邏輯分支，`colspan`（空狀態列）同步從 6 改成 7。
