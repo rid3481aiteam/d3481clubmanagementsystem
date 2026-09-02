@@ -1,5 +1,11 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-08-17（第一百七十一輪，**訂正社名「台北新心扶輪社」→「台北新星扶輪社」**）：上一輪留下的問題，使用者確認正確名稱是「新星」。回頭查 [`020_seed_club_directory_from_excel.sql`](supabase/migrations/020_seed_club_directory_from_excel.sql) 的「手動確認對應」註解，發現「新心」本來就是先前某一輪把另一份 Excel 的「台北新星社」對應過去時猜錯／沒人工覆核留下的（該筆聯絡 email `taipeinova.rotary@gmail.com` 帶有「nova」＝新星，side confirm 這次訂正方向正確）。新增 [`080_fix_taipei_nova_club_name.sql`](supabase/migrations/080_fix_taipei_nova_club_name.sql)：`UPDATE clubs SET name='台北新星扶輪社' WHERE name='台北新心扶輪社' AND zone='第十一分區'`，補上「扶輪社」全稱比照其他社的既有命名慣例（不是 Excel 簡稱「台北新星社」）。純改 `clubs.name` 字串，其他表都是用 `club_id` 外鍵關聯不是用名稱比對，不會有牽連影響；`clubs.name` 沒有 UNIQUE constraint，但新名稱目前資料庫裡沒有其他社在用，不會撞名。
+>
+> **驗證**：純 SQL migration，沒有改前端程式碼，不需要 `vue-tsc`/`build`。這個環境連不到 D3481 專案的 Supabase 無法直接執行驗證。
+>
+> **待使用者：** 到 Supabase Dashboard SQL Editor 執行 080 migration；執行後到「地區通訊錄」「社團總覽」確認第十一分區最後一筆改顯示「台北新星扶輪社」，該社原本填過的執秘/例會等聯絡資訊沒有跟著跑掉（只改了 name 欄位，其他欄位不受影響）。
+
 > 最後更新：2026-08-17（第一百七十輪，**「地區通訊錄」各分區社團排序訂正回創社順序，找到根因**）：使用者反映「有人提出各分區的各社排序沒有按照成立時間」。查證 [`DirectoryView.vue`](src/views/directory/DirectoryView.vue)／[`ClubListView.vue`](src/views/admin/ClubListView.vue) 都是照 `clubs.sort_order` 排序，根因在 [`016_club_sort_order.sql`](supabase/migrations/016_club_sort_order.sql)：這支 migration 幫 `clubs` 加 `sort_order` 欄位時，初始化邏輯是 `ORDER BY name`（依社名排序），把 [`015_seed_district_clubs.sql`](supabase/migrations/015_seed_district_clubs.sql) 原本已經照創社順序輸入好的順序整個打散成字母/筆畫順序。也發現目前系統**完全沒有「成立日期」這種欄位可以拿來排序**，`sort_order` 也**沒有任何 UI 可以手動調整**（016 的註解寫「社團總覽可用上/下移按鈕調整」，但 `ClubListView.vue` 從頭到尾沒有這個功能，`sort_order` 只有新增社團時自動帶入「本分區目前最大值+1」）。
 >
 > 拿使用者之前提供的「2026-27年度出席率.xlsx」逐一比對——這份 Excel 裡每個社團名稱前面都有官方的「分區-序號」編號（例如「1-1台北社」「1-2台北錫口社」），用 Python 逐分區比對後確認：**015 seed 原本輸入的順序，在 11 個分區裡有 9 個完全跟 Excel 的官方編號順序一致**，證實 Excel 編號＝創社順序、015 原始順序也是對的，016 才是把它弄亂的元凶。新增 [`079_club_sort_order_charter_fix.sql`](supabase/migrations/079_club_sort_order_charter_fix.sql)，用 `name+zone` 精準比對逐筆訂正 `sort_order` 回創社順序（比對不到的名稱不會被誤改到別的社）。
