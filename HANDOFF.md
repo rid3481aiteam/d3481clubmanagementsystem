@@ -4,7 +4,7 @@
 >
 > **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。
 >
-> **待使用者：** 到 Supabase Dashboard SQL Editor 執行 078 migration；執行後到「社友名冊」新增或編輯一筆社友，確認「社內職稱」下拉選單有 CP 選項、選了能正常存檔。
+> **078 migration 已由使用者於 2026-08-17 在 Supabase Dashboard SQL Editor 手動執行完成，使用者確認「完成」**——「社友名冊」的「社內職稱」下拉選單已經看得到 CP、可以正常存檔。
 
 > 最後更新：2026-08-17（第一百六十八輪，**「社友出席率統計」表補上「入社日期」欄，方便對照「計算次數」為什麼因人而異**）：使用者看到「社友出席率統計」表裡不同人的「計算次數」差很多（5～12 都有），問「這些數字的差異是什麼，統計基礎是什麼」。查證 `member_attendance_rate` view（[`003_meetings_attendance.sql`](supabase/migrations/003_meetings_attendance.sql)）的 `counted` 是 `COUNT(*) FILTER (WHERE status != 'exempt')`——算的是「這位社友有出席明細紀錄、且不是免計」的例會數，不是全社總例會數。跟使用者說明差異主要來源：① 例會逐人出席是「存檔當下」的名冊快照，社友入社前就已存檔完成的例會不會回溯補上他的紀錄，這是最常見原因；② 免計狀態會被排除在分母外；③ 只用「快速新增」補整場人次、沒有逐人登記的例會，完全不會寫進 `attendance_details`，所有人的計算次數都不會因此增加；④ 只被單獨用「個人補出席」補過幾天的社友計算次數也會偏少。使用者接著說「請檢查」——這個環境連不到 D3481 專案的 Supabase，沒辦法直接查詢 `roster`／`attendance_details` 的真實資料驗證是不是入社時間造成的，改成把①的驗證方式直接做進畫面：[`AttendanceMonthlyView.vue`](src/views/meetings/AttendanceMonthlyView.vue) 的「社友出席率統計」表新增「入社日期」欄（`joinDateFor()`，從已經載入的 `roster.members` 查 `join_date`，不用新查詢），使用者自己就能對照，不用切到「社友名冊」另外查。表格上面的說明文字也補了一句解釋。
 >
