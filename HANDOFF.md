@@ -6,7 +6,7 @@
 >
 > **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。
 >
-> **待使用者：** 到 Supabase Dashboard SQL Editor 執行 081 migration；執行後看「地區通訊錄」第二分區確認台北西區扶青社的卡片不見了，「社團總覽」還是看得到、可以正常編輯。之後想要把它加回通訊錄的話，直接跟我說一聲，我再補一筆 `UPDATE clubs SET directory_visible = true WHERE name = '台北西區扶青社'`。
+> **081 migration 已由使用者於 2026-08-17 在 Supabase Dashboard SQL Editor 手動執行完成，使用者確認「完成」**。之後想把台北西區扶青社加回通訊錄，直接說一聲，補一筆 `UPDATE clubs SET directory_visible = true WHERE name = '台北西區扶青社'` 即可，不用整套重做。
 
 > 最後更新：2026-08-17（第一百七十一輪，**訂正社名「台北新心扶輪社」→「台北新星扶輪社」**）：上一輪留下的問題，使用者確認正確名稱是「新星」。回頭查 [`020_seed_club_directory_from_excel.sql`](supabase/migrations/020_seed_club_directory_from_excel.sql) 的「手動確認對應」註解，發現「新心」本來就是先前某一輪把另一份 Excel 的「台北新星社」對應過去時猜錯／沒人工覆核留下的（該筆聯絡 email `taipeinova.rotary@gmail.com` 帶有「nova」＝新星，side confirm 這次訂正方向正確）。新增 [`080_fix_taipei_nova_club_name.sql`](supabase/migrations/080_fix_taipei_nova_club_name.sql)：`UPDATE clubs SET name='台北新星扶輪社' WHERE name='台北新心扶輪社' AND zone='第十一分區'`，補上「扶輪社」全稱比照其他社的既有命名慣例（不是 Excel 簡稱「台北新星社」）。純改 `clubs.name` 字串，其他表都是用 `club_id` 外鍵關聯不是用名稱比對，不會有牽連影響；`clubs.name` 沒有 UNIQUE constraint，但新名稱目前資料庫裡沒有其他社在用，不會撞名。
 >
