@@ -20,10 +20,12 @@ const keyword = ref('')
 // 判斷，兩頁資料才會一致，不會一邊顯示舊社長一邊顯示新社長。
 const officersByClub = computed(() => buildOfficersByClub(officers.districtByTerm))
 const enrichedClubs = computed(() =>
-  club.allClubs.map(c => {
-    const { presName, secName } = resolveClubLeaders(c, officersByClub.value)
-    return { ...c, pres_name: presName, sec_name: secName }
-  })
+  club.allClubs
+    .filter(c => c.directory_visible)
+    .map(c => {
+      const { presName, secName } = resolveClubLeaders(c, officersByClub.value)
+      return { ...c, pres_name: presName, sec_name: secName }
+    })
 )
 
 const ZONE_ORDER = [

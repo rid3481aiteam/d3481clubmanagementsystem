@@ -80,6 +80,9 @@ export interface Club {
   // 該社第一個 club_secretary/club_admin 帳號的 Email，自動捕捉，跟公開
   // 通訊錄用的 email 分開（見 064_club_account_notify_email.sql）
   account_notify_email: string | null
+  // 是否顯示在「地區通訊錄」，跟該社是否正常運作無關——只影響通訊錄
+  // 這個畫面（見 081_club_directory_visible.sql）
+  directory_visible: boolean
   created_at: string
   updated_at: string
 }

@@ -1,5 +1,13 @@
 # D3481 扶輪社管理系統 — 工作交接紀錄
 
+> 最後更新：2026-08-17（第一百七十二輪，**「地區通訊錄」新增可以先隱藏特定社，套用在「台北西區扶青社」**）：使用者看到「地區通訊錄」第二分區多了一張幾乎空白的卡片（只有社名，執秘/電話/例會等聯絡資訊都是空的），要求「這裡先不顯示這個社」——就是 162 輪新增的「台北西區扶青社」（扶青社/Rotaract，不是一般扶輪社，聯絡資訊當時就說好之後再補）。新增 [`081_club_directory_visible.sql`](supabase/migrations/081_club_directory_visible.sql)：`clubs` 加 `directory_visible boolean NOT NULL DEFAULT true`，並把台北西區扶青社設成 `false`。這個欄位只影響 [`DirectoryView.vue`](src/views/directory/DirectoryView.vue)（`enrichedClubs` 的來源多加一層 `.filter(c => c.directory_visible)`）——**不是刪除或停用**，「社團總覽」（`ClubListView.vue`）、名冊、出席等其他頁面完全不受影響，該社照常存在、之後聯絡資訊補齊了，只要把這個欄位改回 `true`（目前沒有做 UI 開關，要改回來需要再寫一次 SQL 或之後另外做個切換開關 UI，這次先求最小改動達成使用者的即時需求）。新社預設 `directory_visible = true`（DB 欄位有 DEFAULT），不影響「社團總覽」新增社團的既有流程。
+>
+> 順便發現、順便訂正一個上一輪（170）記錯的地方：`ClubListView.vue` 其實**已經有**手動調整社團排序的功能（`moveClub()` 呼叫 `club.swapOrder()`，用上下箭頭按鈕），不是我 170 輪講的「完全沒有這個 UI」——170 輪只 grep 了「上移／下移」這幾個中文字，沒抓到用箭頭圖示的按鈕，判斷有誤，這裡順便更正記錄，避免以後又誤判說系統沒有排序調整功能。
+>
+> **驗證**：`vue-tsc --noEmit`＋`npm run build` 皆通過。
+>
+> **待使用者：** 到 Supabase Dashboard SQL Editor 執行 081 migration；執行後看「地區通訊錄」第二分區確認台北西區扶青社的卡片不見了，「社團總覽」還是看得到、可以正常編輯。之後想要把它加回通訊錄的話，直接跟我說一聲，我再補一筆 `UPDATE clubs SET directory_visible = true WHERE name = '台北西區扶青社'`。
+
 > 最後更新：2026-08-17（第一百七十一輪，**訂正社名「台北新心扶輪社」→「台北新星扶輪社」**）：上一輪留下的問題，使用者確認正確名稱是「新星」。回頭查 [`020_seed_club_directory_from_excel.sql`](supabase/migrations/020_seed_club_directory_from_excel.sql) 的「手動確認對應」註解，發現「新心」本來就是先前某一輪把另一份 Excel 的「台北新星社」對應過去時猜錯／沒人工覆核留下的（該筆聯絡 email `taipeinova.rotary@gmail.com` 帶有「nova」＝新星，side confirm 這次訂正方向正確）。新增 [`080_fix_taipei_nova_club_name.sql`](supabase/migrations/080_fix_taipei_nova_club_name.sql)：`UPDATE clubs SET name='台北新星扶輪社' WHERE name='台北新心扶輪社' AND zone='第十一分區'`，補上「扶輪社」全稱比照其他社的既有命名慣例（不是 Excel 簡稱「台北新星社」）。純改 `clubs.name` 字串，其他表都是用 `club_id` 外鍵關聯不是用名稱比對，不會有牽連影響；`clubs.name` 沒有 UNIQUE constraint，但新名稱目前資料庫裡沒有其他社在用，不會撞名。
 >
 > **驗證**：純 SQL migration，沒有改前端程式碼，不需要 `vue-tsc`/`build`。這個環境連不到 D3481 專案的 Supabase 無法直接執行驗證。
