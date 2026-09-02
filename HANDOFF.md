@@ -10,7 +10,7 @@
 >
 > **驗證**：純 SQL migration，沒有改任何前端程式碼，不需要 `vue-tsc`/`build`。這個環境連不到 D3481 專案的 Supabase，無法直接執行驗證，靠 Python 逐分區比對 Excel 跟 015 seed 的原始文字內容把關（見上方比對結果）。
 >
-> **待使用者：** 到 Supabase Dashboard SQL Editor 執行 079 migration；執行後看「地區通訊錄」跟「社團總覽」，確認各分區社團順序改成創社順序。同時麻煩確認：① 第十一分區最後一筆到底該叫「台北新星社」還是「台北新心扶輪社」（兩個名字哪個對，需要的話我再幫忙訂正資料庫的名稱）；② 第六分區「台北集品社」在資料庫裡實際的名稱是什麼、目前排序是不是已經在本分區最後一位，不是的話告訴我，我再補一筆訂正。
+> **079 migration 已由使用者於 2026-08-17 在 Supabase Dashboard SQL Editor 手動執行完成。②「台北集品社」使用者已確認**：本來就在第六分區最後一位，因為是剛創立的新社，`sort_order` append-to-end 的邏輯本來就對，不用另外補訂正。**①「台北新星社」／「台北新心扶輪社」哪個名字才對，使用者還沒回覆，這題還開著**——下次接手時先來這裡確認完再處理，不要自己猜著去改資料庫的名稱。
 
 > 最後更新：2026-08-17（第一百六十九輪，**社友名冊「社內職稱」新增「CP」（創社社長）**）：使用者要求在「社內職稱」下拉選單新增 CP。查證 `club_position` 欄位在 [`021_roster_member_profile_fields.sql`](supabase/migrations/021_roster_member_profile_fields.sql) 是 DB 層 `CHECK (club_position IN ('PP','IPP','P','VP','PE','S','社友'))`，不是前端憑空列出的選項，光改前端陣列存不進去，一定要連同資料庫約束一起改。新增 [`078_roster_club_position_add_cp.sql`](supabase/migrations/078_roster_club_position_add_cp.sql)：`DROP CONSTRAINT IF EXISTS roster_club_position_check`（021 建立時沒有明確命名，Postgres 自動產生的名稱，021 之後沒有其他 migration 動過，確認可以直接沿用）再重建成含 `CP` 的版本。同步改 `RosterClubPosition` 型別（[`types/index.ts`](src/types/index.ts)）跟 [`RosterView.vue`](src/views/roster/RosterView.vue) 的 `CLUB_POSITIONS` 陣列，`CP` 排在 `PP`／`IPP` 後面（歸類成「歷任／創社」相關的頭銜放一起），`P`／`VP`／`PE`／`S`／`社友` 順序不動。**待使用者到 Supabase Dashboard SQL Editor 手動執行 078 migration**（這個環境連不到 D3481 專案的 Supabase），沒執行的話畫面上雖然選得到 CP，實際存檔會被資料庫的舊 CHECK constraint 擋下來報錯。
 >
